@@ -6,6 +6,9 @@
     <uses-permission android:name="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE"
         tools:ignore="ProtectedPermissions" />
 
+    <!-- For posting our own confirmation notifications (Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
     <application
         android:name=".ExpansesApplication"
         android:allowBackup="true"
@@ -20,6 +23,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
+            android:launchMode="singleTask"
             android:label="@string/app_name"
             android:theme="@style/Theme.Expanses"
             android:windowSoftInputMode="adjustResize">
@@ -46,6 +50,11 @@
                 <action android:name="android.service.notification.NotificationListenerService" />
             </intent-filter>
         </service>
+
+        <!-- BroadcastReceiver for quick-confirming drafts from notification actions -->
+        <receiver
+            android:name=".service.NotificationConfirmReceiver"
+            android:exported="false" />
 
     </application>
 

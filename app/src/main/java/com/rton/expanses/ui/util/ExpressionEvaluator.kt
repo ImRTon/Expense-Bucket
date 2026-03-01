@@ -25,6 +25,7 @@ object ExpressionEvaluator {
         val cleaned = expression
             .replace("×", "*")
             .replace("÷", "/")
+            .replace("−", "-")
             .replace(" ", "")
 
         // Check if it's just a number

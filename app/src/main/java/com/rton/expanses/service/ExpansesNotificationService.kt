@@ -1,10 +1,17 @@
 package com.rton.expanses.service
 
 import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Intent
+import android.os.Build
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
+import androidx.core.app.NotificationCompat
+import com.rton.expanses.MainActivity
+import com.rton.expanses.R
 import com.rton.expanses.data.model.Transaction
 import com.rton.expanses.data.repository.ExpansesRepository
 import com.rton.expanses.ocr.NotificationParser
@@ -13,11 +20,13 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import java.text.NumberFormat
+import java.util.Locale
 import javax.inject.Inject
 
 /**
  * Intercepts notifications from banking / payment apps and
- * creates draft transactions automatically.
+ * shows a heads-up confirmation notification to the user.
  *
  * User must grant notification access in Settings → Notification access.
  */
@@ -26,26 +35,29 @@ class ExpansesNotificationService : NotificationListenerService() {
 
     companion object {
         private const val TAG = "ExpansesNotifSvc"
+        private const val CHANNEL_ID = "expanses_transaction_capture"
+        private const val CHANNEL_NAME = "記帳通知"
 
         /**
          * Package name prefixes of apps we want to intercept.
-         * Add more as needed.
          */
         val WATCHED_PACKAGES = setOf(
             // E-payments
-            "com.jkos.jkopay",         // 街口支付
-            "com.linecorp.linepay",     // LINE Pay
-            "com.linecorp.line",        // LINE (contains LINE Pay notifs)
-            "tw.com.easycard.easygo",   // 悠遊付
-            "com.pi.mobile",            // Pi 拍錢包
-            "com.allpay",               // 全支付
+            "com.jkos.app",             // 街口支付
+            "com.linepaytw.upay",       // LINE Pay
+            "jp.naver.line.android",    // LINE (contains LINE Pay notifs)
+            "com.easycard.wallet",      // 悠遊付
+            "tw.com.pchome.android.pi", // Pi 拍錢包
+            "com.pxpayplus.app",        // 全支付
 
             // Banks
-            "com.taishin.mobile",       // 台新 Richart
+            "tw.com.taishinbank.ccapp", // 台新 Richart Life
             "com.esunbank",             // 玉山銀行
             "com.cathaybk.mymobibank",  // 國泰世華
             "com.ctbcbank.ctbc",        // 中國信託
             "com.fubon.mobilebank",     // 富邦銀行
+            "com.sinopac.DaCard",       // 永豐大咖
+            "wbank.ubot.com.tw",        // 聯邦銀行
 
             // Google Pay / Apple Pay (system-level)
             "com.google.android.apps.nbu.paisa.user",  // Google Pay
@@ -56,11 +68,21 @@ class ExpansesNotificationService : NotificationListenerService() {
 
     private val parser = NotificationParser()
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val currencyFormat = NumberFormat.getCurrencyInstance(Locale("zh", "TW"))
+    private var notificationIdCounter = 10000
+
+    override fun onCreate() {
+        super.onCreate()
+        createNotificationChannel()
+        Log.d(TAG, "Service created, notification channel ready")
+    }
 
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         sbn ?: return
 
         val pkg = sbn.packageName ?: return
+
+        // Step 1: Filter by watched packages
         if (!isWatchedPackage(pkg)) return
 
         val notification = sbn.notification ?: return
@@ -75,18 +97,26 @@ class ExpansesNotificationService : NotificationListenerService() {
             .filter { it.isNotBlank() }
             .joinToString(" ")
 
-        if (combined.isBlank()) return
+        if (combined.isBlank()) {
+            Log.d(TAG, "[$pkg] Empty notification text, skipping")
+            return
+        }
 
-        Log.d(TAG, "Notification from $pkg: $combined")
+        Log.d(TAG, "[$pkg] Intercepted: $combined")
 
-        val parsed = parser.parse(combined, pkg) ?: return
+        // Step 2: Parse with NotificationParser
+        val parsed = parser.parse(combined, pkg)
+        if (parsed == null) {
+            Log.d(TAG, "[$pkg] Parser returned null — no pattern matched")
+            return
+        }
 
-        Log.d(TAG, "Parsed: amount=${parsed.amount}, merchant=${parsed.merchant}")
+        Log.d(TAG, "[$pkg] Parsed: amount=${parsed.amount}, merchant='${parsed.merchant}', isExpense=${parsed.isExpense}")
 
-        // Create draft transaction
+        // Step 3: Insert as draft and show heads-up notification
         serviceScope.launch {
             try {
-                repository.insertTransaction(
+                val transactionId = repository.insertTransaction(
                     Transaction(
                         amount = parsed.amount,
                         note = parsed.merchant.ifBlank { parsed.note },
@@ -97,7 +127,10 @@ class ExpansesNotificationService : NotificationListenerService() {
                         createdAt = System.currentTimeMillis()
                     )
                 )
-                Log.d(TAG, "Draft transaction created: ${parsed.amount}")
+                Log.d(TAG, "Draft created: id=$transactionId, amount=${parsed.amount}")
+
+                // Show heads-up notification to the user
+                showConfirmationNotification(transactionId, parsed)
             } catch (e: Exception) {
                 Log.e(TAG, "Failed to create draft", e)
             }
@@ -106,6 +139,82 @@ class ExpansesNotificationService : NotificationListenerService() {
 
     override fun onNotificationRemoved(sbn: StatusBarNotification?) {
         // no-op
+    }
+
+    // ─── Heads-up notification ──────────────────────────────────────
+
+    private fun showConfirmationNotification(
+        transactionId: Long,
+        parsed: com.rton.expanses.ocr.ParsedTransaction
+    ) {
+        val notifId = notificationIdCounter++
+        val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+
+        val amountText = currencyFormat.format(parsed.amount)
+        val typeText = if (parsed.isExpense) "消費" else "收入"
+        val merchantText = if (parsed.merchant.isNotBlank()) " 於 ${parsed.merchant}" else ""
+
+        // Action 1: Quick confirm (via BroadcastReceiver)
+        val confirmIntent = Intent(this, NotificationConfirmReceiver::class.java).apply {
+            action = NotificationConfirmReceiver.ACTION_CONFIRM
+            putExtra(NotificationConfirmReceiver.EXTRA_TRANSACTION_ID, transactionId)
+            putExtra(NotificationConfirmReceiver.EXTRA_NOTIFICATION_ID, notifId)
+        }
+        val confirmPendingIntent = PendingIntent.getBroadcast(
+            this, transactionId.toInt(), confirmIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        // Action 2: Edit (open app → DraftsScreen)
+        val editIntent = Intent(this, MainActivity::class.java).apply {
+            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
+            putExtra("navigate_to", "drafts")
+        }
+        val editPendingIntent = PendingIntent.getActivity(
+            this, transactionId.toInt() + 50000, editIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle("偵測到${typeText} $amountText")
+            .setContentText("${typeText}${merchantText}，點擊確認記帳")
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setAutoCancel(true)
+            .setContentIntent(editPendingIntent)
+            .addAction(
+                android.R.drawable.ic_menu_save,
+                "✓ 確認記帳",
+                confirmPendingIntent
+            )
+            .addAction(
+                android.R.drawable.ic_menu_edit,
+                "📝 編輯",
+                editPendingIntent
+            )
+            .build()
+
+        nm.notify(notifId, notification)
+        Log.d(TAG, "Heads-up notification shown: id=$notifId")
+    }
+
+    // ─── Helpers ────────────────────────────────────────────────────
+
+    private fun createNotificationChannel() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                CHANNEL_NAME,
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "攔截支付通知並提醒確認記帳"
+                enableLights(true)
+                enableVibration(true)
+            }
+            val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+            nm.createNotificationChannel(channel)
+        }
     }
 
     private fun isWatchedPackage(pkg: String): Boolean {

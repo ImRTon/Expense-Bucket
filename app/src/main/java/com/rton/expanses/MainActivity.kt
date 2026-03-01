@@ -32,24 +32,50 @@ import com.rton.expanses.ui.theme.ExpansesTheme
 import com.rton.expanses.ui.viewmodel.MainViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.content.ContextCompat
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     @Inject lateinit var ocrEngine: OcrEngine
 
+    // Track navigation target from notification deep-link
+    private var pendingNavigateTo: String? = null
+
+    // Must register before CREATED state
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* granted or not — no action needed */ }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        // Request notification permission (Android 13+)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
+
         // Handle share intent (image shared from another app)
         val sharedImageUri = handleShareIntent(intent)
+
+        // Handle deep-link from notification action
+        pendingNavigateTo = intent?.getStringExtra("navigate_to")
 
         setContent {
             ExpansesTheme {
                 ExpansesApp(
                     ocrEngine = ocrEngine,
-                    sharedImageUri = sharedImageUri
+                    sharedImageUri = sharedImageUri,
+                    navigateTo = pendingNavigateTo
                 )
             }
         }
@@ -57,10 +83,19 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
+
         // Handle new share intents when activity already exists
         val uri = handleShareIntent(intent)
         if (uri != null) {
-            setIntent(intent)
+            recreate()
+            return
+        }
+
+        // Handle deep-link from notification
+        val navigateTo = intent.getStringExtra("navigate_to")
+        if (navigateTo != null) {
+            pendingNavigateTo = navigateTo
             recreate()
         }
     }
@@ -70,6 +105,18 @@ class MainActivity : ComponentActivity() {
             return intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri
         }
         return null
+    }
+
+    private fun requestNotificationPermissionIfNeeded() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED
+            ) {
+                registerForActivityResult(
+                    ActivityResultContracts.RequestPermission()
+                ) { /* granted or not */ }.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+        }
     }
 }
 
@@ -96,7 +143,8 @@ private val bottomBarRoutes = bottomNavItems.map { it.route }.toSet()
 @Composable
 fun ExpansesApp(
     ocrEngine: OcrEngine,
-    sharedImageUri: Uri? = null
+    sharedImageUri: Uri? = null,
+    navigateTo: String? = null
 ) {
     val navController = rememberNavController()
     val viewModel: MainViewModel = hiltViewModel()
@@ -120,6 +168,15 @@ fun ExpansesApp(
     LaunchedEffect(sharedImageUri) {
         if (sharedImageUri != null) {
             navController.navigate(Screen.OcrPreview.route) {
+                launchSingleTop = true
+            }
+        }
+    }
+
+    // Navigate to DraftsScreen if opened from notification
+    LaunchedEffect(navigateTo) {
+        if (navigateTo == "drafts") {
+            navController.navigate(Screen.Drafts.route) {
                 launchSingleTop = true
             }
         }

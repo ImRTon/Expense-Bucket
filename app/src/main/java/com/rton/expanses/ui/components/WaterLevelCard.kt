@@ -23,19 +23,19 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.android.awaitFrame
 import kotlinx.coroutines.isActive
 import java.text.NumberFormat
 import java.util.*
 import kotlin.math.*
 
 /**
- * MIUI-style water level balance card.
+ * MIUI-style water level balance card with realistic fluid simulation.
  *
  * - Water level = balance ratio (income vs expense)
- * - Color shifts: green (healthy) → yellow (moderate) → red (low/deficit)
- * - Accelerometer tilts the water surface with fluid-like spring physics
- * - Card background tints with status color so state is visible even with no water
+ * - Color shifts: green (healthy) → yellow → orange → red (deficit)
+ * - Accelerometer tilts water with spring-physics momentum
+ * - Waves are depth-dependent: taller where water is deep, absent where shallow
+ * - Standing-wave sloshing creates visible momentum when device moves
  */
 @Composable
 fun WaterLevelCard(
@@ -102,10 +102,13 @@ fun WaterLevelCard(
     }
 
     // ─── Spring-physics fluid simulation ─────────────────────
-    // Instead of snapping to targetAngle, we simulate a damped spring
-    // so the water "sloshes" with momentum and settles naturally.
+    // Simulates a damped spring so the water "sloshes" with inertia.
     var currentAngle by remember { mutableFloatStateOf(0f) }
     var angularVelocity by remember { mutableFloatStateOf(0f) }
+    // Separate sloshing oscillator: models the fundamental standing wave
+    // in the container (water rocking back and forth as a single hump)
+    var sloshOffset by remember { mutableFloatStateOf(0f) }
+    var sloshVelocity by remember { mutableFloatStateOf(0f) }
 
     LaunchedEffect(Unit) {
         var lastFrameTime = withFrameNanos { it }
@@ -114,41 +117,44 @@ fun WaterLevelCard(
             val dt = ((frameTime - lastFrameTime) / 1_000_000_000f).coerceIn(0f, 0.05f)
             lastFrameTime = frameTime
 
-            // Spring: F = -k*(x - target) - damping*velocity
-            val stiffness = 25f    // how quickly water reacts
-            val damping = 4.5f     // how quickly oscillation dies (lower = more sloshing)
+            // ── Tilt spring ──
+            val stiffness = 20f
+            val damping = 4.5f
             val springForce = stiffness * (targetAngle - currentAngle)
             val dampingForce = -damping * angularVelocity
-            val acceleration = springForce + dampingForce
-
-            angularVelocity += acceleration * dt
+            val accel = springForce + dampingForce
+            angularVelocity += accel * dt
             currentAngle += angularVelocity * dt
+
+            // ── Slosh spring (driven by angular acceleration) ──
+            // Angular acceleration pumps energy into a standing wave.
+            // This oscillator has its own natural frequency and damping,
+            // giving water that characteristic "rock back and forth" motion.
+            val sloshStiffness = 35f   // natural frequency of the slosh
+            val sloshDamping = 3.0f    // how quickly sloshing dies
+            val sloshDrive = accel * 0.8f  // acceleration drives the sloshing
+            val sloshAccel = -sloshStiffness * sloshOffset - sloshDamping * sloshVelocity + sloshDrive
+            sloshVelocity += sloshAccel * dt
+            sloshOffset += sloshVelocity * dt
+            // Clamp to prevent runaway
+            sloshOffset = sloshOffset.coerceIn(-1f, 1f)
         }
     }
 
-    // ─── Wave animation ─────────────────────────────────────
+    // ─── Wave animation (subtle ambient ripple) ──────────────
     val infiniteTransition = rememberInfiniteTransition(label = "wave")
     val wavePhase by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 2f * PI.toFloat(),
         animationSpec = infiniteRepeatable(
-            animation = tween(3000, easing = LinearEasing),
+            animation = tween(4000, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "wavePhase"
     )
-    val wavePhase2 by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 2f * PI.toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(4500, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "wavePhase2"
-    )
 
     // ─── Card background: tinted so state shows even with no water ─
-    val cardBgTop = MaterialTheme.colorScheme.surfaceContainerHighest
+    val cardBgTop = waterColor.copy(alpha = 0.05f)
     val cardBgBottom = waterColor.copy(alpha = 0.15f)
 
     Box(
@@ -158,7 +164,11 @@ fun WaterLevelCard(
             .clip(RoundedCornerShape(24.dp))
             .background(
                 Brush.verticalGradient(
-                    colors = listOf(cardBgTop, cardBgBottom)
+                    colors = listOf(
+                        MaterialTheme.colorScheme.surface,
+                        cardBgTop,
+                        cardBgBottom
+                    )
                 )
             )
     ) {
@@ -167,50 +177,77 @@ fun WaterLevelCard(
             val w = size.width
             val h = size.height
 
-            // Base water line
-            val baseY = h * (1f - animatedLevel * 0.75f)
+            // Total water height in pixels (0 = empty, 0.75*h = full)
+            val waterHeight = h * animatedLevel * 0.75f
 
-            // Real tilt with spring physics (clamped to ±40°)
+            // ── Ambient glow: water emits light so the card never goes dark ──
+            // Always draw a soft glow from the bottom, tinted with waterColor.
+            // Intensity scales with water level but has a minimum so even empty cards glow.
+            val glowAlpha = 0.08f + animatedLevel * 0.12f  // 0.08 when empty, 0.20 when full
+            val glowBrush = Brush.verticalGradient(
+                colors = listOf(
+                    Color.Transparent,
+                    waterColor.copy(alpha = glowAlpha * 0.3f),
+                    waterColor.copy(alpha = glowAlpha)
+                ),
+                startY = h * 0.2f,
+                endY = h
+            )
+            drawRect(brush = glowBrush)
+
+            if (waterHeight < 1f) return@Canvas // no fluid to simulate
+
+            // ── Tilt calculation ──
             val clampedAngle = currentAngle.coerceIn(
-                -40f * PI.toFloat() / 180f,
-                40f * PI.toFloat() / 180f
+                -70f * PI.toFloat() / 180f,
+                70f * PI.toFloat() / 180f
             )
-            val tiltOffset = tan(clampedAngle) * (w / 2f)
+            val rawTiltOffset = tan(clampedAngle) * (w / 2f)
+            // Limit tilt to available water volume
+            val maxDisplacement = min(waterHeight, h - (h - waterHeight))
+            val tiltOffset = rawTiltOffset.coerceIn(-maxDisplacement, maxDisplacement)
 
-            // Layer 1: farthest, slowest, most transparent
-            drawWaveLayer(
-                width = w,
-                height = h,
-                baseY = baseY,
+            // ── Draw 3 wave layers with depth-aware rendering ──
+            drawFluidLayer(
+                width = w, height = h,
+                waterHeight = waterHeight,
                 tiltOffset = tiltOffset,
-                phase = wavePhase,
-                amplitude = 8f,
-                frequency = 1.5f,
-                color = waterColor.copy(alpha = 0.25f)
+                sloshOffset = sloshOffset,
+                angularVelocity = angularVelocity,
+                wavePhase = wavePhase,
+                baseAmplitude = 12f,
+                frequency = 1.8f,
+                layerYShift = 0f,
+                tiltScale = 1.0f,
+                color = waterColor.copy(alpha = 0.3f)
             )
 
-            // Layer 2: middle
-            drawWaveLayer(
-                width = w,
-                height = h,
-                baseY = baseY + 4f,
-                tiltOffset = tiltOffset * 0.85f,
-                phase = wavePhase2 + 1.2f,
-                amplitude = 6f,
-                frequency = 2f,
-                color = waterColor.copy(alpha = 0.4f)
-            )
-
-            // Layer 3: closest, densest
-            drawWaveLayer(
-                width = w,
-                height = h,
-                baseY = baseY + 8f,
-                tiltOffset = tiltOffset * 0.7f,
-                phase = wavePhase + 2.5f,
-                amplitude = 5f,
+            drawFluidLayer(
+                width = w, height = h,
+                waterHeight = waterHeight,
+                tiltOffset = tiltOffset,
+                sloshOffset = sloshOffset,
+                angularVelocity = angularVelocity,
+                wavePhase = wavePhase + 1.8f,
+                baseAmplitude = 9f,
                 frequency = 2.5f,
-                color = waterColor.copy(alpha = 0.55f)
+                layerYShift = 5f,
+                tiltScale = 0.88f,
+                color = waterColor.copy(alpha = 0.45f)
+            )
+
+            drawFluidLayer(
+                width = w, height = h,
+                waterHeight = waterHeight,
+                tiltOffset = tiltOffset,
+                sloshOffset = sloshOffset,
+                angularVelocity = angularVelocity,
+                wavePhase = wavePhase + 3.5f,
+                baseAmplitude = 7f,
+                frequency = 3.2f,
+                layerYShift = 10f,
+                tiltScale = 0.75f,
+                color = waterColor.copy(alpha = 0.6f)
             )
         }
 
@@ -260,29 +297,72 @@ fun WaterLevelCard(
 }
 
 /**
- * Draws a single sine-wave layer filling from wave top to bottom of canvas.
+ * Draws a single fluid layer with physically-correct behavior:
+ *
+ * 1. The water surface tilts based on device angle (tiltOffset)
+ * 2. Wave amplitude is proportional to local water depth (no waves where there's no water)
+ * 3. A standing-wave sloshing component makes the water rock side-to-side with momentum
+ * 4. Small ambient ripples add surface texture
  */
-private fun DrawScope.drawWaveLayer(
+private fun DrawScope.drawFluidLayer(
     width: Float,
     height: Float,
-    baseY: Float,
+    waterHeight: Float,
     tiltOffset: Float,
-    phase: Float,
-    amplitude: Float,
+    sloshOffset: Float,
+    angularVelocity: Float,
+    wavePhase: Float,
+    baseAmplitude: Float,
     frequency: Float,
+    layerYShift: Float,
+    tiltScale: Float,
     color: Color
 ) {
     val path = Path()
     val steps = 80
+    val baseY = height - waterHeight + layerYShift
+    val effectiveTilt = tiltOffset * tiltScale
 
     for (i in 0..steps) {
-        val progress = i.toFloat() / steps
-        val x = width * progress
-        val tilt = tiltOffset * (1f - 2f * progress) // left→right tilt
-        val y = baseY + tilt + amplitude * sin(phase + frequency * 2f * PI.toFloat() * progress)
+        val t = i.toFloat() / steps    // 0.0 (left edge) → 1.0 (right edge)
+        val x = width * t
+
+        // ── 1. Tilt: tilted water surface (linear, like real gravity) ──
+        // At t=0 (left): +tilt, at t=1 (right): -tilt
+        // This means positive tiltOffset raises the left edge.
+        val tiltY = effectiveTilt * (1f - 2f * t)
+
+        // ── 2. Standing wave sloshing (momentum) ──
+        // Fundamental sloshing mode: sin(π·t) creates a single hump
+        // that oscillates based on the slosh spring state.
+        // This is what makes water visibly "rush" to one side.
+        val sloshAmplitude = waterHeight * 0.5f // up to 50% of water height
+        val standingWave = sloshOffset * sloshAmplitude * sin(PI * t).toFloat()
+
+        // ── 3. Calculate local water depth at this x position ──
+        // Water depth = how far from this y-point to the bottom
+        val surfaceY = baseY + tiltY + standingWave
+        val localDepth = (height - surfaceY).coerceAtLeast(0f)
+        // Normalize: 0 = dry, 1 = max depth
+        val depthRatio = (localDepth / height).coerceIn(0f, 1f)
+
+        // ── 4. Depth-proportional ripple waves ──
+        // Waves are only visible where there's water.
+        // Deeper water = taller waves. Shallow/dry = flat surface.
+        val dynamicAmplitude = baseAmplitude * depthRatio * depthRatio
+        // Velocity-boosted waves: sloshing makes waves more chaotic
+        val velocityBoost = min(abs(angularVelocity) * 14f, 35f) * depthRatio
+        val totalAmplitude = dynamicAmplitude + velocityBoost
+
+        val ripple = totalAmplitude * sin(
+            wavePhase + frequency * 2f * PI.toFloat() * t
+        )
+
+        val y = surfaceY + ripple
         if (i == 0) path.moveTo(x, y) else path.lineTo(x, y)
     }
 
+    // Close the path along the bottom edge
     path.lineTo(width, height)
     path.lineTo(0f, height)
     path.close()

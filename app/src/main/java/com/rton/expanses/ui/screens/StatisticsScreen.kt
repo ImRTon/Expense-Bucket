@@ -3,13 +3,16 @@ package com.rton.expanses.ui.screens
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -28,6 +31,14 @@ import com.rton.expanses.ui.util.IconMapper
 import java.text.NumberFormat
 import java.util.*
 
+enum class TimeRange(val label: String) {
+    TODAY("本日"),
+    THIS_WEEK("本週"),
+    THIS_MONTH("本月"),
+    THIS_YEAR("今年"),
+    ALL_TIME("所有")
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StatisticsScreen(
@@ -38,9 +49,63 @@ fun StatisticsScreen(
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("zh", "TW")) }
     val categoryMap = remember(categories) { categories.associateBy { it.id } }
 
+    var selectedRange by remember { mutableStateOf(TimeRange.THIS_MONTH) }
+
+    // Filter transactions based on selected range
+    val filteredTransactions = remember(transactions, selectedRange) {
+        val now = System.currentTimeMillis()
+        val calendar = Calendar.getInstance().apply { timeInMillis = now }
+
+        val (startTime, endTime) = when (selectedRange) {
+            TimeRange.TODAY -> {
+                calendar.set(Calendar.HOUR_OF_DAY, 0)
+                calendar.set(Calendar.MINUTE, 0)
+                calendar.set(Calendar.SECOND, 0)
+                calendar.set(Calendar.MILLISECOND, 0)
+                val start = calendar.timeInMillis
+                calendar.add(Calendar.DAY_OF_MONTH, 1)
+                calendar.timeInMillis - 1 to start
+                start to calendar.timeInMillis - 1
+            }
+            TimeRange.THIS_WEEK -> {
+                calendar.set(Calendar.DAY_OF_WEEK, calendar.firstDayOfWeek)
+                calendar.set(Calendar.HOUR_OF_DAY, 0)
+                calendar.set(Calendar.MINUTE, 0)
+                calendar.set(Calendar.SECOND, 0)
+                calendar.set(Calendar.MILLISECOND, 0)
+                val start = calendar.timeInMillis
+                calendar.add(Calendar.WEEK_OF_YEAR, 1)
+                start to calendar.timeInMillis - 1
+            }
+            TimeRange.THIS_MONTH -> {
+                calendar.set(Calendar.DAY_OF_MONTH, 1)
+                calendar.set(Calendar.HOUR_OF_DAY, 0)
+                calendar.set(Calendar.MINUTE, 0)
+                calendar.set(Calendar.SECOND, 0)
+                calendar.set(Calendar.MILLISECOND, 0)
+                val start = calendar.timeInMillis
+                calendar.add(Calendar.MONTH, 1)
+                start to calendar.timeInMillis - 1
+            }
+            TimeRange.THIS_YEAR -> {
+                calendar.set(Calendar.DAY_OF_YEAR, 1)
+                calendar.set(Calendar.HOUR_OF_DAY, 0)
+                calendar.set(Calendar.MINUTE, 0)
+                calendar.set(Calendar.SECOND, 0)
+                calendar.set(Calendar.MILLISECOND, 0)
+                val start = calendar.timeInMillis
+                calendar.add(Calendar.YEAR, 1)
+                start to calendar.timeInMillis - 1
+            }
+            TimeRange.ALL_TIME -> 0L to Long.MAX_VALUE
+        }
+
+        transactions.filter { it.date in startTime..endTime }
+    }
+
     // Calculate category totals for expenses
-    val categoryTotals = remember(transactions) {
-        transactions
+    val categoryTotals = remember(filteredTransactions) {
+        filteredTransactions
             .filter { it.isExpense && !it.isDraft }
             .groupBy { it.categoryId }
             .mapValues { (_, txs) -> txs.sumOf { it.amount } }
@@ -75,6 +140,34 @@ fun StatisticsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // ─── Filter Chips ───────────────────────────────────
+            item {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(bottom = 8.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    TimeRange.values().forEach { range ->
+                        FilterChip(
+                            selected = selectedRange == range,
+                            onClick = { selectedRange = range },
+                            label = { Text(range.label) },
+                            leadingIcon = if (selectedRange == range) {
+                                {
+                                    Icon(
+                                        imageVector = Icons.Filled.Check,
+                                        contentDescription = "Selected",
+                                        modifier = Modifier.size(FilterChipDefaults.IconSize)
+                                    )
+                                }
+                            } else null
+                        )
+                    }
+                }
+            }
+
             // ─── Donut Chart ────────────────────────────────────
             item {
                 Card(
@@ -90,7 +183,7 @@ fun StatisticsScreen(
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
                         Text(
-                            "本月支出",
+                            "${selectedRange.label}支出",
                             style = MaterialTheme.typography.labelLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
