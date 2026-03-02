@@ -37,14 +37,19 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import kotlinx.coroutines.flow.MutableStateFlow
+import java.io.File
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
     @Inject lateinit var ocrEngine: OcrEngine
 
-    // Track navigation target from notification deep-link
-    private var pendingNavigateTo: String? = null
+    /** Reactive state for shared image URI — drives navigation + OCR without recreate(). */
+    private val _sharedImageUri = MutableStateFlow<Uri?>(null)
+
+    /** Reactive state for notification deep-link target. */
+    private val _pendingNavigateTo = MutableStateFlow<String?>(null)
 
     // Must register before CREATED state
     private val notificationPermissionLauncher = registerForActivityResult(
@@ -65,17 +70,22 @@ class MainActivity : ComponentActivity() {
         }
 
         // Handle share intent (image shared from another app)
-        val sharedImageUri = handleShareIntent(intent)
+        _sharedImageUri.value = handleShareIntent(intent)
 
         // Handle deep-link from notification action
-        pendingNavigateTo = intent?.getStringExtra("navigate_to")
+        _pendingNavigateTo.value = intent?.getStringExtra("navigate_to")
 
         setContent {
+            val sharedImageUri by _sharedImageUri.collectAsState()
+            val navigateTo by _pendingNavigateTo.collectAsState()
+
             ExpansesTheme {
                 ExpansesApp(
                     ocrEngine = ocrEngine,
                     sharedImageUri = sharedImageUri,
-                    navigateTo = pendingNavigateTo
+                    navigateTo = navigateTo,
+                    onSharedImageConsumed = { _sharedImageUri.value = null },
+                    onNavigateToConsumed = { _pendingNavigateTo.value = null }
                 )
             }
         }
@@ -85,37 +95,61 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         setIntent(intent)
 
-        // Handle new share intents when activity already exists
+        // Handle new share intents — no recreate() needed, StateFlow drives recomposition
         val uri = handleShareIntent(intent)
         if (uri != null) {
-            recreate()
+            _sharedImageUri.value = uri
             return
         }
 
         // Handle deep-link from notification
         val navigateTo = intent.getStringExtra("navigate_to")
         if (navigateTo != null) {
-            pendingNavigateTo = navigateTo
-            recreate()
+            _pendingNavigateTo.value = navigateTo
         }
     }
 
+    /**
+     * Extract shared image from intent and copy to internal cache.
+     * Copying immediately ensures we have a readable file:// URI even after
+     * the temporary content URI permission expires (e.g. after recreate / config change).
+     */
     private fun handleShareIntent(intent: Intent?): Uri? {
-        if (intent?.action == Intent.ACTION_SEND && intent.type?.startsWith("image/") == true) {
-            return intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri
+        if (intent?.action != Intent.ACTION_SEND || intent.type?.startsWith("image/") != true) {
+            return null
         }
-        return null
+
+        val sourceUri: Uri? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+        } else {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri
+        }
+
+        return sourceUri?.let { copyToCache(it) }
     }
 
-    private fun requestNotificationPermissionIfNeeded() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED
-            ) {
-                registerForActivityResult(
-                    ActivityResultContracts.RequestPermission()
-                ) { /* granted or not */ }.launch(Manifest.permission.POST_NOTIFICATIONS)
+    /**
+     * Copy a content:// URI to the app's cache directory so OCR can access it
+     * without depending on the caller's temporary read permission grant.
+     */
+    private fun copyToCache(sourceUri: Uri): Uri? {
+        return try {
+            // Clean up previous shared images
+            cacheDir.listFiles()
+                ?.filter { it.name.startsWith("shared_ocr_") }
+                ?.forEach { it.delete() }
+
+            val destFile = File(cacheDir, "shared_ocr_${System.currentTimeMillis()}.jpg")
+            contentResolver.openInputStream(sourceUri)?.use { input ->
+                destFile.outputStream().use { output ->
+                    input.copyTo(output)
+                }
             }
+            Uri.fromFile(destFile)
+        } catch (e: Exception) {
+            // If copy fails (e.g. permission already revoked), return null
+            null
         }
     }
 }
@@ -144,7 +178,9 @@ private val bottomBarRoutes = bottomNavItems.map { it.route }.toSet()
 fun ExpansesApp(
     ocrEngine: OcrEngine,
     sharedImageUri: Uri? = null,
-    navigateTo: String? = null
+    navigateTo: String? = null,
+    onSharedImageConsumed: () -> Unit = {},
+    onNavigateToConsumed: () -> Unit = {}
 ) {
     val navController = rememberNavController()
     val viewModel: MainViewModel = hiltViewModel()
@@ -179,6 +215,7 @@ fun ExpansesApp(
             navController.navigate(Screen.Drafts.route) {
                 launchSingleTop = true
             }
+            onNavigateToConsumed()
         }
     }
 
@@ -386,7 +423,10 @@ fun ExpansesApp(
                     paymentMethods = allPaymentMethods,
                     ocrEngine = ocrEngine,
                     onSave = { viewModel.addTransaction(it) },
-                    onBack = { navController.popBackStack() }
+                    onBack = {
+                        onSharedImageConsumed()
+                        navController.popBackStack()
+                    }
                 )
             }
 
