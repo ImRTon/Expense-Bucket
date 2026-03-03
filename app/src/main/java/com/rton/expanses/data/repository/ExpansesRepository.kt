@@ -59,6 +59,7 @@ class ExpansesRepository @Inject constructor(
     suspend fun insertCategory(category: Category): Long = categoryDao.insertCategory(category)
     suspend fun insertCategories(categories: List<Category>) = categoryDao.insertCategories(categories)
     suspend fun updateCategory(category: Category) = categoryDao.updateCategory(category)
+    suspend fun updateCategories(categories: List<Category>) = categoryDao.updateCategories(categories)
     suspend fun deleteCategory(category: Category) = categoryDao.deleteCategory(category)
     suspend fun deleteSubCategories(parentId: Long) = categoryDao.deleteSubCategories(parentId)
 

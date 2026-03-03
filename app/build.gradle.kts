@@ -69,6 +69,7 @@ dependencies {
 
     // Navigation
     implementation(libs.androidx.navigation.compose)
+    implementation(libs.reorderable)
 
     // Hilt
     implementation(libs.hilt.android)

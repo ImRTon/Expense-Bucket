@@ -410,6 +410,7 @@ fun ExpansesApp(
                     categories = allCategories,
                     onAddCategory = { viewModel.addCategory(it) },
                     onUpdateCategory = { viewModel.updateCategory(it) },
+                    onUpdateCategories = { viewModel.updateCategories(it) },
                     onDeleteCategory = { viewModel.deleteCategory(it) },
                     onBack = { navController.popBackStack() }
                 )

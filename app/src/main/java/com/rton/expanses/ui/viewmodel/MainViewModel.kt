@@ -155,6 +155,10 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { repository.updateCategory(category) }
     }
 
+    fun updateCategories(categories: List<Category>) {
+        viewModelScope.launch { repository.updateCategories(categories) }
+    }
+
     fun deleteCategory(category: Category) {
         viewModelScope.launch {
             // Delete subcategories first if it's a parent

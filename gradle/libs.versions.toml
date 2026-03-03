@@ -15,6 +15,8 @@ hiltNavigationCompose = "1.2.0"
 room = "2.7.1"
 # Navigation
 navigationCompose = "2.8.5"
+# Reorderable
+reorderable = "0.9.6"
 # KSP
 ksp = "2.0.21-1.0.28"
 # Material Icons Extended
@@ -52,6 +54,8 @@ androidx-compose-animation = { group = "androidx.compose.animation", name = "ani
 androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation" }
 # Navigation
 androidx-navigation-compose = { group = "androidx.navigation", name = "navigation-compose", version.ref = "navigationCompose" }
+# Reorderable
+reorderable = { group = "org.burnoutcrew.composereorderable", name = "reorderable", version.ref = "reorderable" }
 # Hilt
 hilt-android = { group = "com.google.dagger", name = "hilt-android", version.ref = "hilt" }
 hilt-android-compiler = { group = "com.google.dagger", name = "hilt-android-compiler", version.ref = "hilt" }

@@ -17,6 +17,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.rton.expanses.data.model.Category
 import com.rton.expanses.ui.util.IconMapper
+import org.burnoutcrew.reorderable.*
+import androidx.compose.ui.draw.shadow
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -24,6 +26,7 @@ fun CategoryManageScreen(
     categories: List<Category>,
     onAddCategory: (Category) -> Unit,
     onUpdateCategory: (Category) -> Unit,
+    onUpdateCategories: (List<Category>) -> Unit,
     onDeleteCategory: (Category) -> Unit,
     onBack: () -> Unit
 ) {
@@ -42,6 +45,46 @@ fun CategoryManageScreen(
             .groupBy { it.parentId }
             .mapValues { (_, v) -> v.sortedBy { it.sortOrder } }
     }
+
+    // Flatten representation for dragging
+    data class FlatCat(val category: Category, val isParent: Boolean, val idGroup: Long)
+    var dragStateList by remember { mutableStateOf(emptyList<FlatCat>()) }
+
+    LaunchedEffect(parentCategories, childCategoriesMap, expandedParentIds) {
+        val list = mutableListOf<FlatCat>()
+        for (p in parentCategories) {
+            list.add(FlatCat(p, true, p.id))
+            if (expandedParentIds.contains(p.id)) {
+                childCategoriesMap[p.id]?.forEach { c -> 
+                    list.add(FlatCat(c, false, p.id)) 
+                }
+            }
+        }
+        dragStateList = list
+    }
+
+    val state = rememberReorderableLazyListState(
+        onMove = { from, to ->
+            dragStateList = dragStateList.toMutableList().apply {
+                add(to.index, removeAt(from.index))
+            }
+        },
+        canDragOver = { draggedOver, dragging ->
+            val draggedItem = dragStateList.getOrNull(dragging.index)
+            val targetItem = dragStateList.getOrNull(draggedOver.index)
+            if (draggedItem == null || targetItem == null) false
+            else if (draggedItem.isParent && targetItem.isParent) true
+            else if (!draggedItem.isParent && !targetItem.isParent && draggedItem.idGroup == targetItem.idGroup) true
+            else false
+        },
+        onDragEnd = { startIndex, endIndex ->
+            // Save updated sorts to database
+            val updatedCategories = dragStateList.mapIndexed { index, flatCat ->
+                flatCat.category.copy(sortOrder = index)
+            }
+            onUpdateCategories(updatedCategories)
+        }
+    )
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -131,49 +174,43 @@ fun CategoryManageScreen(
                 }
             } else {
                 LazyColumn(
+                    state = state.listState,
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
                     verticalArrangement = Arrangement.spacedBy(6.dp),
-                    modifier = Modifier.fillMaxSize()
+                    modifier = Modifier.fillMaxSize().reorderable(state)
                 ) {
-                    parentCategories.forEach { parent ->
-                        val isExpanded = expandedParentIds.contains(parent.id)
-                        val children = childCategoriesMap[parent.id] ?: emptyList()
+                    items(dragStateList, key = { if (it.isParent) "parent_${it.category.id}" else "child_${it.category.id}" }) { flatCat ->
+                        ReorderableItem(state, key = if (flatCat.isParent) "parent_${flatCat.category.id}" else "child_${flatCat.category.id}") { isDragging ->
+                            val elevation = if (isDragging) 8.dp else 0.dp
+                            
+                            Box(modifier = Modifier
+                                .detectReorderAfterLongPress(state)
+                                .shadow(elevation, RoundedCornerShape(14.dp))
+                            ) {
+                                val isExpanded = flatCat.isParent && expandedParentIds.contains(flatCat.category.id)
+                                val children = childCategoriesMap[flatCat.category.id] ?: emptyList()
+                                val childCount = if (flatCat.isParent) children.size else 0
 
-                        // Parent item
-                        item(key = "parent_${parent.id}") {
-                            CategoryListItem(
-                                category = parent,
-                                isParent = true,
-                                isExpanded = isExpanded,
-                                childCount = children.size,
-                                onToggleExpand = {
-                                    expandedParentIds = if (isExpanded) {
-                                        expandedParentIds - parent.id
-                                    } else {
-                                        expandedParentIds + parent.id
-                                    }
-                                },
-                                onEdit = { editingCategory = parent },
-                                onDelete = { onDeleteCategory(parent) },
-                                onAddChild = {
-                                    addAsChildOf = parent
-                                    showAddDialog = true
-                                }
-                            )
-                        }
-
-                        // Children (animated)
-                        if (isExpanded) {
-                            items(children, key = { "child_${it.id}" }) { child ->
                                 CategoryListItem(
-                                    category = child,
-                                    isParent = false,
-                                    isExpanded = false,
-                                    childCount = 0,
-                                    onToggleExpand = {},
-                                    onEdit = { editingCategory = child },
-                                    onDelete = { onDeleteCategory(child) },
-                                    onAddChild = {}
+                                    category = flatCat.category,
+                                    isParent = flatCat.isParent,
+                                    isExpanded = isExpanded,
+                                    childCount = childCount,
+                                    onToggleExpand = {
+                                        if (flatCat.isParent) {
+                                            expandedParentIds = if (isExpanded) {
+                                                expandedParentIds - flatCat.category.id
+                                            } else {
+                                                expandedParentIds + flatCat.category.id
+                                            }
+                                        }
+                                    },
+                                    onEdit = { editingCategory = flatCat.category },
+                                    onDelete = { onDeleteCategory(flatCat.category) },
+                                    onAddChild = {
+                                        addAsChildOf = flatCat.category
+                                        showAddDialog = true
+                                    }
                                 )
                             }
                         }
