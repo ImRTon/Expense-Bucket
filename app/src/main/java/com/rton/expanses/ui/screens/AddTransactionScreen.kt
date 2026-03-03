@@ -12,6 +12,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.ui.platform.LocalView
+import android.view.HapticFeedbackConstants
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -78,9 +80,23 @@ fun AddTransactionScreen(
         }
     }
 
-    val dateFormat = remember { SimpleDateFormat("yyyy/MM/dd  HH:mm", Locale.getDefault()) }
-    val currentDate = remember {
-        dateFormat.format(Date(existingTransaction?.date ?: System.currentTimeMillis()))
+    var selectedDateTime by remember { mutableStateOf(existingTransaction?.date ?: System.currentTimeMillis()) }
+    
+    var showDatePicker by remember { mutableStateOf(false) }
+    var showTimePicker by remember { mutableStateOf(false) }
+    
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = selectedDateTime
+    )
+    val timePickerState = rememberTimePickerState(
+        initialHour = Calendar.getInstance().apply { timeInMillis = selectedDateTime }.get(Calendar.HOUR_OF_DAY),
+        initialMinute = Calendar.getInstance().apply { timeInMillis = selectedDateTime }.get(Calendar.MINUTE),
+        is24Hour = true
+    )
+
+    val view = LocalView.current
+    LaunchedEffect(timePickerState.hour, timePickerState.minute) {
+        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
     }
 
     // Update selectedCategory when isExpense changes (only in add mode)
@@ -125,7 +141,7 @@ fun AddTransactionScreen(
             note = note,
             categoryId = selectedCategory?.id,
             isExpense = isExpense,
-            date = existingTransaction?.date ?: System.currentTimeMillis(),
+            date = selectedDateTime,
             source = existingTransaction?.source ?: "manual",
             projectId = selectedProjectId,
             paymentMethodId = selectedPaymentMethodId,
@@ -319,14 +335,55 @@ fun AddTransactionScreen(
                 }
 
                 // ─── Date display ────────────────────────────────
-                Text(
-                    text = currentDate,
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 20.dp, vertical = 4.dp)
-                )
+                        .padding(horizontal = 16.dp, vertical = 4.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val cal = Calendar.getInstance().apply { timeInMillis = selectedDateTime }
+                    val dFormat = remember { SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()) }
+                    val tFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
+                    
+                    OutlinedCard(
+                        onClick = { showDatePicker = true },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Filled.DateRange,
+                                contentDescription = "選擇日期",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(dFormat.format(cal.time), style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                    OutlinedCard(
+                        onClick = { showTimePicker = true },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Filled.Schedule,
+                                contentDescription = "選擇時間",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(tFormat.format(cal.time), style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
 
                 // ─── Two-Level Category Selector ─────────────────
                 if (parentCategories.isNotEmpty()) {
@@ -613,5 +670,61 @@ fun AddTransactionScreen(
                 )
             }
         }
+    }
+
+    if (showDatePicker) {
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    datePickerState.selectedDateMillis?.let { millis ->
+                        val currentCal = Calendar.getInstance().apply { timeInMillis = selectedDateTime }
+                        val newCal = Calendar.getInstance().apply { timeInMillis = millis }
+                        currentCal.set(Calendar.YEAR, newCal.get(Calendar.YEAR))
+                        currentCal.set(Calendar.MONTH, newCal.get(Calendar.MONTH))
+                        currentCal.set(Calendar.DAY_OF_MONTH, newCal.get(Calendar.DAY_OF_MONTH))
+                        selectedDateTime = currentCal.timeInMillis
+                    }
+                    showDatePicker = false
+                }) {
+                    Text("確定")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDatePicker = false }) {
+                    Text("取消")
+                }
+            }
+        ) {
+            DatePicker(state = datePickerState)
+        }
+    }
+
+    if (showTimePicker) {
+        AlertDialog(
+            onDismissRequest = { showTimePicker = false },
+            title = { Text("選擇時間") },
+            text = {
+                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
+                    TimePicker(state = timePickerState)
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val currentCal = Calendar.getInstance().apply { timeInMillis = selectedDateTime }
+                    currentCal.set(Calendar.HOUR_OF_DAY, timePickerState.hour)
+                    currentCal.set(Calendar.MINUTE, timePickerState.minute)
+                    selectedDateTime = currentCal.timeInMillis
+                    showTimePicker = false
+                }) {
+                    Text("確定")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showTimePicker = false }) {
+                    Text("取消")
+                }
+            }
+        )
     }
 }
