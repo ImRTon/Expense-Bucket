@@ -57,6 +57,18 @@ fun AddTransactionScreen(
     var showNoteField by remember { mutableStateOf(existingTransaction?.note?.isNotBlank() == true) }
     var selectedProjectId by remember { mutableStateOf(existingTransaction?.projectId) }
     var showProjectDropdown by remember { mutableStateOf(false) }
+
+    // Auto-select project whose date range covers today (only in add mode)
+    LaunchedEffect(projects) {
+        if (existingTransaction == null && selectedProjectId == null) {
+            val now = System.currentTimeMillis()
+            val match = projects.firstOrNull { p ->
+                p.isActive && p.startDate != null && p.endDate != null
+                    && now >= p.startDate && now <= p.endDate
+            }
+            if (match != null) selectedProjectId = match.id
+        }
+    }
     var selectedPaymentMethodId by remember {
         mutableStateOf(
             existingTransaction?.paymentMethodId

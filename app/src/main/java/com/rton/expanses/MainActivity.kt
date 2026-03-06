@@ -379,6 +379,7 @@ fun ExpansesApp(
                 arguments = listOf(navArgument("projectId") { type = NavType.LongType })
             ) { backStackEntry ->
                 val projectId = backStackEntry.arguments?.getLong("projectId") ?: return@composable
+                val project = allProjects.find { it.id == projectId }
                 val projectTransactions by viewModel.getTransactionsByProject(projectId)
                     .collectAsStateWithLifecycle(initialValue = emptyList())
                 val projectTotal by viewModel.getProjectExpenseTotal(projectId)
@@ -386,10 +387,12 @@ fun ExpansesApp(
 
                 ProjectDetailScreen(
                     projectId = projectId,
+                    project = project,
                     transactions = projectTransactions,
                     categories = allCategories,
                     totalExpense = projectTotal ?: 0.0,
-                    onBack = { navController.popBackStack() }
+                    onBack = { navController.popBackStack() },
+                    onUpdateProject = { viewModel.updateProject(it) }
                 )
             }
 

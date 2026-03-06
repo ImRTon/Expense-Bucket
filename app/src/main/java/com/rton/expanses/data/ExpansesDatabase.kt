@@ -15,7 +15,7 @@ import com.rton.expanses.data.model.Transaction
 
 @Database(
     entities = [Transaction::class, Category::class, Project::class, PaymentMethod::class],
-    version = 3,
+    version = 4,
     exportSchema = true
 )
 abstract class ExpansesDatabase : RoomDatabase() {
@@ -63,6 +63,17 @@ abstract class ExpansesDatabase : RoomDatabase() {
                 database.execSQL(
                     "ALTER TABLE `categories` ADD COLUMN `parentId` INTEGER DEFAULT NULL"
                 )
+            }
+        }
+
+        /**
+         * Migration from v3 → v4: adds startDate, endDate, budget columns to projects.
+         */
+        val MIGRATION_3_4 = object : Migration(3, 4) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE `projects` ADD COLUMN `startDate` INTEGER DEFAULT NULL")
+                database.execSQL("ALTER TABLE `projects` ADD COLUMN `endDate` INTEGER DEFAULT NULL")
+                database.execSQL("ALTER TABLE `projects` ADD COLUMN `budget` REAL DEFAULT NULL")
             }
         }
     }

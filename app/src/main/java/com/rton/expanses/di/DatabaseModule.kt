@@ -28,7 +28,8 @@ object DatabaseModule {
         )
             .addMigrations(
                 ExpansesDatabase.MIGRATION_1_2,
-                ExpansesDatabase.MIGRATION_2_3
+                ExpansesDatabase.MIGRATION_2_3,
+                ExpansesDatabase.MIGRATION_3_4
             )
             .build()
     }

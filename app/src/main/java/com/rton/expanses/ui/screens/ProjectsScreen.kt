@@ -16,6 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rton.expanses.data.model.Project
+import com.rton.expanses.ui.components.ProjectFormDialog
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -110,16 +111,10 @@ fun ProjectsScreen(
 
     // Add Project Dialog
     if (showAddDialog) {
-        AddProjectDialog(
+        ProjectFormDialog(
             onDismiss = { showAddDialog = false },
-            onConfirm = { name, description, currency ->
-                onAddProject(
-                    Project(
-                        name = name,
-                        description = description,
-                        defaultCurrency = currency
-                    )
-                )
+            onConfirm = { project ->
+                onAddProject(project)
                 showAddDialog = false
             }
         )
@@ -132,6 +127,7 @@ private fun ProjectCard(
     onClick: () -> Unit
 ) {
     val dateFormat = remember { SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()) }
+    val shortDateFormat = remember { SimpleDateFormat("MM/dd", Locale.getDefault()) }
 
     Card(
         onClick = onClick,
@@ -179,8 +175,28 @@ private fun ProjectCard(
                         overflow = TextOverflow.Ellipsis
                     )
                 }
+
+                // Date range
+                val dateRangeText = if (project.startDate != null && project.endDate != null) {
+                    "${shortDateFormat.format(Date(project.startDate))} – ${shortDateFormat.format(Date(project.endDate))}"
+                } else null
+
+                // Budget
+                val budgetText = project.budget?.let {
+                    val fmt = NumberFormat.getNumberInstance(Locale.getDefault())
+                    fmt.maximumFractionDigits = 0
+                    "預算 ${project.defaultCurrency} ${fmt.format(it)}"
+                }
+
                 Text(
-                    "${project.defaultCurrency} · ${dateFormat.format(Date(project.createdAt))}",
+                    buildString {
+                        append(project.defaultCurrency)
+                        if (dateRangeText != null) append(" · $dateRangeText")
+                        if (budgetText != null) append(" · $budgetText")
+                        if (dateRangeText == null && budgetText == null) {
+                            append(" · ${dateFormat.format(Date(project.createdAt))}")
+                        }
+                    },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )
@@ -193,89 +209,4 @@ private fun ProjectCard(
             )
         }
     }
-}
-
-@Composable
-private fun AddProjectDialog(
-    onDismiss: () -> Unit,
-    onConfirm: (name: String, description: String, currency: String) -> Unit
-) {
-    var name by remember { mutableStateOf("") }
-    var description by remember { mutableStateOf("") }
-    var currency by remember { mutableStateOf("JPY") }
-    val currencies = listOf("JPY", "USD", "EUR", "KRW", "GBP", "THB", "VND", "TWD")
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("新增旅行專案") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("專案名稱") },
-                    placeholder = { Text("例如：東京之旅 2026") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-                OutlinedTextField(
-                    value = description,
-                    onValueChange = { description = it },
-                    label = { Text("描述 (選填)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
-                )
-
-                Text(
-                    "預設幣別",
-                    style = MaterialTheme.typography.labelLarge
-                )
-                SingleChoiceSegmentedButtonRow(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    currencies.take(4).forEachIndexed { index, cur ->
-                        SegmentedButton(
-                            selected = currency == cur,
-                            onClick = { currency = cur },
-                            shape = SegmentedButtonDefaults.itemShape(
-                                index = index,
-                                count = 4
-                            ),
-                            label = { Text(cur, style = MaterialTheme.typography.labelSmall) }
-                        )
-                    }
-                }
-                SingleChoiceSegmentedButtonRow(
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    currencies.drop(4).forEachIndexed { index, cur ->
-                        SegmentedButton(
-                            selected = currency == cur,
-                            onClick = { currency = cur },
-                            shape = SegmentedButtonDefaults.itemShape(
-                                index = index,
-                                count = 4
-                            ),
-                            label = { Text(cur, style = MaterialTheme.typography.labelSmall) }
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            Button(
-                onClick = { onConfirm(name, description, currency) },
-                enabled = name.isNotBlank()
-            ) {
-                Text("建立")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("取消")
-            }
-        }
-    )
 }

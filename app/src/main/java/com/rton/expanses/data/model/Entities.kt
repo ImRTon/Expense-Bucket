@@ -42,6 +42,9 @@ data class Project(
     val name: String,
     val description: String = "",
     val defaultCurrency: String = "TWD",
+    val startDate: Long? = null,       // epoch millis, null = 不限
+    val endDate: Long? = null,         // epoch millis, null = 不限
+    val budget: Double? = null,        // 預算金額, null = 不設預算
     val isActive: Boolean = true,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()

@@ -24,4 +24,13 @@ interface ProjectDao {
 
     @Delete
     suspend fun deleteProject(project: Project)
+
+    @Query("""
+        SELECT * FROM projects
+        WHERE isActive = 1
+          AND startDate IS NOT NULL AND endDate IS NOT NULL
+          AND startDate <= :dateMillis AND endDate >= :dateMillis
+        ORDER BY startDate DESC LIMIT 1
+    """)
+    suspend fun getProjectByDate(dateMillis: Long): Project?
 }

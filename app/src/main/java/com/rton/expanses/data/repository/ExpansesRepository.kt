@@ -70,6 +70,7 @@ class ExpansesRepository @Inject constructor(
     suspend fun insertProject(project: Project): Long = projectDao.insertProject(project)
     suspend fun updateProject(project: Project) = projectDao.updateProject(project)
     suspend fun deleteProject(project: Project) = projectDao.deleteProject(project)
+    suspend fun getProjectByDate(dateMillis: Long): Project? = projectDao.getProjectByDate(dateMillis)
 
     // ─── Payment Methods ────────────────────────────────────────────
     fun getAllPaymentMethods(): Flow<List<PaymentMethod>> = paymentMethodDao.getAllPaymentMethods()
