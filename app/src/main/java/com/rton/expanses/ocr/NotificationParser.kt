@@ -66,6 +66,13 @@ class NotificationParser {
             merchantGroup = 1,
             paymentHint = "applepay" // will be overridden by package name
         ),
+        // 永豐大咖/大戶：「xxxx感謝03/06 20:29刷卡台幣539元，商店名稱:悠遊付，實際xxxxx」
+        NotifPattern(
+            regex = Pattern.compile("""刷卡台幣\s*([\d,]+(?:\.\d+)?)\s*元.*?(?:商店名稱|商店)[：:\s]*([^，,]+)"""),
+            amountGroup = 1,
+            merchantGroup = 2,
+            paymentHint = "sinopac"
+        ),
         // 通用格式：「消費 NT$1,234」 or 「扣款 $567」
         NotifPattern(
             regex = Pattern.compile("""(?:消費|扣款|支付|付款)\s*NT?\$?\s*([\d,]+(?:\.\d+)?)"""),
@@ -127,6 +134,7 @@ class NotificationParser {
             "cathaybk" in packageName -> "cathay"
             "ctbcbank" in packageName -> "credit_card"
             "fubon" in packageName -> "credit_card"
+            "sinopac" in packageName -> "sinopac"
             "apple" in packageName -> "applepay"
             "google" in packageName && "pay" in packageName -> "googlepay"
             else -> null
