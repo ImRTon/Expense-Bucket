@@ -253,33 +253,48 @@ fun ExpansesApp(
             }
         }
     ) { innerPadding ->
+        // Map bottom-nav routes to their tab index for directional animation
+        val tabIndexMap = bottomNavItems.mapIndexed { index, item -> item.route to index }.toMap()
+
         NavHost(
             navController = navController,
             startDestination = Screen.Home.route,
             modifier = Modifier.padding(innerPadding),
             enterTransition = {
-                slideIntoContainer(
-                    AnimatedContentTransitionScope.SlideDirection.Left,
-                    tween(300)
-                ) + fadeIn(tween(300))
+                val fromIndex = tabIndexMap[initialState.destination.route]
+                val toIndex = tabIndexMap[targetState.destination.route]
+                val direction = if (fromIndex != null && toIndex != null) {
+                    if (toIndex > fromIndex) AnimatedContentTransitionScope.SlideDirection.Left
+                    else AnimatedContentTransitionScope.SlideDirection.Right
+                } else AnimatedContentTransitionScope.SlideDirection.Left
+                slideIntoContainer(direction, tween(300)) + fadeIn(tween(300))
             },
             exitTransition = {
-                slideOutOfContainer(
-                    AnimatedContentTransitionScope.SlideDirection.Left,
-                    tween(300)
-                ) + fadeOut(tween(300))
+                val fromIndex = tabIndexMap[initialState.destination.route]
+                val toIndex = tabIndexMap[targetState.destination.route]
+                val direction = if (fromIndex != null && toIndex != null) {
+                    if (toIndex > fromIndex) AnimatedContentTransitionScope.SlideDirection.Left
+                    else AnimatedContentTransitionScope.SlideDirection.Right
+                } else AnimatedContentTransitionScope.SlideDirection.Left
+                slideOutOfContainer(direction, tween(300)) + fadeOut(tween(300))
             },
             popEnterTransition = {
-                slideIntoContainer(
-                    AnimatedContentTransitionScope.SlideDirection.Right,
-                    tween(300)
-                ) + fadeIn(tween(300))
+                val fromIndex = tabIndexMap[initialState.destination.route]
+                val toIndex = tabIndexMap[targetState.destination.route]
+                val direction = if (fromIndex != null && toIndex != null) {
+                    if (toIndex < fromIndex) AnimatedContentTransitionScope.SlideDirection.Right
+                    else AnimatedContentTransitionScope.SlideDirection.Left
+                } else AnimatedContentTransitionScope.SlideDirection.Right
+                slideIntoContainer(direction, tween(300)) + fadeIn(tween(300))
             },
             popExitTransition = {
-                slideOutOfContainer(
-                    AnimatedContentTransitionScope.SlideDirection.Right,
-                    tween(300)
-                ) + fadeOut(tween(300))
+                val fromIndex = tabIndexMap[initialState.destination.route]
+                val toIndex = tabIndexMap[targetState.destination.route]
+                val direction = if (fromIndex != null && toIndex != null) {
+                    if (toIndex < fromIndex) AnimatedContentTransitionScope.SlideDirection.Right
+                    else AnimatedContentTransitionScope.SlideDirection.Left
+                } else AnimatedContentTransitionScope.SlideDirection.Right
+                slideOutOfContainer(direction, tween(300)) + fadeOut(tween(300))
             }
         ) {
             // ─── Home ───────────────────────────────────────────────
