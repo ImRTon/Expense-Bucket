@@ -161,7 +161,7 @@ fun WaterLevelCard(
         state = pagerState,
         modifier = modifier
             .fillMaxWidth()
-            .height(220.dp)
+            .height(190.dp)
             .clip(RoundedCornerShape(24.dp))
             .background(
                 Brush.verticalGradient(
@@ -245,7 +245,7 @@ fun WaterLevelCard(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(start = 24.dp, end = 12.dp, top = 16.dp),
+                        .padding(start = 24.dp, end = 12.dp, top = 14.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
@@ -304,7 +304,7 @@ fun WaterLevelCard(
 
                 // Bottom: summary items + page indicator
                 Column(
-                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 16.dp)
+                    modifier = Modifier.padding(start = 24.dp, end = 24.dp, bottom = 14.dp)
                 ) {
                     // Summary items
                     Row(
@@ -326,7 +326,7 @@ fun WaterLevelCard(
                         )
                     }
 
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(8.dp))
 
                     // Page indicator dots
                     Row(
