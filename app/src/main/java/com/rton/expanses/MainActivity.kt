@@ -37,6 +37,7 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
+import com.rton.expanses.data.AppTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.io.File
 
@@ -79,7 +80,10 @@ class MainActivity : ComponentActivity() {
             val sharedImageUri by _sharedImageUri.collectAsState()
             val navigateTo by _pendingNavigateTo.collectAsState()
 
-            ExpansesTheme {
+            val viewModel: MainViewModel = hiltViewModel()
+            val currentTheme by viewModel.currentTheme.collectAsStateWithLifecycle()
+
+            ExpansesTheme(appTheme = currentTheme) {
                 ExpansesApp(
                     ocrEngine = ocrEngine,
                     sharedImageUri = sharedImageUri,
@@ -193,6 +197,7 @@ fun ExpansesApp(
     val incomeCategories by viewModel.incomeCategories.collectAsStateWithLifecycle()
     val periodData by viewModel.periodData.collectAsStateWithLifecycle()
     val monthlyBudget by viewModel.monthlyBudget.collectAsStateWithLifecycle()
+    val currentTheme by viewModel.currentTheme.collectAsStateWithLifecycle()
     val selectedPeriod by viewModel.selectedPeriod.collectAsStateWithLifecycle()
     val periodLabel by viewModel.currentPeriodLabel.collectAsStateWithLifecycle()
     val allProjects by viewModel.allProjects.collectAsStateWithLifecycle()
@@ -415,6 +420,8 @@ fun ExpansesApp(
             // ─── Settings ───────────────────────────────────────────
             composable(Screen.Settings.route) {
                 SettingsScreen(
+                    currentTheme = currentTheme,
+                    onSetTheme = { viewModel.setTheme(it) },
                     monthlyBudget = monthlyBudget,
                     onSetMonthlyBudget = { viewModel.setMonthlyBudget(it) },
                     onNavigateToPaymentMethods = {

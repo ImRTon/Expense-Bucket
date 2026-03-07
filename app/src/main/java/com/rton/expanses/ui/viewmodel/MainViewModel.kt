@@ -3,6 +3,8 @@ package com.rton.expanses.ui.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rton.expanses.data.BudgetDataStore
+import com.rton.expanses.data.AppTheme
+import com.rton.expanses.data.AppSettingsDataStore
 import com.rton.expanses.data.DefaultCategories
 import com.rton.expanses.data.DefaultPaymentMethods
 import com.rton.expanses.data.model.Category
@@ -41,7 +43,8 @@ data class PeriodSummary(
 @HiltViewModel
 class MainViewModel @Inject constructor(
     private val repository: ExpansesRepository,
-    private val budgetDataStore: BudgetDataStore
+    private val budgetDataStore: BudgetDataStore,
+    private val appSettingsDataStore: AppSettingsDataStore
 ) : ViewModel() {
 
     // ─── Categories ─────────────────────────────────────────────────
@@ -179,6 +182,15 @@ class MainViewModel @Inject constructor(
 
     fun setMonthlyBudget(amount: Double) {
         viewModelScope.launch { budgetDataStore.setMonthlyBudget(amount) }
+    }
+
+    // ─── App Theme ──────────────────────────────────────────────────
+    val currentTheme: StateFlow<AppTheme> =
+        appSettingsDataStore.theme
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppTheme.SYSTEM)
+
+    fun setTheme(theme: AppTheme) {
+        viewModelScope.launch { appSettingsDataStore.setTheme(theme) }
     }
 
     // ─── Projects ───────────────────────────────────────────────────

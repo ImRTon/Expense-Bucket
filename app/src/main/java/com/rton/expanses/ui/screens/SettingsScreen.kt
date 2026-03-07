@@ -20,12 +20,16 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.clickable
 import com.rton.expanses.service.ExpansesNotificationService
+import com.rton.expanses.data.AppTheme
 import java.text.NumberFormat
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    currentTheme: AppTheme = AppTheme.SYSTEM,
+    onSetTheme: (AppTheme) -> Unit = {},
     monthlyBudget: Double = 0.0,
     onSetMonthlyBudget: (Double) -> Unit = {},
     onBack: () -> Unit = {},
@@ -33,6 +37,57 @@ fun SettingsScreen(
     onNavigateToCategories: () -> Unit = {}
 ) {
     var showBudgetDialog by remember { mutableStateOf(false) }
+    var showThemeDialog by remember { mutableStateOf(false) }
+
+    // ─── Theme Dialog ──────────────────────────────────────────
+    if (showThemeDialog) {
+        AlertDialog(
+            onDismissRequest = { showThemeDialog = false },
+            title = {
+                Text(
+                    "選擇主題",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.SemiBold
+                    )
+                )
+            },
+            text = {
+                Column {
+                    AppTheme.entries.forEach { themeOption ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onSetTheme(themeOption)
+                                    showThemeDialog = false
+                                }
+                                .padding(vertical = 12.dp)
+                        ) {
+                            RadioButton(
+                                selected = (currentTheme == themeOption),
+                                onClick = {
+                                    onSetTheme(themeOption)
+                                    showThemeDialog = false
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = themeOption.displayName,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showThemeDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
 
     // ─── Budget Dialog ─────────────────────────────────────────
     if (showBudgetDialog) {
@@ -122,7 +177,8 @@ fun SettingsScreen(
             SettingsItem(
                 icon = Icons.Filled.Palette,
                 title = "主題",
-                subtitle = "跟隨系統"
+                subtitle = currentTheme.displayName,
+                onClick = { showThemeDialog = true }
             )
             SettingsItem(
                 icon = Icons.Filled.Language,
