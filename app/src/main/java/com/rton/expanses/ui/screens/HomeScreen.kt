@@ -18,6 +18,8 @@ import com.rton.expanses.data.model.Category
 import com.rton.expanses.data.model.Transaction
 import com.rton.expanses.ui.components.WaterLevelCard
 import com.rton.expanses.ui.components.TransactionListItem
+import com.rton.expanses.ui.viewmodel.PeriodSummary
+import com.rton.expanses.ui.viewmodel.TimePeriod
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -26,8 +28,8 @@ import java.util.*
 fun HomeScreen(
     transactions: List<Transaction>,
     categories: List<Category>,
-    monthlyExpense: Double,
-    monthlyIncome: Double,
+    periodData: Map<TimePeriod, PeriodSummary>,
+    monthlyBudget: Double,
     draftCount: Int,
     onAddClick: () -> Unit,
     onTransactionClick: (Transaction) -> Unit,
@@ -107,11 +109,11 @@ fun HomeScreen(
             contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            // ─── Monthly Summary Card ───────────────────────────
+            // ─── Water Level Card ───────────────────────────────
             item {
                 WaterLevelCard(
-                    expense = monthlyExpense,
-                    income = monthlyIncome,
+                    periodData = periodData,
+                    monthlyBudget = monthlyBudget,
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
             }
@@ -176,3 +178,4 @@ fun HomeScreen(
         }
     }
 }
+

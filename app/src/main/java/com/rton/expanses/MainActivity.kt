@@ -190,8 +190,8 @@ fun ExpansesApp(
     val draftTransactions by viewModel.draftTransactions.collectAsStateWithLifecycle()
     val expenseCategories by viewModel.expenseCategories.collectAsStateWithLifecycle()
     val incomeCategories by viewModel.incomeCategories.collectAsStateWithLifecycle()
-    val monthlyExpense by viewModel.monthlyExpense.collectAsStateWithLifecycle()
-    val monthlyIncome by viewModel.monthlyIncome.collectAsStateWithLifecycle()
+    val periodData by viewModel.periodData.collectAsStateWithLifecycle()
+    val monthlyBudget by viewModel.monthlyBudget.collectAsStateWithLifecycle()
     val allProjects by viewModel.allProjects.collectAsStateWithLifecycle()
     val activeProjects by viewModel.activeProjects.collectAsStateWithLifecycle()
     val allPaymentMethods by viewModel.allPaymentMethods.collectAsStateWithLifecycle()
@@ -302,8 +302,8 @@ fun ExpansesApp(
                 HomeScreen(
                     transactions = transactions,
                     categories = allCategories,
-                    monthlyExpense = monthlyExpense,
-                    monthlyIncome = monthlyIncome,
+                    periodData = periodData,
+                    monthlyBudget = monthlyBudget,
                     draftCount = draftTransactions.size,
                     onAddClick = { navController.navigate(Screen.AddTransaction.route) },
                     onTransactionClick = { transaction ->
@@ -409,6 +409,8 @@ fun ExpansesApp(
             // ─── Settings ───────────────────────────────────────────
             composable(Screen.Settings.route) {
                 SettingsScreen(
+                    monthlyBudget = monthlyBudget,
+                    onSetMonthlyBudget = { viewModel.setMonthlyBudget(it) },
                     onNavigateToPaymentMethods = {
                         navController.navigate(Screen.PaymentMethods.route) {
                             launchSingleTop = true

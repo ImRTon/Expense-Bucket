@@ -84,6 +84,9 @@ dependencies {
     // Accompanist
     implementation(libs.accompanist.permissions)
 
+    // DataStore
+    implementation(libs.datastore.preferences)
+
     // Gson
     implementation(libs.gson)
 

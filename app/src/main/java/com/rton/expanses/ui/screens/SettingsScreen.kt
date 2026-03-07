@@ -21,14 +21,67 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.rton.expanses.service.ExpansesNotificationService
+import java.text.NumberFormat
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
+    monthlyBudget: Double = 0.0,
+    onSetMonthlyBudget: (Double) -> Unit = {},
     onBack: () -> Unit = {},
     onNavigateToPaymentMethods: () -> Unit = {},
     onNavigateToCategories: () -> Unit = {}
 ) {
+    var showBudgetDialog by remember { mutableStateOf(false) }
+
+    // ─── Budget Dialog ─────────────────────────────────────────
+    if (showBudgetDialog) {
+        var budgetText by remember {
+            mutableStateOf(if (monthlyBudget > 0) monthlyBudget.toLong().toString() else "")
+        }
+
+        AlertDialog(
+            onDismissRequest = { showBudgetDialog = false },
+            title = { Text("設定月預算") },
+            text = {
+                Column {
+                    Text(
+                        "設定每月預算金額，用於「支出/預算」水位顯示",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = budgetText,
+                        onValueChange = { newValue ->
+                            if (newValue.isEmpty() || newValue.all { it.isDigit() || it == '.' }) {
+                                budgetText = newValue
+                            }
+                        },
+                        label = { Text("月預算金額") },
+                        prefix = { Text("NT$ ") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    val amount = budgetText.toDoubleOrNull() ?: 0.0
+                    onSetMonthlyBudget(amount)
+                    showBudgetDialog = false
+                }) {
+                    Text("確定")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showBudgetDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
     Scaffold(
         contentWindowInsets = WindowInsets(0),
         topBar = {
@@ -80,6 +133,16 @@ fun SettingsScreen(
                 icon = Icons.Filled.AttachMoney,
                 title = "預設幣別",
                 subtitle = "TWD"
+            )
+            SettingsItem(
+                icon = Icons.Filled.AccountBalanceWallet,
+                title = "月預算",
+                subtitle = if (monthlyBudget > 0) {
+                    "NT$ ${NumberFormat.getNumberInstance().apply { maximumFractionDigits = 0 }.format(monthlyBudget)}"
+                } else {
+                    "未設定"
+                },
+                onClick = { showBudgetDialog = true }
             )
             SettingsItem(
                 icon = Icons.Filled.Category,
