@@ -77,8 +77,9 @@ fun AddTransactionScreen(
         )
     }
 
-    // ─── Two-level category state ────────────────────────────
+    // ─── Two-level category and payment methods state ────────────────────────────
     var expandedParentId by remember { mutableStateOf<Long?>(null) }
+    var expandedPaymentParentId by remember { mutableStateOf<Long?>(null) }
 
     // ─── Numpad visibility state ─────────────────────────────
     var showNumpad by remember { mutableStateOf(true) }
@@ -127,12 +128,28 @@ fun AddTransactionScreen(
         }
     }
 
-    // Derive parent and child categories
     val parentCategories = remember(categories, isExpense) {
         categories.filter { it.isExpense == isExpense && it.parentId == null }
     }
     val childCategoriesMap = remember(categories) {
         categories.filter { it.parentId != null }.groupBy { it.parentId }
+    }
+
+    val parentPaymentMethods = remember(paymentMethods) {
+        paymentMethods.filter { it.parentId == null }.sortedBy { it.sortOrder }
+    }
+    val childPaymentMethodsMap = remember(paymentMethods) {
+        paymentMethods.filter { it.parentId != null }.groupBy { it.parentId }
+    }
+
+    // Resolve selected payment method parent for UI initialization
+    LaunchedEffect(selectedPaymentMethodId, paymentMethods) {
+        if (selectedPaymentMethodId != null && expandedPaymentParentId == null) {
+            val selectedMethod = paymentMethods.find { it.id == selectedPaymentMethodId }
+            if (selectedMethod?.parentId != null) {
+                expandedPaymentParentId = selectedMethod.parentId
+            }
+        }
     }
 
     // Can save?
@@ -493,41 +510,109 @@ fun AddTransactionScreen(
                     }
                 }
 
-                // ─── Payment Method Selector ─────────────────────
-                if (paymentMethods.isNotEmpty()) {
+                // ─── Two-Level Payment Method Selector ─────────────────────
+                if (parentPaymentMethods.isNotEmpty()) {
                     Text(
                         "支付工具",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 20.dp, top = 12.dp, bottom = 6.dp)
                     )
+                    // Parent payment methods
                     Row(
                         modifier = Modifier
                             .horizontalScroll(rememberScrollState())
                             .padding(horizontal = 16.dp),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        paymentMethods.forEach { method ->
-                            val isSelected = selectedPaymentMethodId == method.id
-                            val color = Color(method.color)
+                        parentPaymentMethods.forEach { parent ->
+                            val chipColor = Color(parent.color)
+                            val isParentSelected = expandedPaymentParentId == parent.id ||
+                                (selectedPaymentMethodId != null && paymentMethods.find { it.id == selectedPaymentMethodId }?.parentId == parent.id) ||
+                                selectedPaymentMethodId == parent.id
+                                
                             FilterChip(
-                                selected = isSelected,
-                                onClick = { selectedPaymentMethodId = method.id },
-                                label = { Text(method.name, style = MaterialTheme.typography.labelMedium) },
+                                selected = isParentSelected,
+                                onClick = {
+                                    val children = childPaymentMethodsMap[parent.id]
+                                    if (children.isNullOrEmpty()) {
+                                        selectedPaymentMethodId = parent.id
+                                        expandedPaymentParentId = null
+                                    } else {
+                                        expandedPaymentParentId = if (expandedPaymentParentId == parent.id) null else parent.id
+                                    }
+                                },
+                                label = { Text(parent.name, style = MaterialTheme.typography.labelMedium) },
                                 leadingIcon = {
                                     Icon(
-                                        PaymentIconMapper.getIcon(method.icon),
+                                        PaymentIconMapper.getIcon(parent.icon),
                                         contentDescription = null,
                                         modifier = Modifier.size(16.dp),
-                                        tint = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer
-                                        else color
+                                        tint = if (isParentSelected) Color.White else chipColor
                                     )
                                 },
                                 colors = FilterChipDefaults.filterChipColors(
-                                    selectedContainerColor = color.copy(alpha = 0.2f),
-                                    selectedLabelColor = MaterialTheme.colorScheme.onSurface,
-                                    selectedLeadingIconColor = color
+                                    containerColor = chipColor.copy(alpha = 0.1f),
+                                    labelColor = chipColor,
+                                    selectedContainerColor = chipColor,
+                                    selectedLabelColor = Color.White
+                                ),
+                                border = FilterChipDefaults.filterChipBorder(
+                                    borderColor = chipColor.copy(alpha = 0.3f),
+                                    selectedBorderColor = chipColor,
+                                    enabled = true,
+                                    selected = isParentSelected
                                 )
+                            )
+                        }
+                    }
+
+                    // Child payment methods (animated expand)
+                    AnimatedVisibility(visible = expandedPaymentParentId != null) {
+                        val children = childPaymentMethodsMap[expandedPaymentParentId] ?: emptyList()
+                        if (children.isNotEmpty()) {
+                            Row(
+                                modifier = Modifier
+                                    .horizontalScroll(rememberScrollState())
+                                    .padding(start = 32.dp, end = 16.dp, top = 6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                children.forEach { child ->
+                                    val chipColor = Color(child.color)
+                                    val isSelected = selectedPaymentMethodId == child.id
+                                    AssistChip(
+                                        onClick = { selectedPaymentMethodId = child.id },
+                                        label = { Text(child.name, style = MaterialTheme.typography.labelSmall) },
+                                        colors = AssistChipDefaults.assistChipColors(
+                                            containerColor = if (isSelected) chipColor.copy(alpha = 0.2f)
+                                                else MaterialTheme.colorScheme.surface,
+                                            labelColor = if (isSelected) chipColor
+                                                else MaterialTheme.colorScheme.onSurface
+                                        ),
+                                        border = AssistChipDefaults.assistChipBorder(
+                                            borderColor = if (isSelected) chipColor
+                                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                            enabled = true
+                                        )
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Show selected payment method label
+                    selectedPaymentMethodId?.let { methodId ->
+                        val method = paymentMethods.find { it.id == methodId }
+                        method?.let { m ->
+                            val parentName = if (m.parentId != null) {
+                                parentPaymentMethods.find { it.id == m.parentId }?.name ?: ""
+                            } else ""
+                            val label = if (parentName.isNotBlank()) "$parentName > ${m.name}" else m.name
+                            Text(
+                                "已選: $label",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color(m.color),
+                                modifier = Modifier.padding(start = 20.dp, top = 4.dp)
                             )
                         }
                     }

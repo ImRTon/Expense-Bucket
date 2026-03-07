@@ -16,6 +16,7 @@ data class PaymentMethod(
     val color: Long = 0xFF6B7280,   // ARGB default gray
     val type: String = "cash",       // "cash", "credit", "epay", "other"
     val isDefault: Boolean = false,  // only one should be default
+    val parentId: Long? = null,      // null = parent, non-null = child of that parent
     val sortOrder: Int = 0
 )
 

@@ -10,105 +10,55 @@ import com.rton.expanses.data.model.PaymentMethod
  */
 object DefaultPaymentMethods {
 
-    fun get(): List<PaymentMethod> = listOf(
-        // ─── Cash ──────────────────────────────────────────────
-        PaymentMethod(
-            name = "現金",
-            icon = "cash",
-            color = 0xFF4ADE80,
-            type = "cash",
-            isDefault = true,
-            sortOrder = 0
-        ),
-
-        // ─── Credit Cards ───────────────────────────────────────
-        PaymentMethod(
-            name = "信用卡",
-            icon = "credit_card",
-            color = 0xFF818CF8,
-            type = "credit",
-            sortOrder = 10
-        ),
-        PaymentMethod(
-            name = "Richart JCB",
-            icon = "richart",
-            color = 0xFF60A5FA,
-            type = "credit",
-            sortOrder = 11
-        ),
-        PaymentMethod(
-            name = "玉山 Visa",
-            icon = "esun",
-            color = 0xFFFF8C00,
-            type = "credit",
-            sortOrder = 12
-        ),
-        PaymentMethod(
-            name = "國泰世華",
-            icon = "cathay",
-            color = 0xFF10B981,
-            type = "credit",
-            sortOrder = 13
-        ),
-
-        // ─── E-Payment ─────────────────────────────────────────
-        PaymentMethod(
-            name = "街口支付",
-            icon = "jko",
-            color = 0xFFF59E0B,
-            type = "epay",
-            sortOrder = 20
-        ),
-        PaymentMethod(
-            name = "LINE Pay",
-            icon = "linepay",
-            color = 0xFF22C55E,
-            type = "epay",
-            sortOrder = 21
-        ),
-        PaymentMethod(
-            name = "悠遊付",
-            icon = "easycard",
-            color = 0xFF3B82F6,
-            type = "epay",
-            sortOrder = 22
-        ),
-        PaymentMethod(
-            name = "Apple Pay",
-            icon = "applepay",
-            color = 0xFF1C1C1E,
-            type = "epay",
-            sortOrder = 23
-        ),
-        PaymentMethod(
-            name = "Google Pay",
-            icon = "googlepay",
-            color = 0xFF4285F4,
-            type = "epay",
-            sortOrder = 24
-        ),
-        PaymentMethod(
-            name = "Pi 拍錢包",
-            icon = "pi",
-            color = 0xFFEC4899,
-            type = "epay",
-            sortOrder = 25
-        ),
-        PaymentMethod(
-            name = "全支付",
-            icon = "pay_full",
-            color = 0xFF0EA5E9,
-            type = "epay",
-            sortOrder = 26
-        ),
-
-        // ─── Other ─────────────────────────────────────────────
-        PaymentMethod(
-            name = "銀行轉帳",
-            icon = "bank_transfer",
-            color = 0xFF6B7280,
-            type = "other",
-            sortOrder = 30
-        )
+    data class PaymentMethodSeed(
+        val name: String,
+        val icon: String,
+        val color: Long,
+        val type: String,
+        val isDefault: Boolean = false,
+        val sortOrder: Int = 0,
+        val parentName: String? = null // null = parent
     )
+
+    fun getSeeds(): List<PaymentMethodSeed> = listOf(
+        // ─── Parents ──────────────────────────────────────────────
+        PaymentMethodSeed("現金", "Payments", 0xFF4CAF50, "cash", isDefault = true, sortOrder = 0),
+        PaymentMethodSeed("信用卡", "CreditCard", 0xFF2196F3, "credit", sortOrder = 1),
+        PaymentMethodSeed("電子支付", "PhoneIphone", 0xFFFF9800, "epay", sortOrder = 2),
+        PaymentMethodSeed("其他", "Toll", 0xFF9E9E9E, "other", sortOrder = 3),
+
+        // ─── Children ─────────────────────────────────────────────
+        // Cash (If we want a default child for Cash, but usually standard money isn't subcategorized default, left empty for now)
+
+        // Credit Cards
+        PaymentMethodSeed("Richart JCB", "richart", 0xFF60A5FA, "credit", sortOrder = 10, parentName = "信用卡"),
+        PaymentMethodSeed("玉山 Visa", "esun", 0xFFFF8C00, "credit", sortOrder = 11, parentName = "信用卡"),
+        PaymentMethodSeed("國泰世華", "cathay", 0xFF10B981, "credit", sortOrder = 12, parentName = "信用卡"),
+
+        // E-Payment
+        PaymentMethodSeed("街口支付", "jko", 0xFFF59E0B, "epay", sortOrder = 20, parentName = "電子支付"),
+        PaymentMethodSeed("LINE Pay", "linepay", 0xFF22C55E, "epay", sortOrder = 21, parentName = "電子支付"),
+        PaymentMethodSeed("悠遊付", "easycard", 0xFF3B82F6, "epay", sortOrder = 22, parentName = "電子支付"),
+        PaymentMethodSeed("Apple Pay", "applepay", 0xFF1C1C1E, "epay", sortOrder = 23, parentName = "電子支付"),
+        PaymentMethodSeed("Google Pay", "googlepay", 0xFF4285F4, "epay", sortOrder = 24, parentName = "電子支付"),
+        PaymentMethodSeed("Pi 拍錢包", "pi", 0xFFEC4899, "epay", sortOrder = 25, parentName = "電子支付"),
+        PaymentMethodSeed("全支付", "pay_full", 0xFF0EA5E9, "epay", sortOrder = 26, parentName = "電子支付"),
+
+        // Other
+        PaymentMethodSeed("銀行轉帳", "bank_transfer", 0xFF6B7280, "other", sortOrder = 30, parentName = "其他")
+    )
+
+    fun get(): List<PaymentMethod> = getSeeds()
+        .filter { it.parentName == null }
+        .map { seed ->
+            PaymentMethod(
+                name = seed.name,
+                icon = seed.icon,
+                color = seed.color,
+                type = seed.type,
+                isDefault = seed.isDefault,
+                sortOrder = seed.sortOrder,
+                parentId = null
+            )
+        }
 }

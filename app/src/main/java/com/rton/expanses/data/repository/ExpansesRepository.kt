@@ -74,12 +74,15 @@ class ExpansesRepository @Inject constructor(
 
     // ─── Payment Methods ────────────────────────────────────────────
     fun getAllPaymentMethods(): Flow<List<PaymentMethod>> = paymentMethodDao.getAllPaymentMethods()
+    fun getParentPaymentMethods(): Flow<List<PaymentMethod>> = paymentMethodDao.getParentPaymentMethods()
+    fun getSubPaymentMethods(parentId: Long): Flow<List<PaymentMethod>> = paymentMethodDao.getSubPaymentMethods(parentId)
     suspend fun getPaymentMethodById(id: Long): PaymentMethod? = paymentMethodDao.getPaymentMethodById(id)
     suspend fun getDefaultPaymentMethod(): PaymentMethod? = paymentMethodDao.getDefaultPaymentMethod()
     suspend fun insertPaymentMethod(method: PaymentMethod): Long = paymentMethodDao.insertPaymentMethod(method)
     suspend fun insertPaymentMethods(methods: List<PaymentMethod>) = paymentMethodDao.insertPaymentMethods(methods)
     suspend fun updatePaymentMethod(method: PaymentMethod) = paymentMethodDao.updatePaymentMethod(method)
     suspend fun deletePaymentMethod(method: PaymentMethod) = paymentMethodDao.deletePaymentMethod(method)
+    suspend fun deleteSubPaymentMethods(parentId: Long) = paymentMethodDao.deleteSubPaymentMethods(parentId)
     suspend fun setDefaultPaymentMethod(id: Long) {
         paymentMethodDao.clearAllDefaults()
         paymentMethodDao.setDefault(id)

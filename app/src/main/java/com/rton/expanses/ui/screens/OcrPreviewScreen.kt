@@ -52,6 +52,10 @@ fun OcrPreviewScreen(
     var selectedCategory by remember { mutableStateOf<Category?>(null) }
     var selectedPaymentMethodId by remember { mutableStateOf<Long?>(null) }
 
+    // ─── Two-level category and payment methods state ────────────────────────────
+    var expandedParentId by remember { mutableStateOf<Long?>(null) }
+    var expandedPaymentParentId by remember { mutableStateOf<Long?>(null) }
+
     // Run OCR when screen opens
     LaunchedEffect(imageUri) {
         if (imageUri == null) {
@@ -90,6 +94,29 @@ fun OcrPreviewScreen(
             selectedPaymentMethodId = paymentMethods.firstOrNull { it.isDefault }?.id
                 ?: paymentMethods.first().id
         }
+        
+        // Resolve selected payment method parent for UI initialization
+        if (selectedPaymentMethodId != null && expandedPaymentParentId == null) {
+            val selectedMethod = paymentMethods.find { it.id == selectedPaymentMethodId }
+            if (selectedMethod?.parentId != null) {
+                expandedPaymentParentId = selectedMethod.parentId
+            }
+        }
+    }
+
+    // Derive parent and child payment methods
+    val parentPaymentMethods = remember(paymentMethods) {
+        paymentMethods.filter { it.parentId == null }.sortedBy { it.sortOrder }
+    }
+    val childPaymentMethodsMap = remember(paymentMethods) {
+        paymentMethods.filter { it.parentId != null }.groupBy { it.parentId }
+    }
+
+    val parentCategories = remember(categories, isExpense) {
+        categories.filter { it.isExpense == isExpense && it.parentId == null }
+    }
+    val childCategoriesMap = remember(categories) {
+        categories.filter { it.parentId != null }.groupBy { it.parentId }
     }
 
     Scaffold(
@@ -320,57 +347,179 @@ fun OcrPreviewScreen(
                 )
             }
 
-            // Category selector
-            val filteredCategories = categories.filter { it.isExpense == isExpense }
-            if (filteredCategories.isNotEmpty()) {
+            // Category selector (Two-level)
+            if (parentCategories.isNotEmpty()) {
                 Text(
                     "分類",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                // Parent categories
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    filteredCategories.forEach { cat ->
+                    parentCategories.forEach { parent ->
+                        val chipColor = Color(parent.color)
+                        val isParentSelected = expandedParentId == parent.id ||
+                            selectedCategory?.parentId == parent.id ||
+                            selectedCategory?.id == parent.id
                         FilterChip(
-                            selected = selectedCategory?.id == cat.id,
-                            onClick = { selectedCategory = cat },
-                            label = { Text(cat.name) }
+                            selected = isParentSelected,
+                            onClick = {
+                                val children = childCategoriesMap[parent.id]
+                                if (children.isNullOrEmpty()) {
+                                    selectedCategory = parent
+                                    expandedParentId = null
+                                } else {
+                                    expandedParentId = if (expandedParentId == parent.id) null else parent.id
+                                }
+                            },
+                            label = { Text(parent.name) }
                         )
                     }
+                }
+
+                // Child categories
+                AnimatedVisibility(visible = expandedParentId != null) {
+                    val children = childCategoriesMap[expandedParentId] ?: emptyList()
+                    if (children.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier
+                                .horizontalScroll(rememberScrollState())
+                                .padding(start = 16.dp, top = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            children.forEach { child ->
+                                val chipColor = Color(child.color)
+                                val isSelected = selectedCategory?.id == child.id
+                                AssistChip(
+                                    onClick = { selectedCategory = child },
+                                    label = { Text(child.name, style = MaterialTheme.typography.labelSmall) },
+                                    colors = AssistChipDefaults.assistChipColors(
+                                        containerColor = if (isSelected) chipColor.copy(alpha = 0.2f)
+                                        else MaterialTheme.colorScheme.surface,
+                                        labelColor = if (isSelected) chipColor
+                                        else MaterialTheme.colorScheme.onSurface
+                                    ),
+                                    border = AssistChipDefaults.assistChipBorder(
+                                        borderColor = if (isSelected) chipColor
+                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                        enabled = true
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+                
+                // Selected category label
+                selectedCategory?.let { cat ->
+                    val parentName = if (cat.parentId != null) {
+                        parentCategories.find { it.id == cat.parentId }?.name ?: ""
+                    } else ""
+                    val label = if (parentName.isNotBlank()) "$parentName > ${cat.name}" else cat.name
+                    Text(
+                        "已選: $label",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Color(cat.color),
+                        modifier = Modifier.padding(top = 4.dp)
+                    )
                 }
             }
 
             // Payment method selector
-            if (paymentMethods.isNotEmpty()) {
+            if (parentPaymentMethods.isNotEmpty()) {
                 Text(
                     "支付工具",
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
+                // Parent methods
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
                         .horizontalScroll(rememberScrollState()),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    paymentMethods.forEach { method ->
-                        val color = Color(method.color)
+                    parentPaymentMethods.forEach { parent ->
+                        val isParentSelected = expandedPaymentParentId == parent.id ||
+                            (selectedPaymentMethodId != null && paymentMethods.find { it.id == selectedPaymentMethodId }?.parentId == parent.id) ||
+                            selectedPaymentMethodId == parent.id
+                        val color = Color(parent.color)
+                        
                         FilterChip(
-                            selected = selectedPaymentMethodId == method.id,
-                            onClick = { selectedPaymentMethodId = method.id },
-                            label = { Text(method.name, style = MaterialTheme.typography.labelMedium) },
+                            selected = isParentSelected,
+                            onClick = { 
+                                val children = childPaymentMethodsMap[parent.id]
+                                if (children.isNullOrEmpty()) {
+                                    selectedPaymentMethodId = parent.id
+                                    expandedPaymentParentId = null
+                                } else {
+                                    expandedPaymentParentId = if (expandedPaymentParentId == parent.id) null else parent.id
+                                }
+                            },
+                            label = { Text(parent.name, style = MaterialTheme.typography.labelMedium) },
                             leadingIcon = {
                                 Icon(
-                                    PaymentIconMapper.getIcon(method.icon),
+                                    PaymentIconMapper.getIcon(parent.icon),
                                     contentDescription = null,
                                     modifier = Modifier.size(16.dp),
                                     tint = color
                                 )
                             }
+                        )
+                    }
+                }
+                
+                // Child methods
+                AnimatedVisibility(visible = expandedPaymentParentId != null) {
+                    val children = childPaymentMethodsMap[expandedPaymentParentId] ?: emptyList()
+                    if (children.isNotEmpty()) {
+                        Row(
+                            modifier = Modifier
+                                .horizontalScroll(rememberScrollState())
+                                .padding(start = 16.dp, top = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            children.forEach { child ->
+                                val chipColor = Color(child.color)
+                                val isSelected = selectedPaymentMethodId == child.id
+                                AssistChip(
+                                    onClick = { selectedPaymentMethodId = child.id },
+                                    label = { Text(child.name, style = MaterialTheme.typography.labelSmall) },
+                                    colors = AssistChipDefaults.assistChipColors(
+                                        containerColor = if (isSelected) chipColor.copy(alpha = 0.2f)
+                                        else MaterialTheme.colorScheme.surface,
+                                        labelColor = if (isSelected) chipColor
+                                        else MaterialTheme.colorScheme.onSurface
+                                    ),
+                                    border = AssistChipDefaults.assistChipBorder(
+                                        borderColor = if (isSelected) chipColor
+                                        else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                        enabled = true
+                                    )
+                                )
+                            }
+                        }
+                    }
+                }
+
+                // Show selected payment method label
+                selectedPaymentMethodId?.let { methodId ->
+                    val method = paymentMethods.find { it.id == methodId }
+                    method?.let { m ->
+                        val parentName = if (m.parentId != null) {
+                            parentPaymentMethods.find { it.id == m.parentId }?.name ?: ""
+                        } else ""
+                        val label = if (parentName.isNotBlank()) "$parentName > ${m.name}" else m.name
+                        Text(
+                            "已選: $label",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color(m.color),
+                            modifier = Modifier.padding(top = 4.dp)
                         )
                     }
                 }

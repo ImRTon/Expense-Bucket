@@ -15,7 +15,7 @@ import com.rton.expanses.data.model.Transaction
 
 @Database(
     entities = [Transaction::class, Category::class, Project::class, PaymentMethod::class],
-    version = 4,
+    version = 5,
     exportSchema = true
 )
 abstract class ExpansesDatabase : RoomDatabase() {
@@ -74,6 +74,82 @@ abstract class ExpansesDatabase : RoomDatabase() {
                 database.execSQL("ALTER TABLE `projects` ADD COLUMN `startDate` INTEGER DEFAULT NULL")
                 database.execSQL("ALTER TABLE `projects` ADD COLUMN `endDate` INTEGER DEFAULT NULL")
                 database.execSQL("ALTER TABLE `projects` ADD COLUMN `budget` REAL DEFAULT NULL")
+            }
+        }
+
+        /**
+         * Migration from v4 → v5: adds parentId to payment_methods and populates default parent methods.
+         */
+        val MIGRATION_4_5 = object : Migration(4, 5) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // 1. Add parentId column
+                database.execSQL("ALTER TABLE `payment_methods` ADD COLUMN `parentId` INTEGER DEFAULT NULL")
+
+                // 2. Insert parent categories (現金, 信用卡, 電子支付, 其他)
+                // Note: The ARGB colors are approximate defaults, since we only need them as logic groupings now
+                val cashColor = 0xFF4CAF50.toLong()
+                val creditColor = 0xFF2196F3.toLong()
+                val epayColor = 0xFFFF9800.toLong()
+                val otherColor = 0xFF9E9E9E.toLong()
+
+                // Execute inserts and get their new IDs (using generic icons for parents)
+                val cashId = database.insert("payment_methods", android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE,
+                    android.content.ContentValues().apply {
+                        put("name", "現金")
+                        put("icon", "Payments")
+                        put("color", cashColor)
+                        put("type", "cash")
+                        put("isDefault", 0)
+                        put("sortOrder", 0)
+                        putNull("parentId")
+                    })
+
+                val creditId = database.insert("payment_methods", android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE,
+                    android.content.ContentValues().apply {
+                        put("name", "信用卡")
+                        put("icon", "CreditCard")
+                        put("color", creditColor)
+                        put("type", "credit")
+                        put("isDefault", 0)
+                        put("sortOrder", 1)
+                        putNull("parentId")
+                    })
+
+                val epayId = database.insert("payment_methods", android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE,
+                    android.content.ContentValues().apply {
+                        put("name", "電子支付")
+                        put("icon", "PhoneIphone")
+                        put("color", epayColor)
+                        put("type", "epay")
+                        put("isDefault", 0)
+                        put("sortOrder", 2)
+                        putNull("parentId")
+                    })
+
+                val otherId = database.insert("payment_methods", android.database.sqlite.SQLiteDatabase.CONFLICT_REPLACE,
+                    android.content.ContentValues().apply {
+                        put("name", "其他")
+                        put("icon", "Toll")
+                        put("color", otherColor)
+                        put("type", "other")
+                        put("isDefault", 0)
+                        put("sortOrder", 3)
+                        putNull("parentId")
+                    })
+
+                // 3. Update existing records to link to the new parents based on their 'type'
+                // We only update records that were just made sub-categories (which originally had parentId = NULL before we added it, but let's be safe and check IDs != the ones we just inserted)
+                val updateArgsCash = arrayOf(cashId, "cash", cashId, creditId, epayId, otherId)
+                database.execSQL("UPDATE `payment_methods` SET `parentId` = ? WHERE `type` = ? AND `id` NOT IN (?, ?, ?, ?)", updateArgsCash)
+
+                val updateArgsCredit = arrayOf(creditId, "credit", cashId, creditId, epayId, otherId)
+                database.execSQL("UPDATE `payment_methods` SET `parentId` = ? WHERE `type` = ? AND `id` NOT IN (?, ?, ?, ?)", updateArgsCredit)
+
+                val updateArgsEpay = arrayOf(epayId, "epay", cashId, creditId, epayId, otherId)
+                database.execSQL("UPDATE `payment_methods` SET `parentId` = ? WHERE `type` = ? AND `id` NOT IN (?, ?, ?, ?)", updateArgsEpay)
+
+                val updateArgsOther = arrayOf(otherId, "other", cashId, creditId, epayId, otherId)
+                database.execSQL("UPDATE `payment_methods` SET `parentId` = ? WHERE `type` = ? AND `id` NOT IN (?, ?, ?, ?)", updateArgsOther)
             }
         }
     }

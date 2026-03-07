@@ -9,6 +9,12 @@ interface PaymentMethodDao {
     @Query("SELECT * FROM payment_methods ORDER BY sortOrder ASC, id ASC")
     fun getAllPaymentMethods(): Flow<List<PaymentMethod>>
 
+    @Query("SELECT * FROM payment_methods WHERE parentId IS NULL ORDER BY sortOrder ASC, id ASC")
+    fun getParentPaymentMethods(): Flow<List<PaymentMethod>>
+
+    @Query("SELECT * FROM payment_methods WHERE parentId = :parentId ORDER BY sortOrder ASC, id ASC")
+    fun getSubPaymentMethods(parentId: Long): Flow<List<PaymentMethod>>
+
     @Query("SELECT * FROM payment_methods WHERE id = :id")
     suspend fun getPaymentMethodById(id: Long): PaymentMethod?
 
@@ -26,6 +32,9 @@ interface PaymentMethodDao {
 
     @Delete
     suspend fun deletePaymentMethod(method: PaymentMethod)
+
+    @Query("DELETE FROM payment_methods WHERE parentId = :parentId")
+    suspend fun deleteSubPaymentMethods(parentId: Long)
 
     @Query("UPDATE payment_methods SET isDefault = 0")
     suspend fun clearAllDefaults()

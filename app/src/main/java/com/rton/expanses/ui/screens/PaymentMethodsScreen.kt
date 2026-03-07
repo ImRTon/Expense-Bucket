@@ -31,16 +31,15 @@ fun PaymentMethodsScreen(
     onBack: () -> Unit = {}
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
+    var selectedParentIdForAdd by remember { mutableStateOf<Long?>(null) }
 
-    val grouped = remember(paymentMethods) {
-        mapOf(
-            "cash"   to paymentMethods.filter { it.type == "cash" },
-            "credit" to paymentMethods.filter { it.type == "credit" },
-            "epay"   to paymentMethods.filter { it.type == "epay" },
-            "other"  to paymentMethods.filter { it.type == "other" }
-        )
+    // Group methods: Parents first, then map parentId to their children
+    val parents = remember(paymentMethods) {
+        paymentMethods.filter { it.parentId == null }.sortedBy { it.sortOrder }
     }
-    val typeLabels = mapOf("cash" to "現金", "credit" to "信用卡", "epay" to "電子支付", "other" to "其他")
+    val childrenMap = remember(paymentMethods) {
+        paymentMethods.filter { it.parentId != null }.groupBy { it.parentId }
+    }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -62,7 +61,10 @@ fun PaymentMethodsScreen(
         },
         floatingActionButton = {
             ExtendedFloatingActionButton(
-                onClick = { showAddDialog = true },
+                onClick = {
+                    selectedParentIdForAdd = null
+                    showAddDialog = true
+                },
                 icon = { Icon(Icons.Filled.Add, null) },
                 text = { Text("新增支付工具") },
                 containerColor = MaterialTheme.colorScheme.primary
@@ -76,19 +78,47 @@ fun PaymentMethodsScreen(
             contentPadding = PaddingValues(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            grouped.forEach { (type, methods) ->
-                if (methods.isNotEmpty()) {
-                    item(key = "header_$type") {
+            parents.forEach { parent ->
+                item(key = "parent_${parent.id}") {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 16.dp, bottom = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
-                            typeLabels[type] ?: type,
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                fontWeight = FontWeight.SemiBold
+                            parent.name,
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.Bold
                             ),
                             color = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
+                            modifier = Modifier.weight(1f)
+                        )
+                        IconButton(onClick = {
+                            selectedParentIdForAdd = parent.id
+                            showAddDialog = true
+                        }) {
+                            Icon(
+                                Icons.Filled.Add,
+                                contentDescription = "新增子項目",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+
+                val children = childrenMap[parent.id]?.sortedBy { it.sortOrder } ?: emptyList()
+                if (children.isEmpty()) {
+                    item {
+                        Text(
+                            "尚無子項目",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                            modifier = Modifier.padding(start = 16.dp, bottom = 8.dp)
                         )
                     }
-                    items(methods, key = { it.id }) { method ->
+                } else {
+                    items(children, key = { "child_${it.id}" }) { method ->
                         PaymentMethodItem(
                             method = method,
                             onDelete = { onDelete(method) },
@@ -103,6 +133,7 @@ fun PaymentMethodsScreen(
 
     if (showAddDialog) {
         AddPaymentMethodDialog(
+            parentId = selectedParentIdForAdd,
             onDismiss = { showAddDialog = false },
             onConfirm = { method ->
                 onAdd(method)
@@ -207,6 +238,7 @@ private fun PaymentMethodItem(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AddPaymentMethodDialog(
+    parentId: Long?,
     onDismiss: () -> Unit,
     onConfirm: (PaymentMethod) -> Unit
 ) {
@@ -237,22 +269,24 @@ private fun AddPaymentMethodDialog(
                     value = name,
                     onValueChange = { name = it },
                     label = { Text("名稱") },
-                    placeholder = { Text("例如：街口支付") },
+                    placeholder = { Text(if (parentId != null) "例如：街口支付" else "例如：虛擬貨幣") },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                // Type picker
-                Text("類型", style = MaterialTheme.typography.labelLarge)
-                SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
-                    types.forEachIndexed { index, (key, label) ->
-                        SegmentedButton(
-                            selected = selectedType == key,
-                            onClick = { selectedType = key },
-                            shape = SegmentedButtonDefaults.itemShape(index, types.size),
-                            label = { Text(label, style = MaterialTheme.typography.labelSmall) }
-                        )
+                if (parentId == null) {
+                    // Type picker for parents only
+                    Text("類型", style = MaterialTheme.typography.labelLarge)
+                    SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
+                        types.forEachIndexed { index, (key, label) ->
+                            SegmentedButton(
+                                selected = selectedType == key,
+                                onClick = { selectedType = key },
+                                shape = SegmentedButtonDefaults.itemShape(index, types.size),
+                                label = { Text(label, style = MaterialTheme.typography.labelSmall) }
+                            )
+                        }
                     }
                 }
 
@@ -328,7 +362,8 @@ private fun AddPaymentMethodDialog(
                             name = name.trim(),
                             icon = selectedIcon,
                             color = presetColors[selectedColorIndex],
-                            type = selectedType
+                            type = selectedType,
+                            parentId = parentId
                         )
                     )
                 },

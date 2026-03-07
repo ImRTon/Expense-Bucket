@@ -120,7 +120,41 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             repository.getAllPaymentMethods().first().let { methods ->
                 if (methods.isEmpty()) {
-                    repository.insertPaymentMethods(DefaultPaymentMethods.get())
+                    val seeds = DefaultPaymentMethods.getSeeds()
+                    val parents = seeds.filter { it.parentName == null }
+                    val children = seeds.filter { it.parentName != null }
+
+                    // Insert parents and collect their generated IDs
+                    val parentIdMap = mutableMapOf<String, Long>()
+                    for (parent in parents) {
+                        val id = repository.insertPaymentMethod(
+                            PaymentMethod(
+                                name = parent.name,
+                                icon = parent.icon,
+                                color = parent.color,
+                                type = parent.type,
+                                isDefault = parent.isDefault,
+                                sortOrder = parent.sortOrder,
+                                parentId = null
+                            )
+                        )
+                        parentIdMap[parent.name] = id
+                    }
+
+                    // Insert children with correct parentId
+                    val childMethods = children.mapNotNull { child ->
+                        val parentId = parentIdMap[child.parentName] ?: return@mapNotNull null
+                        PaymentMethod(
+                            name = child.name,
+                            icon = child.icon,
+                            color = child.color,
+                            type = child.type,
+                            isDefault = child.isDefault,
+                            sortOrder = child.sortOrder,
+                            parentId = parentId
+                        )
+                    }
+                    repository.insertPaymentMethods(childMethods)
                 }
             }
         }
@@ -201,12 +235,20 @@ class MainViewModel @Inject constructor(
     }
 
     fun deletePaymentMethod(method: PaymentMethod) {
-        viewModelScope.launch { repository.deletePaymentMethod(method) }
+        viewModelScope.launch {
+            if (method.parentId == null) {
+                repository.deleteSubPaymentMethods(method.id)
+            }
+            repository.deletePaymentMethod(method)
+        }
     }
 
     fun setDefaultPaymentMethod(id: Long) {
         viewModelScope.launch { repository.setDefaultPaymentMethod(id) }
     }
+
+    fun getSubPaymentMethods(parentId: Long): Flow<List<PaymentMethod>> =
+        repository.getSubPaymentMethods(parentId)
 
     // ─── Helpers ────────────────────────────────────────────────────
     private fun getMonthRange(year: Int? = null, month: Int? = null): Pair<Long, Long> {
