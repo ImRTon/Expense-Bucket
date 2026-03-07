@@ -34,7 +34,6 @@ fun HomeScreen(
     onAddClick: () -> Unit,
     onTransactionClick: (Transaction) -> Unit,
     onDeleteTransaction: (Transaction) -> Unit,
-    onNavigateToProjects: () -> Unit,
     onNavigateToDrafts: () -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -76,9 +75,6 @@ fun HomeScreen(
                                 Icon(Icons.Filled.Notifications, contentDescription = "待確認")
                             }
                         }
-                    }
-                    IconButton(onClick = onNavigateToProjects) {
-                        Icon(Icons.Filled.Luggage, contentDescription = "旅行專案")
                     }
                 },
                 windowInsets = WindowInsets(0),

@@ -26,8 +26,7 @@ import java.util.*
 fun ProjectsScreen(
     projects: List<Project>,
     onAddProject: (Project) -> Unit,
-    onProjectClick: (Long) -> Unit,
-    onBack: () -> Unit
+    onProjectClick: (Long) -> Unit
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
 
@@ -42,11 +41,6 @@ fun ProjectsScreen(
                             fontWeight = FontWeight.SemiBold
                         )
                     )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
-                    }
                 },
                 windowInsets = WindowInsets(0),
                 colors = TopAppBarDefaults.topAppBarColors(

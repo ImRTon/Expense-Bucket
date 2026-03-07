@@ -166,7 +166,7 @@ data class BottomNavItem(
 val bottomNavItems = listOf(
     BottomNavItem("首頁",     Icons.Filled.Home,       Screen.Home.route),
     BottomNavItem("統計",     Icons.Filled.PieChart,   Screen.Statistics.route),
-    BottomNavItem("支付工具", Icons.Filled.CreditCard, Screen.PaymentMethods.route),
+    BottomNavItem("專案管理", Icons.Filled.Luggage,    Screen.Projects.route),
     BottomNavItem("設定",     Icons.Filled.Settings,   Screen.Settings.route)
 )
 
@@ -310,7 +310,6 @@ fun ExpansesApp(
                         navController.navigate(Screen.EditTransaction.createRoute(transaction.id))
                     },
                     onDeleteTransaction = { viewModel.deleteTransaction(it) },
-                    onNavigateToProjects = { navController.navigate(Screen.Projects.route) },
                     onNavigateToDrafts = { navController.navigate(Screen.Drafts.route) }
                 )
             }
@@ -368,8 +367,7 @@ fun ExpansesApp(
                     onAddProject = { viewModel.addProject(it) },
                     onProjectClick = { projectId ->
                         navController.navigate(Screen.ProjectDetail.createRoute(projectId))
-                    },
-                    onBack = { navController.popBackStack() }
+                    }
                 )
             }
 
@@ -402,7 +400,8 @@ fun ExpansesApp(
                     paymentMethods = allPaymentMethods,
                     onAdd = { viewModel.addPaymentMethod(it) },
                     onDelete = { viewModel.deletePaymentMethod(it) },
-                    onSetDefault = { viewModel.setDefaultPaymentMethod(it) }
+                    onSetDefault = { viewModel.setDefaultPaymentMethod(it) },
+                    onBack = { navController.popBackStack() }
                 )
             }
 
