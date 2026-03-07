@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.rton.expanses.data.model.Category
 import com.rton.expanses.data.model.Transaction
 import com.rton.expanses.ui.components.WaterLevelCard
@@ -30,7 +31,11 @@ fun HomeScreen(
     categories: List<Category>,
     periodData: Map<TimePeriod, PeriodSummary>,
     monthlyBudget: Double,
+    selectedPeriod: TimePeriod,
+    periodLabel: String,
     draftCount: Int,
+    onSelectPeriod: (TimePeriod) -> Unit,
+    onStepPeriod: (Int) -> Unit,
     onAddClick: () -> Unit,
     onTransactionClick: (Transaction) -> Unit,
     onDeleteTransaction: (Transaction) -> Unit,
@@ -65,6 +70,48 @@ fun HomeScreen(
                     )
                 },
                 actions = {
+                    // Period navigation: ◀ label ▶
+                    if (selectedPeriod != TimePeriod.ALL) {
+                        IconButton(
+                            onClick = { onStepPeriod(-1) },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.ChevronLeft,
+                                contentDescription = "上一期",
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                        Text(
+                            text = periodLabel,
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 13.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        IconButton(
+                            onClick = { onStepPeriod(1) },
+                            modifier = Modifier.size(32.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.ChevronRight,
+                                contentDescription = "下一期",
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
+                    } else {
+                        Text(
+                            text = "全部",
+                            style = MaterialTheme.typography.labelLarge.copy(
+                                fontWeight = FontWeight.Medium,
+                                fontSize = 13.sp
+                            ),
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(end = 8.dp)
+                        )
+                    }
+
                     if (draftCount > 0) {
                         BadgedBox(
                             badge = {
@@ -110,6 +157,13 @@ fun HomeScreen(
                 WaterLevelCard(
                     periodData = periodData,
                     monthlyBudget = monthlyBudget,
+                    selectedPage = TimePeriod.entries.indexOf(selectedPeriod),
+                    onPageChanged = { pageIndex ->
+                        val period = TimePeriod.entries[pageIndex]
+                        if (period != selectedPeriod) {
+                            onSelectPeriod(period)
+                        }
+                    },
                     modifier = Modifier.padding(bottom = 8.dp)
                 )
             }

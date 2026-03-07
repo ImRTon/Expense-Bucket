@@ -13,7 +13,9 @@ import com.rton.expanses.data.repository.ExpansesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
+import java.text.SimpleDateFormat
 import java.util.Calendar
+import java.util.Locale
 import javax.inject.Inject
 
 // ─── Enums for WaterLevelCard ───────────────────────────────────────
@@ -59,6 +61,39 @@ class MainViewModel @Inject constructor(
     val draftTransactions: StateFlow<List<Transaction>> =
         repository.getDraftTransactions()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    // ─── Selected Period (shared by WaterLevelCard & transaction list) ──
+    private val _selectedPeriod = MutableStateFlow(TimePeriod.MONTH)
+    val selectedPeriod: StateFlow<TimePeriod> = _selectedPeriod.asStateFlow()
+
+    private val _periodOffset = MutableStateFlow(0)
+    val periodOffset: StateFlow<Int> = _periodOffset.asStateFlow()
+
+    fun setSelectedPeriod(period: TimePeriod) {
+        _selectedPeriod.value = period
+        _periodOffset.value = 0
+    }
+
+    fun stepPeriod(delta: Int) {
+        if (_selectedPeriod.value == TimePeriod.ALL) return
+        _periodOffset.value += delta
+    }
+
+    /** Human-readable label for the current period+offset, e.g. "2026年3月", "3/1~3/7" */
+    val currentPeriodLabel: StateFlow<String> = combine(
+        _selectedPeriod, _periodOffset
+    ) { period, offset ->
+        formatPeriodLabel(period, offset)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
+
+    /** Transactions filtered by selected period + offset */
+    val filteredTransactions: StateFlow<List<Transaction>> = combine(
+        _selectedPeriod, _periodOffset
+    ) { period, offset ->
+        getDateRangeForPeriod(period, offset)
+    }.flatMapLatest { (start, end) ->
+        repository.getTransactionsByDateRange(start, end)
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // ─── Multi-period totals for WaterLevelCard ─────────────────────
     private val _todayRange = MutableStateFlow(getTodayRange())
@@ -346,32 +381,9 @@ class MainViewModel @Inject constructor(
         repository.getSubPaymentMethods(parentId)
 
     // ─── Date Range Helpers ─────────────────────────────────────────
-    private fun getTodayRange(): Pair<Long, Long> {
-        val cal = Calendar.getInstance()
-        cal.set(Calendar.HOUR_OF_DAY, 0)
-        cal.set(Calendar.MINUTE, 0)
-        cal.set(Calendar.SECOND, 0)
-        cal.set(Calendar.MILLISECOND, 0)
-        val start = cal.timeInMillis
-        cal.add(Calendar.DAY_OF_YEAR, 1)
-        cal.add(Calendar.MILLISECOND, -1)
-        val end = cal.timeInMillis
-        return start to end
-    }
+    private fun getTodayRange(): Pair<Long, Long> = getDateRangeForPeriod(TimePeriod.TODAY, 0)
 
-    private fun getWeekRange(): Pair<Long, Long> {
-        val cal = Calendar.getInstance()
-        cal.set(Calendar.DAY_OF_WEEK, cal.firstDayOfWeek)
-        cal.set(Calendar.HOUR_OF_DAY, 0)
-        cal.set(Calendar.MINUTE, 0)
-        cal.set(Calendar.SECOND, 0)
-        cal.set(Calendar.MILLISECOND, 0)
-        val start = cal.timeInMillis
-        cal.add(Calendar.WEEK_OF_YEAR, 1)
-        cal.add(Calendar.MILLISECOND, -1)
-        val end = cal.timeInMillis
-        return start to end
-    }
+    private fun getWeekRange(): Pair<Long, Long> = getDateRangeForPeriod(TimePeriod.WEEK, 0)
 
     private fun getMonthRange(year: Int? = null, month: Int? = null): Pair<Long, Long> {
         val cal = Calendar.getInstance()
@@ -389,22 +401,94 @@ class MainViewModel @Inject constructor(
         return start to end
     }
 
-    private fun getYearRange(): Pair<Long, Long> {
+    private fun getYearRange(): Pair<Long, Long> = getDateRangeForPeriod(TimePeriod.YEAR, 0)
+
+    private fun getAllRange(): Pair<Long, Long> = 0L to Long.MAX_VALUE
+
+    /**
+     * Computes the date range for a given [period] shifted by [offset].
+     * offset=0 means current, -1 means previous, +1 means next.
+     */
+    private fun getDateRangeForPeriod(period: TimePeriod, offset: Int): Pair<Long, Long> {
         val cal = Calendar.getInstance()
-        cal.set(Calendar.MONTH, Calendar.JANUARY)
-        cal.set(Calendar.DAY_OF_MONTH, 1)
-        cal.set(Calendar.HOUR_OF_DAY, 0)
-        cal.set(Calendar.MINUTE, 0)
-        cal.set(Calendar.SECOND, 0)
-        cal.set(Calendar.MILLISECOND, 0)
-        val start = cal.timeInMillis
-        cal.add(Calendar.YEAR, 1)
-        cal.add(Calendar.MILLISECOND, -1)
-        val end = cal.timeInMillis
-        return start to end
+        when (period) {
+            TimePeriod.TODAY -> {
+                cal.add(Calendar.DAY_OF_YEAR, offset)
+                cal.set(Calendar.HOUR_OF_DAY, 0)
+                cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0)
+                cal.set(Calendar.MILLISECOND, 0)
+                val start = cal.timeInMillis
+                cal.add(Calendar.DAY_OF_YEAR, 1)
+                cal.add(Calendar.MILLISECOND, -1)
+                return start to cal.timeInMillis
+            }
+            TimePeriod.WEEK -> {
+                cal.set(Calendar.DAY_OF_WEEK, cal.firstDayOfWeek)
+                cal.add(Calendar.WEEK_OF_YEAR, offset)
+                cal.set(Calendar.HOUR_OF_DAY, 0)
+                cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0)
+                cal.set(Calendar.MILLISECOND, 0)
+                val start = cal.timeInMillis
+                cal.add(Calendar.WEEK_OF_YEAR, 1)
+                cal.add(Calendar.MILLISECOND, -1)
+                return start to cal.timeInMillis
+            }
+            TimePeriod.MONTH -> {
+                cal.add(Calendar.MONTH, offset)
+                cal.set(Calendar.DAY_OF_MONTH, 1)
+                cal.set(Calendar.HOUR_OF_DAY, 0)
+                cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0)
+                cal.set(Calendar.MILLISECOND, 0)
+                val start = cal.timeInMillis
+                cal.add(Calendar.MONTH, 1)
+                cal.add(Calendar.MILLISECOND, -1)
+                return start to cal.timeInMillis
+            }
+            TimePeriod.YEAR -> {
+                cal.add(Calendar.YEAR, offset)
+                cal.set(Calendar.MONTH, Calendar.JANUARY)
+                cal.set(Calendar.DAY_OF_MONTH, 1)
+                cal.set(Calendar.HOUR_OF_DAY, 0)
+                cal.set(Calendar.MINUTE, 0)
+                cal.set(Calendar.SECOND, 0)
+                cal.set(Calendar.MILLISECOND, 0)
+                val start = cal.timeInMillis
+                cal.add(Calendar.YEAR, 1)
+                cal.add(Calendar.MILLISECOND, -1)
+                return start to cal.timeInMillis
+            }
+            TimePeriod.ALL -> return 0L to Long.MAX_VALUE
+        }
     }
 
-    private fun getAllRange(): Pair<Long, Long> {
-        return 0L to Long.MAX_VALUE
+    /** Formats a human-readable label for the given period + offset. */
+    private fun formatPeriodLabel(period: TimePeriod, offset: Int): String {
+        val cal = Calendar.getInstance()
+        return when (period) {
+            TimePeriod.TODAY -> {
+                cal.add(Calendar.DAY_OF_YEAR, offset)
+                SimpleDateFormat("M/d (E)", Locale.TAIWAN).format(cal.time)
+            }
+            TimePeriod.WEEK -> {
+                cal.set(Calendar.DAY_OF_WEEK, cal.firstDayOfWeek)
+                cal.add(Calendar.WEEK_OF_YEAR, offset)
+                val start = SimpleDateFormat("M/d", Locale.TAIWAN).format(cal.time)
+                cal.add(Calendar.DAY_OF_YEAR, 6)
+                val end = SimpleDateFormat("M/d", Locale.TAIWAN).format(cal.time)
+                "$start ~ $end"
+            }
+            TimePeriod.MONTH -> {
+                cal.add(Calendar.MONTH, offset)
+                SimpleDateFormat("yyyy年M月", Locale.TAIWAN).format(cal.time)
+            }
+            TimePeriod.YEAR -> {
+                cal.add(Calendar.YEAR, offset)
+                SimpleDateFormat("yyyy年", Locale.TAIWAN).format(cal.time)
+            }
+            TimePeriod.ALL -> "全部"
+        }
     }
 }

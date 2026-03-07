@@ -41,14 +41,30 @@ import kotlin.math.*
 fun WaterLevelCard(
     periodData: Map<TimePeriod, PeriodSummary>,
     monthlyBudget: Double,
+    selectedPage: Int = 2,
+    onPageChanged: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     val periods = TimePeriod.entries
     val pagerState = rememberPagerState(
-        initialPage = 2, // default to MONTH
+        initialPage = selectedPage,
         pageCount = { periods.size }
     )
     val currentPeriod = periods[pagerState.currentPage]
+
+    // Sync: external selectedPage -> pager
+    LaunchedEffect(selectedPage) {
+        if (pagerState.currentPage != selectedPage) {
+            pagerState.animateScrollToPage(selectedPage)
+        }
+    }
+
+    // Sync: pager swipe -> external callback
+    LaunchedEffect(pagerState) {
+        snapshotFlow { pagerState.currentPage }.collect { page ->
+            onPageChanged(page)
+        }
+    }
 
     // Compare mode state — force EXPENSE_INCOME on ALL period
     var compareMode by remember { mutableStateOf(CompareMode.EXPENSE_INCOME) }

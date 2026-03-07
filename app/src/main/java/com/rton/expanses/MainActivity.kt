@@ -187,11 +187,14 @@ fun ExpansesApp(
 
     // Collect states
     val transactions by viewModel.allTransactions.collectAsStateWithLifecycle()
+    val filteredTransactions by viewModel.filteredTransactions.collectAsStateWithLifecycle()
     val draftTransactions by viewModel.draftTransactions.collectAsStateWithLifecycle()
     val expenseCategories by viewModel.expenseCategories.collectAsStateWithLifecycle()
     val incomeCategories by viewModel.incomeCategories.collectAsStateWithLifecycle()
     val periodData by viewModel.periodData.collectAsStateWithLifecycle()
     val monthlyBudget by viewModel.monthlyBudget.collectAsStateWithLifecycle()
+    val selectedPeriod by viewModel.selectedPeriod.collectAsStateWithLifecycle()
+    val periodLabel by viewModel.currentPeriodLabel.collectAsStateWithLifecycle()
     val allProjects by viewModel.allProjects.collectAsStateWithLifecycle()
     val activeProjects by viewModel.activeProjects.collectAsStateWithLifecycle()
     val allPaymentMethods by viewModel.allPaymentMethods.collectAsStateWithLifecycle()
@@ -300,11 +303,15 @@ fun ExpansesApp(
             // ─── Home ───────────────────────────────────────────────
             composable(Screen.Home.route) {
                 HomeScreen(
-                    transactions = transactions,
+                    transactions = filteredTransactions,
                     categories = allCategories,
                     periodData = periodData,
                     monthlyBudget = monthlyBudget,
+                    selectedPeriod = selectedPeriod,
+                    periodLabel = periodLabel,
                     draftCount = draftTransactions.size,
+                    onSelectPeriod = { viewModel.setSelectedPeriod(it) },
+                    onStepPeriod = { viewModel.stepPeriod(it) },
                     onAddClick = { navController.navigate(Screen.AddTransaction.route) },
                     onTransactionClick = { transaction ->
                         navController.navigate(Screen.EditTransaction.createRoute(transaction.id))
