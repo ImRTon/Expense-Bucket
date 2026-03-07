@@ -18,6 +18,7 @@ import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.Transaction
 import com.rton.expensebucket.ui.components.WaterLevelCard
 import com.rton.expensebucket.ui.components.TransactionListItem
+import com.rton.expensebucket.ui.viewmodel.CompareMode
 import com.rton.expensebucket.ui.viewmodel.PeriodSummary
 import com.rton.expensebucket.ui.viewmodel.TimePeriod
 import java.text.SimpleDateFormat
@@ -30,6 +31,8 @@ fun HomeScreen(
     categories: List<Category>,
     periodData: Map<TimePeriod, PeriodSummary>,
     monthlyBudget: Double,
+    compareMode: CompareMode,
+    onCompareModeChanged: (CompareMode) -> Unit,
     selectedPeriod: TimePeriod,
     periodLabel: String,
     draftCount: Int,
@@ -62,7 +65,7 @@ fun HomeScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "Expanses",
+                        "Expenses",
                         style = MaterialTheme.typography.headlineMedium.copy(
                             fontWeight = FontWeight.Bold
                         )
@@ -156,6 +159,8 @@ fun HomeScreen(
                 WaterLevelCard(
                     periodData = periodData,
                     monthlyBudget = monthlyBudget,
+                    compareMode = compareMode,
+                    onCompareModeChanged = onCompareModeChanged,
                     selectedPage = TimePeriod.entries.indexOf(selectedPeriod),
                     onPageChanged = { pageIndex ->
                         val period = TimePeriod.entries[pageIndex]

@@ -34,8 +34,8 @@ import javax.inject.Inject
 class ExpenseBucketNotificationService : NotificationListenerService() {
 
     companion object {
-        private const val TAG = "ExpansesNotifSvc"
-        private const val CHANNEL_ID = "expanses_transaction_capture"
+        private const val TAG = "ExpensesNotifSvc"
+        private const val CHANNEL_ID = "expenses_transaction_capture"
         private const val CHANNEL_NAME = "記帳通知"
 
         /**

@@ -26,6 +26,7 @@ class AppSettingsDataStore @Inject constructor(
 ) {
     companion object {
         private val APP_THEME_KEY = stringPreferencesKey("app_theme")
+        private val COMPARE_MODE_KEY = stringPreferencesKey("compare_mode")
     }
 
     val theme: Flow<AppTheme> = context.appSettingsDataStore.data.map { prefs ->
@@ -40,6 +41,16 @@ class AppSettingsDataStore @Inject constructor(
     suspend fun setTheme(theme: AppTheme) {
         context.appSettingsDataStore.edit { prefs ->
             prefs[APP_THEME_KEY] = theme.name
+        }
+    }
+
+    val compareMode: Flow<String> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[COMPARE_MODE_KEY] ?: "EXPENSE_INCOME"
+    }
+
+    suspend fun setCompareMode(mode: String) {
+        context.appSettingsDataStore.edit { prefs ->
+            prefs[COMPARE_MODE_KEY] = mode
         }
     }
 }

@@ -60,7 +60,7 @@ private val LightColorScheme = lightColorScheme(
 )
 
 @Composable
-fun ExpansesTheme(
+fun ExpensesTheme(
     appTheme: AppTheme = AppTheme.SYSTEM,
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit

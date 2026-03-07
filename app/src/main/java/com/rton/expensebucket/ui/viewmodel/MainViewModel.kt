@@ -146,6 +146,16 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { appSettingsDataStore.setTheme(theme) }
     }
 
+    // ─── Compare Mode (persisted) ───────────────────────────────────
+    val compareMode: StateFlow<CompareMode> =
+        appSettingsDataStore.compareMode.map { name ->
+            try { CompareMode.valueOf(name) } catch (_: Exception) { CompareMode.EXPENSE_INCOME }
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), CompareMode.EXPENSE_INCOME)
+
+    fun setCompareMode(mode: CompareMode) {
+        viewModelScope.launch { appSettingsDataStore.setCompareMode(mode.name) }
+    }
+
     // ─── Projects ───────────────────────────────────────────────────
     val activeProjects: StateFlow<List<Project>> =
         repository.getActiveProjects()

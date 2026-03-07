@@ -41,6 +41,8 @@ import kotlin.math.*
 fun WaterLevelCard(
     periodData: Map<TimePeriod, PeriodSummary>,
     monthlyBudget: Double,
+    compareMode: CompareMode,
+    onCompareModeChanged: (CompareMode) -> Unit,
     selectedPage: Int = 2,
     onPageChanged: (Int) -> Unit = {},
     modifier: Modifier = Modifier
@@ -66,8 +68,7 @@ fun WaterLevelCard(
         }
     }
 
-    // Compare mode state — force EXPENSE_INCOME on ALL period
-    var compareMode by remember { mutableStateOf(CompareMode.EXPENSE_INCOME) }
+    // Compare mode — force EXPENSE_INCOME on ALL period
     val effectiveMode = if (currentPeriod == TimePeriod.ALL) {
         CompareMode.EXPENSE_INCOME
     } else {
@@ -274,10 +275,11 @@ fun WaterLevelCard(
                     if (pagePeriod != TimePeriod.ALL) {
                         FilledTonalButton(
                             onClick = {
-                                compareMode = if (compareMode == CompareMode.EXPENSE_INCOME)
+                                val newMode = if (compareMode == CompareMode.EXPENSE_INCOME)
                                     CompareMode.EXPENSE_BUDGET
                                 else
                                     CompareMode.EXPENSE_INCOME
+                                onCompareModeChanged(newMode)
                             },
                             shape = RoundedCornerShape(12.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),

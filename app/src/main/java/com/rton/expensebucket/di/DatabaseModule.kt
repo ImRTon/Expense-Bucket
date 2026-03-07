@@ -24,7 +24,7 @@ object DatabaseModule {
         return Room.databaseBuilder(
             context,
             ExpenseBucketDatabase::class.java,
-            "expanses_database"
+            "expenses_database"
         )
             .addMigrations(
                 ExpenseBucketDatabase.MIGRATION_1_2,

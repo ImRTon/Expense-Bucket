@@ -28,8 +28,9 @@ import androidx.navigation.navArgument
 import com.rton.expensebucket.navigation.Screen
 import com.rton.expensebucket.ocr.OcrEngine
 import com.rton.expensebucket.ui.screens.*
-import com.rton.expensebucket.ui.theme.ExpansesTheme
+import com.rton.expensebucket.ui.theme.ExpensesTheme
 import com.rton.expensebucket.ui.viewmodel.MainViewModel
+import com.rton.expensebucket.ui.viewmodel.CompareMode
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import android.Manifest
@@ -82,8 +83,8 @@ class MainActivity : ComponentActivity() {
             val viewModel: MainViewModel = hiltViewModel()
             val currentTheme by viewModel.currentTheme.collectAsStateWithLifecycle()
 
-            ExpansesTheme(appTheme = currentTheme) {
-                ExpansesApp(
+            ExpensesTheme(appTheme = currentTheme) {
+                ExpensesApp(
                     ocrEngine = ocrEngine,
                     sharedImageUri = sharedImageUri,
                     navigateTo = navigateTo,
@@ -178,7 +179,7 @@ private val bottomBarRoutes = bottomNavItems.map { it.route }.toSet()
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun ExpansesApp(
+fun ExpensesApp(
     ocrEngine: OcrEngine,
     sharedImageUri: Uri? = null,
     navigateTo: String? = null,
@@ -202,6 +203,7 @@ fun ExpansesApp(
     val allProjects by viewModel.allProjects.collectAsStateWithLifecycle()
     val activeProjects by viewModel.activeProjects.collectAsStateWithLifecycle()
     val allPaymentMethods by viewModel.allPaymentMethods.collectAsStateWithLifecycle()
+    val compareMode by viewModel.compareMode.collectAsStateWithLifecycle()
 
     val allCategories = remember(expenseCategories, incomeCategories) {
         expenseCategories + incomeCategories
@@ -311,6 +313,8 @@ fun ExpansesApp(
                     categories = allCategories,
                     periodData = periodData,
                     monthlyBudget = monthlyBudget,
+                    compareMode = compareMode,
+                    onCompareModeChanged = { viewModel.setCompareMode(it) },
                     selectedPeriod = selectedPeriod,
                     periodLabel = periodLabel,
                     draftCount = draftTransactions.size,
