@@ -436,7 +436,9 @@ fun ExpensesApp(
                         navController.navigate(Screen.CategoryManage.route) {
                             launchSingleTop = true
                         }
-                    }
+                    },
+                    onExportData = { ctx, uri, callback -> viewModel.exportData(ctx, uri, callback) },
+                    onImportData = { ctx, uri, callback -> viewModel.importData(ctx, uri, callback) }
                 )
             }
 

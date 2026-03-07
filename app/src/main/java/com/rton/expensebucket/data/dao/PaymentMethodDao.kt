@@ -18,6 +18,9 @@ interface PaymentMethodDao {
     @Query("SELECT * FROM payment_methods WHERE id = :id")
     suspend fun getPaymentMethodById(id: Long): PaymentMethod?
 
+    @Query("SELECT * FROM payment_methods WHERE name = :name LIMIT 1")
+    suspend fun getPaymentMethodByName(name: String): PaymentMethod?
+
     @Query("SELECT * FROM payment_methods WHERE isDefault = 1 LIMIT 1")
     suspend fun getDefaultPaymentMethod(): PaymentMethod?
 

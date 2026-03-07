@@ -56,6 +56,7 @@ class ExpenseBucketRepository @Inject constructor(
     fun getSubCategories(parentId: Long): Flow<List<Category>> =
         categoryDao.getSubCategories(parentId)
     suspend fun getCategoryById(id: Long): Category? = categoryDao.getCategoryById(id)
+    suspend fun getCategoryByNameAndType(name: String, isExpense: Boolean): Category? = categoryDao.getCategoryByNameAndType(name, isExpense)
     suspend fun insertCategory(category: Category): Long = categoryDao.insertCategory(category)
     suspend fun insertCategories(categories: List<Category>) = categoryDao.insertCategories(categories)
     suspend fun updateCategory(category: Category) = categoryDao.updateCategory(category)
@@ -67,6 +68,7 @@ class ExpenseBucketRepository @Inject constructor(
     fun getAllProjects(): Flow<List<Project>> = projectDao.getAllProjects()
     fun getActiveProjects(): Flow<List<Project>> = projectDao.getActiveProjects()
     suspend fun getProjectById(id: Long): Project? = projectDao.getProjectById(id)
+    suspend fun getProjectByName(name: String): Project? = projectDao.getProjectByName(name)
     suspend fun insertProject(project: Project): Long = projectDao.insertProject(project)
     suspend fun updateProject(project: Project) = projectDao.updateProject(project)
     suspend fun deleteProject(project: Project) = projectDao.deleteProject(project)
@@ -77,6 +79,7 @@ class ExpenseBucketRepository @Inject constructor(
     fun getParentPaymentMethods(): Flow<List<PaymentMethod>> = paymentMethodDao.getParentPaymentMethods()
     fun getSubPaymentMethods(parentId: Long): Flow<List<PaymentMethod>> = paymentMethodDao.getSubPaymentMethods(parentId)
     suspend fun getPaymentMethodById(id: Long): PaymentMethod? = paymentMethodDao.getPaymentMethodById(id)
+    suspend fun getPaymentMethodByName(name: String): PaymentMethod? = paymentMethodDao.getPaymentMethodByName(name)
     suspend fun getDefaultPaymentMethod(): PaymentMethod? = paymentMethodDao.getDefaultPaymentMethod()
     suspend fun insertPaymentMethod(method: PaymentMethod): Long = paymentMethodDao.insertPaymentMethod(method)
     suspend fun insertPaymentMethods(methods: List<PaymentMethod>) = paymentMethodDao.insertPaymentMethods(methods)

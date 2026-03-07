@@ -3,7 +3,11 @@ package com.rton.expensebucket.ui.screens
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
+import android.net.Uri
 import android.provider.Settings
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -32,7 +36,9 @@ fun SettingsScreen(
     onSetMonthlyBudget: (Double) -> Unit = {},
     onBack: () -> Unit = {},
     onNavigateToPaymentMethods: () -> Unit = {},
-    onNavigateToCategories: () -> Unit = {}
+    onNavigateToCategories: () -> Unit = {},
+    onExportData: (Context, Uri, (Boolean, String?) -> Unit) -> Unit = { _, _, _ -> },
+    onImportData: (Context, Uri, (Boolean, String?) -> Unit) -> Unit = { _, _, _ -> }
 ) {
     var showBudgetDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
@@ -133,6 +139,36 @@ fun SettingsScreen(
                 }
             }
         )
+    }
+
+    val context = LocalContext.current
+
+    val exportLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        if (uri != null) {
+            onExportData(context, uri) { success, errorMsg ->
+                if (success) {
+                    Toast.makeText(context, "匯出成功", Toast.LENGTH_SHORT).show()
+                } else {
+                    Toast.makeText(context, "匯出失敗: ${errorMsg ?: "未知錯誤"}", Toast.LENGTH_SHORT).show()
+                }
+            }
+        }
+    }
+
+    val importLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            onImportData(context, uri) { success, errorMsg ->
+                if (success) {
+                    Toast.makeText(context, errorMsg ?: "匯入成功", Toast.LENGTH_LONG).show()
+                } else {
+                    Toast.makeText(context, "匯入失敗: ${errorMsg ?: "未知錯誤"}", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
     }
 
     Scaffold(
@@ -269,12 +305,24 @@ fun SettingsScreen(
             SettingsItem(
                 icon = Icons.Filled.FileUpload,
                 title = "匯出資料",
-                subtitle = "匯出為 CSV 檔案"
+                subtitle = "匯出為 CSV 檔案",
+                onClick = {
+                    exportLauncher.launch("ExpenseBucket_Export.csv")
+                }
+            )
+            SettingsItem(
+                icon = Icons.Filled.FileDownload,
+                title = "匯入資料",
+                subtitle = "從 CSV 檔案匯入",
+                onClick = {
+                    importLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "application/csv", "*/*"))
+                }
             )
             SettingsItem(
                 icon = Icons.Filled.Category,
                 title = "管理分類",
-                subtitle = "新增或編輯記帳分類"
+                subtitle = "新增或編輯記帳分類",
+                onClick = onNavigateToCategories
             )
             SettingsItem(
                 icon = Icons.Filled.CreditCard,

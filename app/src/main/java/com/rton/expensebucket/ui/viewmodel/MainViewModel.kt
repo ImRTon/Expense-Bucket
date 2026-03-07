@@ -1,5 +1,7 @@
 package com.rton.expensebucket.ui.viewmodel
 
+import android.content.Context
+import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rton.expensebucket.data.BudgetDataStore
@@ -12,6 +14,7 @@ import com.rton.expensebucket.data.model.PaymentMethod
 import com.rton.expensebucket.data.model.Project
 import com.rton.expensebucket.data.model.Transaction
 import com.rton.expensebucket.data.repository.ExpenseBucketRepository
+import com.rton.expensebucket.util.DataExportImportManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -44,7 +47,8 @@ data class PeriodSummary(
 class MainViewModel @Inject constructor(
     private val repository: ExpenseBucketRepository,
     private val budgetDataStore: BudgetDataStore,
-    private val appSettingsDataStore: AppSettingsDataStore
+    private val appSettingsDataStore: AppSettingsDataStore,
+    private val dataExportImportManager: DataExportImportManager
 ) : ViewModel() {
 
     // ─── Categories ─────────────────────────────────────────────────
@@ -354,6 +358,29 @@ class MainViewModel @Inject constructor(
 
     fun getSubPaymentMethods(parentId: Long): Flow<List<PaymentMethod>> =
         repository.getSubPaymentMethods(parentId)
+
+    // ─── Data Export/Import ─────────────────────────────────────────
+    fun exportData(context: Context, uri: Uri, onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            val result = dataExportImportManager.exportToCsv(context, uri)
+            if (result.isSuccess) {
+                onResult(true, null)
+            } else {
+                onResult(false, result.exceptionOrNull()?.message)
+            }
+        }
+    }
+
+    fun importData(context: Context, uri: Uri, onResult: (Boolean, String?) -> Unit) {
+        viewModelScope.launch {
+            val result = dataExportImportManager.importFromCsv(context, uri)
+            if (result.isSuccess) {
+                onResult(true, "成功匯入 ${result.getOrNull()} 筆資料")
+            } else {
+                onResult(false, result.exceptionOrNull()?.message)
+            }
+        }
+    }
 
     // ─── Date Range Helpers ─────────────────────────────────────────
 
