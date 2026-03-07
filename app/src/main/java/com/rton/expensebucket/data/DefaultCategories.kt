@@ -1,6 +1,6 @@
-package com.rton.expanses.data
+package com.rton.expensebucket.data
 
-import com.rton.expanses.data.model.Category
+import com.rton.expensebucket.data.model.Category
 
 /**
  * Default categories with parent-child hierarchy.

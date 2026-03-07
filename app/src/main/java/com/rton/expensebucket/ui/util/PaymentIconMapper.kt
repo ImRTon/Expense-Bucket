@@ -1,4 +1,4 @@
-package com.rton.expanses.ui.util
+package com.rton.expensebucket.ui.util
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*

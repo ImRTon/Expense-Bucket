@@ -1,4 +1,4 @@
-package com.rton.expanses.ui.theme
+package com.rton.expensebucket.ui.theme
 
 import androidx.compose.ui.graphics.Color
 

@@ -1,6 +1,5 @@
-package com.rton.expanses.ui.screens
+package com.rton.expensebucket.ui.screens
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,8 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.rton.expanses.data.model.Category
-import com.rton.expanses.ui.util.IconMapper
+import com.rton.expensebucket.data.model.Category
+import com.rton.expensebucket.ui.util.IconMapper
 import org.burnoutcrew.reorderable.*
 import androidx.compose.ui.draw.shadow
 

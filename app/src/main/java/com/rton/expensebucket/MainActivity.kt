@@ -1,4 +1,4 @@
-package com.rton.expanses
+package com.rton.expensebucket
 
 import android.content.Intent
 import android.net.Uri
@@ -25,11 +25,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import com.rton.expanses.navigation.Screen
-import com.rton.expanses.ocr.OcrEngine
-import com.rton.expanses.ui.screens.*
-import com.rton.expanses.ui.theme.ExpansesTheme
-import com.rton.expanses.ui.viewmodel.MainViewModel
+import com.rton.expensebucket.navigation.Screen
+import com.rton.expensebucket.ocr.OcrEngine
+import com.rton.expensebucket.ui.screens.*
+import com.rton.expensebucket.ui.theme.ExpansesTheme
+import com.rton.expensebucket.ui.viewmodel.MainViewModel
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import android.Manifest
@@ -37,7 +37,6 @@ import android.content.pm.PackageManager
 import android.os.Build
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
-import com.rton.expanses.data.AppTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 import java.io.File
 
@@ -344,7 +343,7 @@ fun ExpansesApp(
             ) { backStackEntry ->
                 val transactionId = backStackEntry.arguments?.getLong("transactionId") ?: return@composable
 
-                var existingTransaction by remember { mutableStateOf<com.rton.expanses.data.model.Transaction?>(null) }
+                var existingTransaction by remember { mutableStateOf<com.rton.expensebucket.data.model.Transaction?>(null) }
                 var isLoading by remember { mutableStateOf(true) }
 
                 LaunchedEffect(transactionId) {

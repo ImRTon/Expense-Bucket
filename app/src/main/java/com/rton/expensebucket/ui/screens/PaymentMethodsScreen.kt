@@ -1,4 +1,4 @@
-package com.rton.expanses.ui.screens
+package com.rton.expensebucket.ui.screens
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
@@ -18,8 +18,8 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.rton.expanses.data.model.PaymentMethod
-import com.rton.expanses.ui.util.PaymentIconMapper
+import com.rton.expensebucket.data.model.PaymentMethod
+import com.rton.expensebucket.ui.util.PaymentIconMapper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

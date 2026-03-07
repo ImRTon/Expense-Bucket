@@ -1,9 +1,8 @@
-package com.rton.expanses.ui.screens
+package com.rton.expensebucket.ui.screens
 
 import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -23,12 +22,12 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
-import com.rton.expanses.data.model.Category
-import com.rton.expanses.data.model.PaymentMethod
-import com.rton.expanses.data.model.Transaction
-import com.rton.expanses.ocr.OcrEngine
-import com.rton.expanses.ocr.OcrResult
-import com.rton.expanses.ui.util.PaymentIconMapper
+import com.rton.expensebucket.data.model.Category
+import com.rton.expensebucket.data.model.PaymentMethod
+import com.rton.expensebucket.data.model.Transaction
+import com.rton.expensebucket.ocr.OcrEngine
+import com.rton.expensebucket.ocr.OcrResult
+import com.rton.expensebucket.ui.util.PaymentIconMapper
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable

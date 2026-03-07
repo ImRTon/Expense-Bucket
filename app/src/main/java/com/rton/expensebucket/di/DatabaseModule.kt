@@ -1,12 +1,12 @@
-package com.rton.expanses.di
+package com.rton.expensebucket.di
 
 import android.content.Context
 import androidx.room.Room
-import com.rton.expanses.data.ExpansesDatabase
-import com.rton.expanses.data.dao.CategoryDao
-import com.rton.expanses.data.dao.PaymentMethodDao
-import com.rton.expanses.data.dao.ProjectDao
-import com.rton.expanses.data.dao.TransactionDao
+import com.rton.expensebucket.data.ExpenseBucketDatabase
+import com.rton.expensebucket.data.dao.CategoryDao
+import com.rton.expensebucket.data.dao.PaymentMethodDao
+import com.rton.expensebucket.data.dao.ProjectDao
+import com.rton.expensebucket.data.dao.TransactionDao
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -20,33 +20,33 @@ object DatabaseModule {
 
     @Provides
     @Singleton
-    fun provideDatabase(@ApplicationContext context: Context): ExpansesDatabase {
+    fun provideDatabase(@ApplicationContext context: Context): ExpenseBucketDatabase {
         return Room.databaseBuilder(
             context,
-            ExpansesDatabase::class.java,
+            ExpenseBucketDatabase::class.java,
             "expanses_database"
         )
             .addMigrations(
-                ExpansesDatabase.MIGRATION_1_2,
-                ExpansesDatabase.MIGRATION_2_3,
-                ExpansesDatabase.MIGRATION_3_4
+                ExpenseBucketDatabase.MIGRATION_1_2,
+                ExpenseBucketDatabase.MIGRATION_2_3,
+                ExpenseBucketDatabase.MIGRATION_3_4
             )
             .build()
     }
 
     @Provides
-    fun provideTransactionDao(database: ExpansesDatabase): TransactionDao =
+    fun provideTransactionDao(database: ExpenseBucketDatabase): TransactionDao =
         database.transactionDao()
 
     @Provides
-    fun provideCategoryDao(database: ExpansesDatabase): CategoryDao =
+    fun provideCategoryDao(database: ExpenseBucketDatabase): CategoryDao =
         database.categoryDao()
 
     @Provides
-    fun provideProjectDao(database: ExpansesDatabase): ProjectDao =
+    fun provideProjectDao(database: ExpenseBucketDatabase): ProjectDao =
         database.projectDao()
 
     @Provides
-    fun providePaymentMethodDao(database: ExpansesDatabase): PaymentMethodDao =
+    fun providePaymentMethodDao(database: ExpenseBucketDatabase): PaymentMethodDao =
         database.paymentMethodDao()
 }

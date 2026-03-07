@@ -1,4 +1,4 @@
-package com.rton.expanses.ui.theme
+package com.rton.expensebucket.ui.theme
 
 import android.app.Activity
 import android.os.Build
@@ -15,7 +15,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-import com.rton.expanses.data.AppTheme
+import com.rton.expensebucket.data.AppTheme
 
 private val DarkColorScheme = darkColorScheme(
     primary = Emerald40,

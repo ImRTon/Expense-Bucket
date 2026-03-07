@@ -1,7 +1,7 @@
-package com.rton.expanses.data.dao
+package com.rton.expensebucket.data.dao
 
 import androidx.room.*
-import com.rton.expanses.data.model.PaymentMethod
+import com.rton.expensebucket.data.model.PaymentMethod
 import kotlinx.coroutines.flow.Flow
 
 @Dao

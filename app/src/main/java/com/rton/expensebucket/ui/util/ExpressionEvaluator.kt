@@ -1,4 +1,4 @@
-package com.rton.expanses.ui.util
+package com.rton.expensebucket.ui.util
 
 /**
  * Simple expression evaluator for basic arithmetic.

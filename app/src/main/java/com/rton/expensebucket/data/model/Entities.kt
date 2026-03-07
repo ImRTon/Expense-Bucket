@@ -1,4 +1,4 @@
-package com.rton.expanses.data.model
+package com.rton.expensebucket.data.model
 
 import androidx.room.Entity
 import androidx.room.ForeignKey

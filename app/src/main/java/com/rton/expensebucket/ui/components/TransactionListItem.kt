@@ -1,4 +1,4 @@
-package com.rton.expanses.ui.components
+package com.rton.expensebucket.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
@@ -17,9 +17,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.rton.expanses.data.model.Category
-import com.rton.expanses.data.model.Transaction
-import com.rton.expanses.ui.util.IconMapper
+import com.rton.expensebucket.data.model.Category
+import com.rton.expensebucket.data.model.Transaction
+import com.rton.expensebucket.ui.util.IconMapper
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*

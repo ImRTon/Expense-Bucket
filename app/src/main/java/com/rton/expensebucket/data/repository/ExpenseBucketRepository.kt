@@ -1,19 +1,19 @@
-package com.rton.expanses.data.repository
+package com.rton.expensebucket.data.repository
 
-import com.rton.expanses.data.dao.CategoryDao
-import com.rton.expanses.data.dao.PaymentMethodDao
-import com.rton.expanses.data.dao.ProjectDao
-import com.rton.expanses.data.dao.TransactionDao
-import com.rton.expanses.data.model.Category
-import com.rton.expanses.data.model.PaymentMethod
-import com.rton.expanses.data.model.Project
-import com.rton.expanses.data.model.Transaction
+import com.rton.expensebucket.data.dao.CategoryDao
+import com.rton.expensebucket.data.dao.PaymentMethodDao
+import com.rton.expensebucket.data.dao.ProjectDao
+import com.rton.expensebucket.data.dao.TransactionDao
+import com.rton.expensebucket.data.model.Category
+import com.rton.expensebucket.data.model.PaymentMethod
+import com.rton.expensebucket.data.model.Project
+import com.rton.expensebucket.data.model.Transaction
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class ExpansesRepository @Inject constructor(
+class ExpenseBucketRepository @Inject constructor(
     private val transactionDao: TransactionDao,
     private val categoryDao: CategoryDao,
     private val projectDao: ProjectDao,

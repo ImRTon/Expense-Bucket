@@ -1,17 +1,15 @@
-package com.rton.expanses.ui.screens
+package com.rton.expensebucket.ui.screens
 
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.provider.Settings
-import android.text.TextUtils
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -21,8 +19,8 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
-import com.rton.expanses.service.ExpansesNotificationService
-import com.rton.expanses.data.AppTheme
+import com.rton.expensebucket.service.ExpenseBucketNotificationService
+import com.rton.expensebucket.data.AppTheme
 import java.text.NumberFormat
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -407,7 +405,7 @@ private fun SettingsToggleItem(
  * Check if our NotificationListenerService has permission.
  */
 private fun isNotificationListenerEnabled(context: Context): Boolean {
-    val cn = ComponentName(context, ExpansesNotificationService::class.java)
+    val cn = ComponentName(context, ExpenseBucketNotificationService::class.java)
     val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
     return flat != null && flat.contains(cn.flattenToString())
 }

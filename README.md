@@ -1,4 +1,4 @@
-# Expanses
+# Expense Bucket
 This is a personal expense tracking app with advance AI features such as OCR and notification scanning.
 
 ## Features

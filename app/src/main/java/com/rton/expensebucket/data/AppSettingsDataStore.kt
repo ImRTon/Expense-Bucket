@@ -1,4 +1,4 @@
-package com.rton.expanses.data
+package com.rton.expensebucket.data
 
 import android.content.Context
 import androidx.datastore.core.DataStore

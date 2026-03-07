@@ -1,6 +1,6 @@
-package com.rton.expanses.data
+package com.rton.expensebucket.data
 
-import com.rton.expanses.data.model.PaymentMethod
+import com.rton.expensebucket.data.model.PaymentMethod
 
 /**
  * Default payment methods seeded on first launch.

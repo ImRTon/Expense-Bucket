@@ -1,11 +1,11 @@
-package com.rton.expanses.service
+package com.rton.expensebucket.service
 
 import android.app.NotificationManager
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import com.rton.expanses.data.dao.TransactionDao
+import com.rton.expensebucket.data.dao.TransactionDao
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,7 +20,7 @@ import javax.inject.Inject
 class NotificationConfirmReceiver : BroadcastReceiver() {
 
     companion object {
-        const val ACTION_CONFIRM = "com.rton.expanses.ACTION_CONFIRM_DRAFT"
+        const val ACTION_CONFIRM = "com.rton.expensebucket.ACTION_CONFIRM_DRAFT"
         const val EXTRA_TRANSACTION_ID = "transaction_id"
         const val EXTRA_NOTIFICATION_ID = "notification_id"
         private const val TAG = "NotifConfirmRcv"

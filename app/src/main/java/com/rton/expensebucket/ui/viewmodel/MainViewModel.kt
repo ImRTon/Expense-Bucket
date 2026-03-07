@@ -1,17 +1,17 @@
-package com.rton.expanses.ui.viewmodel
+package com.rton.expensebucket.ui.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.rton.expanses.data.BudgetDataStore
-import com.rton.expanses.data.AppTheme
-import com.rton.expanses.data.AppSettingsDataStore
-import com.rton.expanses.data.DefaultCategories
-import com.rton.expanses.data.DefaultPaymentMethods
-import com.rton.expanses.data.model.Category
-import com.rton.expanses.data.model.PaymentMethod
-import com.rton.expanses.data.model.Project
-import com.rton.expanses.data.model.Transaction
-import com.rton.expanses.data.repository.ExpansesRepository
+import com.rton.expensebucket.data.BudgetDataStore
+import com.rton.expensebucket.data.AppTheme
+import com.rton.expensebucket.data.AppSettingsDataStore
+import com.rton.expensebucket.data.DefaultCategories
+import com.rton.expensebucket.data.DefaultPaymentMethods
+import com.rton.expensebucket.data.model.Category
+import com.rton.expensebucket.data.model.PaymentMethod
+import com.rton.expensebucket.data.model.Project
+import com.rton.expensebucket.data.model.Transaction
+import com.rton.expensebucket.data.repository.ExpenseBucketRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
@@ -42,7 +42,7 @@ data class PeriodSummary(
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    private val repository: ExpansesRepository,
+    private val repository: ExpenseBucketRepository,
     private val budgetDataStore: BudgetDataStore,
     private val appSettingsDataStore: AppSettingsDataStore
 ) : ViewModel() {
@@ -99,76 +99,29 @@ class MainViewModel @Inject constructor(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // ─── Multi-period totals for WaterLevelCard ─────────────────────
-    private val _todayRange = MutableStateFlow(getTodayRange())
-    private val _weekRange = MutableStateFlow(getWeekRange())
-    private val _monthRange = MutableStateFlow(getMonthRange())
-    private val _yearRange = MutableStateFlow(getYearRange())
-    private val _allRange = MutableStateFlow(getAllRange())
-
-    // Today
-    private val todayExpense: StateFlow<Double> =
-        _todayRange.flatMapLatest { (start, end) ->
-            repository.getTotalExpenseByDateRange(start, end).map { it ?: 0.0 }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
-
-    private val todayIncome: StateFlow<Double> =
-        _todayRange.flatMapLatest { (start, end) ->
-            repository.getTotalIncomeByDateRange(start, end).map { it ?: 0.0 }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
-
-    // Week
-    private val weekExpense: StateFlow<Double> =
-        _weekRange.flatMapLatest { (start, end) ->
-            repository.getTotalExpenseByDateRange(start, end).map { it ?: 0.0 }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
-
-    private val weekIncome: StateFlow<Double> =
-        _weekRange.flatMapLatest { (start, end) ->
-            repository.getTotalIncomeByDateRange(start, end).map { it ?: 0.0 }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
-
-    // Month (kept for backward compat and also used by other parts)
-    val monthlyExpense: StateFlow<Double> =
-        _monthRange.flatMapLatest { (start, end) ->
-            repository.getTotalExpenseByDateRange(start, end).map { it ?: 0.0 }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
-
-    val monthlyIncome: StateFlow<Double> =
-        _monthRange.flatMapLatest { (start, end) ->
-            repository.getTotalIncomeByDateRange(start, end).map { it ?: 0.0 }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
-
-    // Year
-    private val yearExpense: StateFlow<Double> =
-        _yearRange.flatMapLatest { (start, end) ->
-            repository.getTotalExpenseByDateRange(start, end).map { it ?: 0.0 }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
-
-    private val yearIncome: StateFlow<Double> =
-        _yearRange.flatMapLatest { (start, end) ->
-            repository.getTotalIncomeByDateRange(start, end).map { it ?: 0.0 }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
-
-    // All
-    private val allExpense: StateFlow<Double> =
-        _allRange.flatMapLatest { (start, end) ->
-            repository.getTotalExpenseByDateRange(start, end).map { it ?: 0.0 }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
-
-    private val allIncome: StateFlow<Double> =
-        _allRange.flatMapLatest { (start, end) ->
-            repository.getTotalIncomeByDateRange(start, end).map { it ?: 0.0 }
-        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0.0)
-
+    // Reactive: selected period uses periodOffset, others use offset 0.
     /** Combined map of all period summaries for the WaterLevelCard. */
     val periodData: StateFlow<Map<TimePeriod, PeriodSummary>> = combine(
-        combine(todayExpense, todayIncome) { e, i -> TimePeriod.TODAY to PeriodSummary(e, i) },
-        combine(weekExpense, weekIncome) { e, i -> TimePeriod.WEEK to PeriodSummary(e, i) },
-        combine(monthlyExpense, monthlyIncome) { e, i -> TimePeriod.MONTH to PeriodSummary(e, i) },
-        combine(yearExpense, yearIncome) { e, i -> TimePeriod.YEAR to PeriodSummary(e, i) },
-        combine(allExpense, allIncome) { e, i -> TimePeriod.ALL to PeriodSummary(e, i) },
-    ) { today, week, month, year, all ->
-        mapOf(today, week, month, year, all)
+        _selectedPeriod, _periodOffset
+    ) { selectedPeriod, offset ->
+        // Compute date ranges: the selected period uses the current offset,
+        // all other periods use offset=0 (current).
+        TimePeriod.entries.map { tp ->
+            val tpOffset = if (tp == selectedPeriod) offset else 0
+            tp to getDateRangeForPeriod(tp, tpOffset)
+        }
+    }.flatMapLatest { rangesWithPeriod ->
+        val flows = rangesWithPeriod.map { (tp, range) ->
+            combine(
+                repository.getTotalExpenseByDateRange(range.first, range.second)
+                    .map { it ?: 0.0 },
+                repository.getTotalIncomeByDateRange(range.first, range.second)
+                    .map { it ?: 0.0 }
+            ) { expense, income ->
+                tp to PeriodSummary(expense, income)
+            }
+        }
+        combine(flows) { pairs -> pairs.toMap() }
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
@@ -393,29 +346,6 @@ class MainViewModel @Inject constructor(
         repository.getSubPaymentMethods(parentId)
 
     // ─── Date Range Helpers ─────────────────────────────────────────
-    private fun getTodayRange(): Pair<Long, Long> = getDateRangeForPeriod(TimePeriod.TODAY, 0)
-
-    private fun getWeekRange(): Pair<Long, Long> = getDateRangeForPeriod(TimePeriod.WEEK, 0)
-
-    private fun getMonthRange(year: Int? = null, month: Int? = null): Pair<Long, Long> {
-        val cal = Calendar.getInstance()
-        if (year != null) cal.set(Calendar.YEAR, year)
-        if (month != null) cal.set(Calendar.MONTH, month)
-        cal.set(Calendar.DAY_OF_MONTH, 1)
-        cal.set(Calendar.HOUR_OF_DAY, 0)
-        cal.set(Calendar.MINUTE, 0)
-        cal.set(Calendar.SECOND, 0)
-        cal.set(Calendar.MILLISECOND, 0)
-        val start = cal.timeInMillis
-        cal.add(Calendar.MONTH, 1)
-        cal.add(Calendar.MILLISECOND, -1)
-        val end = cal.timeInMillis
-        return start to end
-    }
-
-    private fun getYearRange(): Pair<Long, Long> = getDateRangeForPeriod(TimePeriod.YEAR, 0)
-
-    private fun getAllRange(): Pair<Long, Long> = 0L to Long.MAX_VALUE
 
     /**
      * Computes the date range for a given [period] shifted by [offset].

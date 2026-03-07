@@ -1,4 +1,4 @@
-package com.rton.expanses.ui.screens
+package com.rton.expensebucket.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
@@ -22,13 +22,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.rton.expanses.data.model.Category
-import com.rton.expanses.data.model.PaymentMethod
-import com.rton.expanses.data.model.Project
-import com.rton.expanses.data.model.Transaction
-import com.rton.expanses.ui.components.ExpenseNumpad
-import com.rton.expanses.ui.util.ExpressionEvaluator
-import com.rton.expanses.ui.util.PaymentIconMapper
+import com.rton.expensebucket.data.model.Category
+import com.rton.expensebucket.data.model.PaymentMethod
+import com.rton.expensebucket.data.model.Project
+import com.rton.expensebucket.data.model.Transaction
+import com.rton.expensebucket.ui.components.ExpenseNumpad
+import com.rton.expensebucket.ui.util.ExpressionEvaluator
+import com.rton.expensebucket.ui.util.PaymentIconMapper
 import java.text.SimpleDateFormat
 import java.util.*
 

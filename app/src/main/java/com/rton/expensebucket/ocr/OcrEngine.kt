@@ -1,4 +1,4 @@
-package com.rton.expanses.ocr
+package com.rton.expensebucket.ocr
 
 import android.content.Context
 import android.net.Uri

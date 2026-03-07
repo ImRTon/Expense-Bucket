@@ -1,4 +1,4 @@
-package com.rton.expanses.ui.components
+package com.rton.expensebucket.ui.components
 
 import android.content.Context
 import android.hardware.Sensor
@@ -26,9 +26,9 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.rton.expanses.ui.viewmodel.CompareMode
-import com.rton.expanses.ui.viewmodel.PeriodSummary
-import com.rton.expanses.ui.viewmodel.TimePeriod
+import com.rton.expensebucket.ui.viewmodel.CompareMode
+import com.rton.expensebucket.ui.viewmodel.PeriodSummary
+import com.rton.expensebucket.ui.viewmodel.TimePeriod
 import kotlinx.coroutines.isActive
 import java.text.NumberFormat
 import java.util.*
@@ -214,7 +214,7 @@ fun WaterLevelCard(
                 // Use the animated level for the current page, raw level for others
                 val level = if (pageIndex == pagerState.currentPage) animatedLevel
                             else pageDisplay.level.toFloat()
-                val waterHeight = h * level * 0.75f
+                val waterHeight = h * level * 0.95f
 
                 val color = when {
                     pageDisplay.level > 0.6 -> Color(0xFF4ADE80)

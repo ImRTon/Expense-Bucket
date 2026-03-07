@@ -22,5 +22,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Expanses"
+rootProject.name = "Expense Bucket"
 include(":app")

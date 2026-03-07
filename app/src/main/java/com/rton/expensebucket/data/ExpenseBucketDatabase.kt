@@ -1,24 +1,24 @@
-package com.rton.expanses.data
+package com.rton.expensebucket.data
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
-import com.rton.expanses.data.dao.CategoryDao
-import com.rton.expanses.data.dao.PaymentMethodDao
-import com.rton.expanses.data.dao.ProjectDao
-import com.rton.expanses.data.dao.TransactionDao
-import com.rton.expanses.data.model.Category
-import com.rton.expanses.data.model.PaymentMethod
-import com.rton.expanses.data.model.Project
-import com.rton.expanses.data.model.Transaction
+import com.rton.expensebucket.data.dao.CategoryDao
+import com.rton.expensebucket.data.dao.PaymentMethodDao
+import com.rton.expensebucket.data.dao.ProjectDao
+import com.rton.expensebucket.data.dao.TransactionDao
+import com.rton.expensebucket.data.model.Category
+import com.rton.expensebucket.data.model.PaymentMethod
+import com.rton.expensebucket.data.model.Project
+import com.rton.expensebucket.data.model.Transaction
 
 @Database(
     entities = [Transaction::class, Category::class, Project::class, PaymentMethod::class],
     version = 5,
     exportSchema = true
 )
-abstract class ExpansesDatabase : RoomDatabase() {
+abstract class ExpenseBucketDatabase : RoomDatabase() {
     abstract fun transactionDao(): TransactionDao
     abstract fun categoryDao(): CategoryDao
     abstract fun projectDao(): ProjectDao

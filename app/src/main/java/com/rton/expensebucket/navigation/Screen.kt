@@ -1,4 +1,4 @@
-package com.rton.expanses.navigation
+package com.rton.expensebucket.navigation
 
 /**
  * Navigation routes for the app.

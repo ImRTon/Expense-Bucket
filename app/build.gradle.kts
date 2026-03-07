@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.rton.expanses"
+    namespace = "com.rton.expensebucket"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.rton.expanses"
+        applicationId = "com.rton.expensebucket"
         minSdk = 26
         targetSdk = 36
         versionCode = 1

@@ -1,4 +1,4 @@
-package com.rton.expanses.ui.components
+package com.rton.expensebucket.ui.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -9,7 +9,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.rton.expanses.data.model.Project
+import com.rton.expensebucket.data.model.Project
 import java.text.SimpleDateFormat
 import java.util.*
 

@@ -1,4 +1,4 @@
-package com.rton.expanses.ocr
+package com.rton.expensebucket.ocr
 
 /**
  * Placeholder for local LLM-based parser (<1B parameters).

@@ -1,4 +1,4 @@
-package com.rton.expanses.ocr
+package com.rton.expensebucket.ocr
 
 import java.util.regex.Pattern
 

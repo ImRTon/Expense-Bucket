@@ -1,4 +1,4 @@
-package com.rton.expanses.ui.components
+package com.rton.expensebucket.ui.components
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background

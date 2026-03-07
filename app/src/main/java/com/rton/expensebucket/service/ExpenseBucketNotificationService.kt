@@ -1,4 +1,4 @@
-package com.rton.expanses.service
+package com.rton.expensebucket.service
 
 import android.app.Notification
 import android.app.NotificationChannel
@@ -10,11 +10,11 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.rton.expanses.MainActivity
-import com.rton.expanses.R
-import com.rton.expanses.data.model.Transaction
-import com.rton.expanses.data.repository.ExpansesRepository
-import com.rton.expanses.ocr.NotificationParser
+import com.rton.expensebucket.MainActivity
+import com.rton.expensebucket.R
+import com.rton.expensebucket.data.model.Transaction
+import com.rton.expensebucket.data.repository.ExpenseBucketRepository
+import com.rton.expensebucket.ocr.NotificationParser
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,7 +31,7 @@ import javax.inject.Inject
  * User must grant notification access in Settings → Notification access.
  */
 @AndroidEntryPoint
-class ExpansesNotificationService : NotificationListenerService() {
+class ExpenseBucketNotificationService : NotificationListenerService() {
 
     companion object {
         private const val TAG = "ExpansesNotifSvc"
@@ -64,7 +64,7 @@ class ExpansesNotificationService : NotificationListenerService() {
         )
     }
 
-    @Inject lateinit var repository: ExpansesRepository
+    @Inject lateinit var repository: ExpenseBucketRepository
 
     private val parser = NotificationParser()
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
@@ -145,7 +145,7 @@ class ExpansesNotificationService : NotificationListenerService() {
 
     private fun showConfirmationNotification(
         transactionId: Long,
-        parsed: com.rton.expanses.ocr.ParsedTransaction
+        parsed: com.rton.expensebucket.ocr.ParsedTransaction
     ) {
         val notifId = notificationIdCounter++
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager

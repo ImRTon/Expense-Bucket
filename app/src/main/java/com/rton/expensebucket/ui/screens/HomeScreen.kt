@@ -1,6 +1,5 @@
-package com.rton.expanses.ui.screens
+package com.rton.expensebucket.ui.screens
 
-import androidx.compose.animation.*
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -15,12 +14,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.rton.expanses.data.model.Category
-import com.rton.expanses.data.model.Transaction
-import com.rton.expanses.ui.components.WaterLevelCard
-import com.rton.expanses.ui.components.TransactionListItem
-import com.rton.expanses.ui.viewmodel.PeriodSummary
-import com.rton.expanses.ui.viewmodel.TimePeriod
+import com.rton.expensebucket.data.model.Category
+import com.rton.expensebucket.data.model.Transaction
+import com.rton.expensebucket.ui.components.WaterLevelCard
+import com.rton.expensebucket.ui.components.TransactionListItem
+import com.rton.expensebucket.ui.viewmodel.PeriodSummary
+import com.rton.expensebucket.ui.viewmodel.TimePeriod
 import java.text.SimpleDateFormat
 import java.util.*
 

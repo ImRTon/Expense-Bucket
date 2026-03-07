@@ -1,4 +1,4 @@
-package com.rton.expanses
+package com.rton.expensebucket
 
 import org.junit.Test
 

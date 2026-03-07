@@ -1,4 +1,4 @@
-package com.rton.expanses.ocr
+package com.rton.expensebucket.ocr
 
 /**
  * Parsed result from OCR or notification text.

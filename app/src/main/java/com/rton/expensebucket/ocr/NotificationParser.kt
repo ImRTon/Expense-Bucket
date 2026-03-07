@@ -1,11 +1,11 @@
-package com.rton.expanses.ocr
+package com.rton.expensebucket.ocr
 
 import java.util.regex.Pattern
 
 /**
  * Parses notification text from banking/payment apps into transaction data.
  *
- * Supported apps (by package name patterns in ExpansesNotificationService):
+ * Supported apps (by package name patterns in ExpenseBucketNotificationService):
  * - LINE Pay, 街口支付, 悠遊付, Apple Pay/Google Pay
  * - 台新 Richart, 玉山, 國泰世華, 中國信託, 富邦 etc.
  */

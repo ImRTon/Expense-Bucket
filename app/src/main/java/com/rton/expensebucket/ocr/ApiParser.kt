@@ -1,4 +1,4 @@
-package com.rton.expanses.ocr
+package com.rton.expensebucket.ocr
 
 /**
  * Placeholder for cloud API-based parser.

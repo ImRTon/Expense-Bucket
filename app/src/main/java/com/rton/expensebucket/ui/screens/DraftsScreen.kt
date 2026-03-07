@@ -1,4 +1,4 @@
-package com.rton.expanses.ui.screens
+package com.rton.expensebucket.ui.screens
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -18,8 +18,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import com.rton.expanses.data.model.Category
-import com.rton.expanses.data.model.Transaction
+import com.rton.expensebucket.data.model.Category
+import com.rton.expensebucket.data.model.Transaction
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*

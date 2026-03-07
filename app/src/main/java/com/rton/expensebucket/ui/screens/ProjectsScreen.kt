@@ -1,4 +1,4 @@
-package com.rton.expanses.ui.screens
+package com.rton.expensebucket.ui.screens
 
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.*
@@ -6,7 +6,6 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -15,8 +14,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.rton.expanses.data.model.Project
-import com.rton.expanses.ui.components.ProjectFormDialog
+import com.rton.expensebucket.data.model.Project
+import com.rton.expensebucket.ui.components.ProjectFormDialog
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
