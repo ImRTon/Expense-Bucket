@@ -1,11 +1,13 @@
 package com.rton.expensebucket.ui.screens
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -31,12 +33,22 @@ fun ProjectDetailScreen(
     categories: List<Category>,
     totalExpense: Double,
     onBack: () -> Unit,
-    onUpdateProject: (Project) -> Unit
+    onUpdateProject: (Project) -> Unit,
+    onDeleteProject: (Project) -> Unit
 ) {
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("zh", "TW")) }
     val categoryMap = remember(categories) { categories.associateBy { it.id } }
+    val categoryStats = remember(transactions) {
+        transactions
+            .filter { it.isExpense }
+            .groupBy { it.categoryId }
+            .mapValues { (_, txs) -> txs.sumOf { it.amount * it.exchangeRate } }
+            .toList()
+            .sortedByDescending { it.second }
+    }
     
     var showEditDialog by remember { mutableStateOf(false) }
+    var showDeleteConfirmDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -59,6 +71,9 @@ fun ProjectDetailScreen(
                     if (project != null) {
                         IconButton(onClick = { showEditDialog = true }) {
                             Icon(Icons.Filled.Edit, contentDescription = "編輯專案")
+                        }
+                        IconButton(onClick = { showDeleteConfirmDialog = true }) {
+                            Icon(Icons.Filled.Delete, contentDescription = "刪除專案", tint = MaterialTheme.colorScheme.error)
                         }
                     }
                 },
@@ -177,6 +192,28 @@ fun ProjectDetailScreen(
                 }
             }
 
+            // ─── Category Statistics ────────────────────────────
+            if (categoryStats.isNotEmpty()) {
+                item {
+                    Text(
+                        "類別統計",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.SemiBold
+                        ),
+                        modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
+                    )
+                }
+
+                items(categoryStats, key = { "stat_${it.first}" }) { (categoryId, total) ->
+                    val category = categoryMap[categoryId]
+                    CategoryStatItem(
+                        category = category,
+                        totalAmount = total,
+                        totalExpense = totalExpense
+                    )
+                }
+            }
+
             // ─── Transaction List ───────────────────────────────
             item {
                 Text(
@@ -209,5 +246,114 @@ fun ProjectDetailScreen(
                 showEditDialog = false
             }
         )
+    }
+
+    if (showDeleteConfirmDialog && project != null) {
+        AlertDialog(
+            onDismissRequest = { showDeleteConfirmDialog = false },
+            title = { Text("刪除專案") },
+            text = { Text("確定要刪除「${project.name}」嗎？這將會刪除該專案的所有設定，但專案內的交易紀錄會被保留且變回未分類。") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onDeleteProject(project)
+                        showDeleteConfirmDialog = false
+                        onBack()
+                    }
+                ) {
+                    Text("刪除", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteConfirmDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+}
+
+@Composable
+private fun CategoryStatItem(
+    category: Category?,
+    totalAmount: Double,
+    totalExpense: Double
+) {
+    val currencyFormat = remember { java.text.NumberFormat.getCurrencyInstance(java.util.Locale("zh", "TW")) }
+    val ratio = if (totalExpense > 0) (totalAmount / totalExpense).toFloat() else 0f
+    
+    Card(
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 4.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .background(
+                        category?.color?.let { 
+                            try { Color(it) } catch (e: Exception) { MaterialTheme.colorScheme.primaryContainer }
+                        } ?: MaterialTheme.colorScheme.primaryContainer,
+                        shape = androidx.compose.foundation.shape.CircleShape
+                    ),
+                contentAlignment = androidx.compose.ui.Alignment.Center
+            ) {
+                Icon(
+                    imageVector = com.rton.expensebucket.ui.util.IconMapper.getIcon(category?.icon ?: "MoreHoriz"),
+                    contentDescription = category?.name ?: "類別",
+                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = category?.name ?: "未知類別",
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
+                    )
+                    Text(
+                        text = currencyFormat.format(totalAmount),
+                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
+                    )
+                }
+                Spacer(modifier = Modifier.height(4.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+                ) {
+                    LinearProgressIndicator(
+                        progress = { ratio.coerceAtMost(1f) },
+                        modifier = Modifier
+                            .weight(1f)
+                            .height(6.dp)
+                            .padding(end = 8.dp),
+                        color = category?.color?.let { 
+                            try { Color(it) } catch (e: Exception) { MaterialTheme.colorScheme.primary }
+                        } ?: MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
+                        drawStopIndicator = {}
+                    )
+                    Text(
+                        text = "${(ratio * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+        }
     }
 }

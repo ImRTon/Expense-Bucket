@@ -14,6 +14,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -39,14 +43,25 @@ fun TransactionListItem(
     val currencyFormat = NumberFormat.getCurrencyInstance(Locale("zh", "TW"))
     val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
 
+    val itemWidth = remember { mutableFloatStateOf(0f) }
+    val stateHolder = remember { mutableStateOf<SwipeToDismissBoxState?>(null) }
+
     val dismissState = rememberSwipeToDismissBoxState(
+        positionalThreshold = { totalDistance -> totalDistance * 0.5f }, // 至少滑超過一半的距離
+
         confirmValueChange = { value ->
             if (value == SwipeToDismissBoxValue.EndToStart) {
+                // Ignore fast fling if the physical distance hasn't met the 50% requirement
+                val currentOffset = try { Math.abs(stateHolder.value?.requireOffset() ?: 0f) } catch (e: Exception) { 0f }
+                if (itemWidth.floatValue > 0 && currentOffset < itemWidth.floatValue * 0.5f) {
+                    return@rememberSwipeToDismissBoxState false
+                }
                 onDelete()
                 true
             } else false
         }
     )
+    stateHolder.value = dismissState
 
     SwipeToDismissBox(
         state = dismissState,
@@ -54,10 +69,18 @@ fun TransactionListItem(
             val color by animateColorAsState(
                 when (dismissState.targetValue) {
                     SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.error
-                    else -> Color.Transparent
+                    else -> MaterialTheme.colorScheme.errorContainer
                 },
                 label = "swipeColor"
             )
+            val iconColor by animateColorAsState(
+                when (dismissState.targetValue) {
+                    SwipeToDismissBoxValue.EndToStart -> MaterialTheme.colorScheme.onError
+                    else -> MaterialTheme.colorScheme.onErrorContainer
+                },
+                label = "iconColor"
+            )
+
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -69,7 +92,7 @@ fun TransactionListItem(
                 Icon(
                     Icons.Filled.Delete,
                     contentDescription = "刪除",
-                    tint = Color.White
+                    tint = iconColor
                 )
             }
         },
@@ -78,7 +101,11 @@ fun TransactionListItem(
     ) {
         Card(
             onClick = onClick,
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .onSizeChanged { size ->
+                    itemWidth.floatValue = size.width.toFloat()
+                },
             shape = RoundedCornerShape(16.dp),
             colors = CardDefaults.cardColors(
                 containerColor = MaterialTheme.colorScheme.surface

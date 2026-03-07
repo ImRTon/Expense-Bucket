@@ -405,7 +405,8 @@ fun ExpensesApp(
                     categories = allCategories,
                     totalExpense = projectTotal ?: 0.0,
                     onBack = { navController.popBackStack() },
-                    onUpdateProject = { viewModel.updateProject(it) }
+                    onUpdateProject = { viewModel.updateProject(it) },
+                    onDeleteProject = { viewModel.deleteProject(it) }
                 )
             }
 
