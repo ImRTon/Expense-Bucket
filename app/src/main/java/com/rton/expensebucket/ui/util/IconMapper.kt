@@ -31,6 +31,12 @@ object IconMapper {
         "Pets" to Icons.Filled.Pets,
         "LocalCafe" to Icons.Filled.LocalCafe,
         "FitnessCenter" to Icons.Filled.FitnessCenter,
+        "DeliveryDining" to Icons.Filled.DeliveryDining,
+        "LocalGasStation" to Icons.Filled.LocalGasStation,
+        "CleaningServices" to Icons.Filled.CleaningServices,
+        "Spa" to Icons.Filled.Spa,
+        "MenuBook" to Icons.Filled.MenuBook,
+        "Category" to Icons.Filled.Category,
     )
 
     fun getIcon(name: String): ImageVector {
