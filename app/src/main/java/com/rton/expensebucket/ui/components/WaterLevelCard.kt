@@ -56,15 +56,17 @@ fun WaterLevelCard(
 
     // Sync: external selectedPage -> pager
     LaunchedEffect(selectedPage) {
-        if (pagerState.currentPage != selectedPage) {
+        if (pagerState.currentPage != selectedPage && !pagerState.isScrollInProgress) {
             pagerState.animateScrollToPage(selectedPage)
         }
     }
 
     // Sync: pager swipe -> external callback
-    LaunchedEffect(pagerState) {
-        snapshotFlow { pagerState.currentPage }.collect { page ->
-            onPageChanged(page)
+    LaunchedEffect(pagerState, selectedPage) {
+        snapshotFlow { pagerState.settledPage }.collect { page ->
+            if (page != selectedPage) {
+                onPageChanged(page)
+            }
         }
     }
 
