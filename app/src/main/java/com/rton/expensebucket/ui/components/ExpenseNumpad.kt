@@ -65,9 +65,15 @@ fun ExpenseNumpad(
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+            // Combining solid surface color with the semi-transparent variant overlay
+            color = MaterialTheme.colorScheme.surface,
             tonalElevation = 2.dp
         ) {
+            Surface(
+                modifier = Modifier.fillMaxWidth(),
+                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+            ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -178,6 +184,7 @@ fun ExpenseNumpad(
                 }
 
                 Spacer(modifier = Modifier.height(4.dp))
+            }
             }
         }
     }

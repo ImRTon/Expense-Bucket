@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.LocalFocusManager
 import android.view.HapticFeedbackConstants
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -108,6 +109,8 @@ fun AddTransactionScreen(
     )
 
     val view = LocalView.current
+    val focusManager = LocalFocusManager.current
+    
     LaunchedEffect(timePickerState.hour, timePickerState.minute) {
         view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
     }
@@ -247,7 +250,7 @@ fun AddTransactionScreen(
             )
         }
     ) { padding ->
-        Column(
+        Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
@@ -257,13 +260,17 @@ fun AddTransactionScreen(
             // ═══════════════════════════════════════════════════════
             Column(
                 modifier = Modifier
-                    .weight(1f)
+                    .fillMaxSize()
                     .verticalScroll(scrollState)
+                    .imePadding()
                     .padding(bottom = 8.dp)
             ) {
                 // ─── Amount Display (tappable) ───────────────────
                 Card(
-                    onClick = { showNumpad = true },
+                    onClick = { 
+                        focusManager.clearFocus()
+                        showNumpad = true 
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 8.dp),
@@ -350,13 +357,23 @@ fun AddTransactionScreen(
                     ) {
                         SegmentedButton(
                             selected = isExpense,
-                            onClick = { isExpense = true; expandedParentId = null },
+                            onClick = { 
+                                isExpense = true
+                                expandedParentId = null
+                                focusManager.clearFocus()
+                                showNumpad = false
+                            },
                             shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
                             label = { Text("支出") }
                         )
                         SegmentedButton(
                             selected = !isExpense,
-                            onClick = { isExpense = false; expandedParentId = null },
+                            onClick = { 
+                                isExpense = false
+                                expandedParentId = null
+                                focusManager.clearFocus()
+                                showNumpad = false
+                            },
                             shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
                             label = { Text("收入") }
                         )
@@ -375,7 +392,11 @@ fun AddTransactionScreen(
                     val tFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
                     
                     OutlinedCard(
-                        onClick = { showDatePicker = true },
+                        onClick = { 
+                            showDatePicker = true
+                            focusManager.clearFocus()
+                            showNumpad = false
+                        },
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.weight(1f)
                     ) {
@@ -394,7 +415,11 @@ fun AddTransactionScreen(
                         }
                     }
                     OutlinedCard(
-                        onClick = { showTimePicker = true },
+                        onClick = { 
+                            showTimePicker = true
+                            focusManager.clearFocus()
+                            showNumpad = false
+                        },
                         shape = RoundedCornerShape(12.dp),
                         modifier = Modifier.weight(1f)
                     ) {
@@ -444,6 +469,8 @@ fun AddTransactionScreen(
                                     } else {
                                         expandedParentId = if (expandedParentId == parent.id) null else parent.id
                                     }
+                                    focusManager.clearFocus()
+                                    showNumpad = false
                                 },
                                 label = { Text(parent.name, style = MaterialTheme.typography.labelMedium) },
                                 colors = FilterChipDefaults.filterChipColors(
@@ -476,7 +503,11 @@ fun AddTransactionScreen(
                                     val chipColor = Color(child.color)
                                     val isSelected = selectedCategory?.id == child.id
                                     AssistChip(
-                                        onClick = { selectedCategory = child },
+                                        onClick = { 
+                                            selectedCategory = child 
+                                            focusManager.clearFocus()
+                                            showNumpad = false
+                                        },
                                         label = { Text(child.name, style = MaterialTheme.typography.labelSmall) },
                                         colors = AssistChipDefaults.assistChipColors(
                                             containerColor = if (isSelected) chipColor.copy(alpha = 0.2f)
@@ -541,6 +572,8 @@ fun AddTransactionScreen(
                                     } else {
                                         expandedPaymentParentId = if (expandedPaymentParentId == parent.id) null else parent.id
                                     }
+                                    focusManager.clearFocus()
+                                    showNumpad = false
                                 },
                                 label = { Text(parent.name, style = MaterialTheme.typography.labelMedium) },
                                 leadingIcon = {
@@ -581,7 +614,11 @@ fun AddTransactionScreen(
                                     val chipColor = Color(child.color)
                                     val isSelected = selectedPaymentMethodId == child.id
                                     AssistChip(
-                                        onClick = { selectedPaymentMethodId = child.id },
+                                        onClick = { 
+                                            selectedPaymentMethodId = child.id 
+                                            focusManager.clearFocus()
+                                            showNumpad = false
+                                        },
                                         label = { Text(child.name, style = MaterialTheme.typography.labelSmall) },
                                         colors = AssistChipDefaults.assistChipColors(
                                             containerColor = if (isSelected) chipColor.copy(alpha = 0.2f)
@@ -626,7 +663,11 @@ fun AddTransactionScreen(
                             .padding(horizontal = 16.dp, vertical = 8.dp)
                     ) {
                         OutlinedCard(
-                            onClick = { showProjectDropdown = true },
+                            onClick = { 
+                                showProjectDropdown = true 
+                                focusManager.clearFocus()
+                                showNumpad = false
+                            },
                             shape = RoundedCornerShape(12.dp),
                             modifier = Modifier.fillMaxWidth()
                         ) {
@@ -706,7 +747,11 @@ fun AddTransactionScreen(
                 }
 
                 TextButton(
-                    onClick = { showNoteField = !showNoteField },
+                    onClick = { 
+                        showNoteField = !showNoteField 
+                        if (!showNoteField) focusManager.clearFocus()
+                        showNumpad = false
+                    },
                     modifier = Modifier.padding(start = 8.dp)
                 ) {
                     Text(if (showNoteField) "隱藏備註" else "＋ 新增備註")
@@ -741,6 +786,7 @@ fun AddTransactionScreen(
             // ═══════════════════════════════════════════════════════
             AnimatedVisibility(
                 visible = showNumpad,
+                modifier = Modifier.align(Alignment.BottomCenter),
                 enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
                 exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
             ) {
