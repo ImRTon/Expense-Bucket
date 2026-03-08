@@ -406,7 +406,10 @@ fun ExpensesApp(
                     totalExpense = projectTotal ?: 0.0,
                     onBack = { navController.popBackStack() },
                     onUpdateProject = { viewModel.updateProject(it) },
-                    onDeleteProject = { viewModel.deleteProject(it) }
+                    onDeleteProject = { viewModel.deleteProject(it) },
+                    onTransactionClick = { transaction ->
+                        navController.navigate(Screen.EditTransaction.createRoute(transaction.id))
+                    }
                 )
             }
 

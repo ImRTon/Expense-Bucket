@@ -34,7 +34,8 @@ fun ProjectDetailScreen(
     totalExpense: Double,
     onBack: () -> Unit,
     onUpdateProject: (Project) -> Unit,
-    onDeleteProject: (Project) -> Unit
+    onDeleteProject: (Project) -> Unit,
+    onTransactionClick: (Transaction) -> Unit
 ) {
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("zh", "TW")) }
     val categoryMap = remember(categories) { categories.associateBy { it.id } }
@@ -229,7 +230,8 @@ fun ProjectDetailScreen(
                 TransactionListItem(
                     transaction = transaction,
                     category = categoryMap[transaction.categoryId],
-                    onDelete = { /* TODO: delete from project */ }
+                    onDelete = { /* TODO: delete from project */ },
+                    onClick = { onTransactionClick(transaction) }
                 )
             }
 
