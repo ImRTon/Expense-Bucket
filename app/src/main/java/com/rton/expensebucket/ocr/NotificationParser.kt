@@ -1,5 +1,6 @@
 package com.rton.expensebucket.ocr
 
+import java.util.Calendar
 import java.util.regex.Pattern
 
 /**
@@ -20,10 +21,20 @@ class NotificationParser {
         val amountGroup: Int = 1,
         val merchantGroup: Int = 2,
         val paymentHint: String? = null,
-        val isIncome: Boolean = false
+        val isIncome: Boolean = false,
+        val dateGroup: Int = -1
     )
 
     private val patterns = listOf(
+        // 台新 Richart：「【信用卡消費通知】您的Richart卡(末三碼xxxx)於01/30-18:06網路刷卡約新台幣3,019元，實際消費xxxx」
+        // 或是「【信用卡消費通知】您的Richart卡(末三碼xxxx)於01/30-18:06刷卡約新台幣3,019元，實際消費xxxx」
+        NotifPattern(
+            regex = Pattern.compile("""Richart卡.*?[於在]\s*(\d{2}/\d{2}-\d{2}:\d{2})\s*(?:網路)?刷卡約新台幣\s*([\d,]+(?:\.\d+)?)"""),
+            amountGroup = 2,
+            merchantGroup = -1,
+            paymentHint = "richart",
+            dateGroup = 1
+        ),
         // 街口支付：「您已於 7-ELEVEN 付款 NT$89」
         NotifPattern(
             regex = Pattern.compile("""[於在]\s*(.{2,20}?)\s*(?:付款|消費|支付)\s*NT?\$?\s*([\d,]+(?:\.\d+)?)"""),
@@ -107,13 +118,17 @@ class NotificationParser {
 
                 val hint = detectPaymentHintFromPackage(packageName) ?: p.paymentHint
 
+                val dateStr = if (p.dateGroup > 0) matcher.group(p.dateGroup) else null
+                val parsedDate = parseNotificationDate(dateStr)
+
                 return ParsedTransaction(
                     amount = amount,
                     merchant = merchant,
                     note = text.take(100),
                     isExpense = !p.isIncome,
+                    date = parsedDate,
                     paymentMethodHint = hint,
-                    confidence = if (merchant.isNotBlank()) 0.9f else 0.6f
+                    confidence = if (merchant.isNotBlank() || parsedDate != null) 0.9f else 0.6f
                 )
             }
         }
@@ -138,6 +153,38 @@ class NotificationParser {
             "apple" in packageName -> "applepay"
             "google" in packageName && "pay" in packageName -> "googlepay"
             else -> null
+        }
+    }
+
+    /**
+     * Parse date string like "01/30-18:06" to a Long timestamp in milliseconds.
+     */
+    private fun parseNotificationDate(dateStr: String?): Long? {
+        if (dateStr == null) return null
+        return try {
+            val regex = """(\d{2})/(\d{2})-(\d{2}):(\d{2})""".toRegex()
+            val match = regex.find(dateStr) ?: return null
+
+            val (month, day, hour, minute) = match.destructured
+
+            val calendar = Calendar.getInstance()
+            calendar.set(Calendar.MONTH, month.toInt() - 1) // 0-based month
+            calendar.set(Calendar.DAY_OF_MONTH, day.toInt())
+            calendar.set(Calendar.HOUR_OF_DAY, hour.toInt())
+            calendar.set(Calendar.MINUTE, minute.toInt())
+            calendar.set(Calendar.SECOND, 0)
+            calendar.set(Calendar.MILLISECOND, 0)
+
+            // Make sure the parsed time doesn't significantly exceed current time 
+            // e.g. crossing a year boundary from December to January
+            val now = Calendar.getInstance()
+            if (calendar.timeInMillis > now.timeInMillis + 7 * 24 * 3600 * 1000L) {
+                calendar.add(Calendar.YEAR, -1)
+            }
+
+            calendar.timeInMillis
+        } catch (e: Exception) {
+            null
         }
     }
 }

@@ -446,6 +446,11 @@ fun ExpensesApp(
                             launchSingleTop = true
                         }
                     },
+                    onNavigateToDrafts = {
+                        navController.navigate(Screen.Drafts.route) {
+                            launchSingleTop = true
+                        }
+                    },
                     onExportData = { ctx, uri, callback -> viewModel.exportData(ctx, uri, callback) },
                     onImportData = { ctx, uri, callback -> viewModel.importData(ctx, uri, callback) }
                 )
@@ -485,6 +490,9 @@ fun ExpensesApp(
                     categories = allCategories,
                     onConfirm = { viewModel.confirmDraft(it) },
                     onDelete = { viewModel.deleteTransaction(it) },
+                    onEdit = { transaction ->
+                        navController.navigate(Screen.EditTransaction.createRoute(transaction.id))
+                    },
                     onBack = { navController.popBackStack() }
                 )
             }

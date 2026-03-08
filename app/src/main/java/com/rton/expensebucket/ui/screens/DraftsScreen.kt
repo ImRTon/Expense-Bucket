@@ -8,6 +8,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -31,6 +32,7 @@ fun DraftsScreen(
     categories: List<Category>,
     onConfirm: (Long) -> Unit,
     onDelete: (Transaction) -> Unit,
+    onEdit: (Transaction) -> Unit,
     onBack: () -> Unit
 ) {
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("zh", "TW")) }
@@ -108,7 +110,8 @@ fun DraftsScreen(
                         currencyFormat = currencyFormat,
                         dateFormat = dateFormat,
                         onConfirm = { onConfirm(draft.id) },
-                        onDelete = { onDelete(draft) }
+                        onDelete = { onDelete(draft) },
+                        onEdit = { onEdit(draft) }
                     )
                 }
             }
@@ -123,7 +126,8 @@ private fun DraftItem(
     currencyFormat: NumberFormat,
     dateFormat: SimpleDateFormat,
     onConfirm: () -> Unit,
-    onDelete: () -> Unit
+    onDelete: () -> Unit,
+    onEdit: () -> Unit
 ) {
     Card(
         shape = RoundedCornerShape(16.dp),
@@ -171,6 +175,13 @@ private fun DraftItem(
             }
 
             // Action buttons
+            IconButton(onClick = onEdit) {
+                Icon(
+                    Icons.Filled.Edit,
+                    contentDescription = "編輯",
+                    tint = MaterialTheme.colorScheme.primary
+                )
+            }
             IconButton(onClick = onConfirm) {
                 Icon(
                     Icons.Filled.Check,

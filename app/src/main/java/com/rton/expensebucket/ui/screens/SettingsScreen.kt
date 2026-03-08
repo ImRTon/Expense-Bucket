@@ -23,6 +23,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.rton.expensebucket.service.ExpenseBucketNotificationService
 import com.rton.expensebucket.data.AppTheme
 import java.text.NumberFormat
@@ -39,6 +42,7 @@ fun SettingsScreen(
     onBack: () -> Unit = {},
     onNavigateToPaymentMethods: () -> Unit = {},
     onNavigateToCategories: () -> Unit = {},
+    onNavigateToDrafts: () -> Unit = {},
     onExportData: (Context, Uri, (Boolean, String?) -> Unit) -> Unit = { _, _, _ -> },
     onImportData: (Context, Uri, (Boolean, String?) -> Unit) -> Unit = { _, _, _ -> }
 ) {
@@ -320,12 +324,22 @@ fun SettingsScreen(
             )
 
             val context = LocalContext.current
+            val lifecycleOwner = LocalLifecycleOwner.current
+
             val notificationEnabled = remember {
                 mutableStateOf(isNotificationListenerEnabled(context))
             }
-            // Refresh when returning from settings
-            LaunchedEffect(Unit) {
-                notificationEnabled.value = isNotificationListenerEnabled(context)
+            // Refresh when returning from system settings
+            DisposableEffect(lifecycleOwner) {
+                val observer = LifecycleEventObserver { _, event ->
+                    if (event == Lifecycle.Event.ON_RESUME) {
+                        notificationEnabled.value = isNotificationListenerEnabled(context)
+                    }
+                }
+                lifecycleOwner.lifecycle.addObserver(observer)
+                onDispose {
+                    lifecycleOwner.lifecycle.removeObserver(observer)
+                }
             }
             SettingsToggleItem(
                 icon = Icons.Filled.Notifications,
@@ -338,7 +352,8 @@ fun SettingsScreen(
                     context.startActivity(
                         Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
                     )
-                }
+                },
+                onClick = onNavigateToDrafts
             )
 
             var ocrEnabled by remember { mutableStateOf(true) }
@@ -467,7 +482,8 @@ private fun SettingsToggleItem(
     title: String,
     subtitle: String,
     checked: Boolean,
-    onCheckedChange: (Boolean) -> Unit
+    onCheckedChange: (Boolean) -> Unit,
+    onClick: (() -> Unit)? = null
 ) {
     Card(
         shape = RoundedCornerShape(12.dp),
@@ -475,10 +491,14 @@ private fun SettingsToggleItem(
             containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
         )
     ) {
+        val modifier = if (onClick != null) {
+            Modifier.fillMaxWidth().clickable { onClick() }
+        } else {
+            Modifier.fillMaxWidth()
+        }
+        
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 12.dp),
+            modifier = modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
@@ -499,6 +519,14 @@ private fun SettingsToggleItem(
                     subtitle,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            if (onClick != null) {
+                VerticalDivider(
+                    modifier = Modifier
+                        .height(32.dp)
+                        .padding(horizontal = 8.dp),
+                    color = MaterialTheme.colorScheme.outlineVariant
                 )
             }
             Switch(
