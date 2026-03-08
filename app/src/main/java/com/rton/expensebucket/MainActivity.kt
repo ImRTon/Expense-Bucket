@@ -419,6 +419,7 @@ fun ExpensesApp(
                 PaymentMethodsScreen(
                     paymentMethods = allPaymentMethods,
                     onAdd = { viewModel.addPaymentMethod(it) },
+                    onEdit = { viewModel.updatePaymentMethod(it) },
                     onDelete = { viewModel.deletePaymentMethod(it) },
                     onSetDefault = { viewModel.setDefaultPaymentMethod(it) },
                     onBack = { navController.popBackStack() }

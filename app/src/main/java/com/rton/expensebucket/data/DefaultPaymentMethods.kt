@@ -31,18 +31,21 @@ object DefaultPaymentMethods {
         // Cash (If we want a default child for Cash, but usually standard money isn't subcategorized default, left empty for now)
 
         // Credit Cards
-        PaymentMethodSeed("Richart JCB", "richart", 0xFF60A5FA, "credit", sortOrder = 10, parentName = "信用卡"),
-        PaymentMethodSeed("玉山 Visa", "esun", 0xFFFF8C00, "credit", sortOrder = 11, parentName = "信用卡"),
-        PaymentMethodSeed("國泰世華", "cathay", 0xFF10B981, "credit", sortOrder = 12, parentName = "信用卡"),
+        PaymentMethodSeed("Visa", "visa", 0xFF1A1F71, "credit", sortOrder = 10, parentName = "信用卡"),
+        PaymentMethodSeed("Mastercard", "mastercard", 0xFFEB001B, "credit", sortOrder = 11, parentName = "信用卡"),
+        PaymentMethodSeed("JCB", "jcb", 0xFF0B4EA2, "credit", sortOrder = 12, parentName = "信用卡"),
 
         // E-Payment
-        PaymentMethodSeed("街口支付", "jko", 0xFFF59E0B, "epay", sortOrder = 20, parentName = "電子支付"),
-        PaymentMethodSeed("LINE Pay", "linepay", 0xFF22C55E, "epay", sortOrder = 21, parentName = "電子支付"),
+        PaymentMethodSeed("街口支付", "jko", 0xFFE60912, "epay", sortOrder = 20, parentName = "電子支付"),
+        PaymentMethodSeed("LINE Pay", "linepay", 0xFF07B53B, "epay", sortOrder = 21, parentName = "電子支付"),
         PaymentMethodSeed("悠遊付", "easycard", 0xFF3B82F6, "epay", sortOrder = 22, parentName = "電子支付"),
-        PaymentMethodSeed("Apple Pay", "applepay", 0xFF1C1C1E, "epay", sortOrder = 23, parentName = "電子支付"),
+        PaymentMethodSeed("Apple Pay", "applepay", 0xFF000000, "epay", sortOrder = 23, parentName = "電子支付"),
         PaymentMethodSeed("Google Pay", "googlepay", 0xFF4285F4, "epay", sortOrder = 24, parentName = "電子支付"),
-        PaymentMethodSeed("Pi 拍錢包", "pi", 0xFFEC4899, "epay", sortOrder = 25, parentName = "電子支付"),
-        PaymentMethodSeed("全支付", "pay_full", 0xFF0EA5E9, "epay", sortOrder = 26, parentName = "電子支付"),
+        PaymentMethodSeed("Samsung Pay", "samsungpay", 0xFF1428A0, "epay", sortOrder = 25, parentName = "電子支付"),
+        PaymentMethodSeed("PayPal", "paypal", 0xFF00457C, "epay", sortOrder = 26, parentName = "電子支付"),
+        PaymentMethodSeed("Pi 拍錢包", "pi", 0xFFEC4899, "epay", sortOrder = 27, parentName = "電子支付"),
+        PaymentMethodSeed("全支付", "pay_full", 0xFFFFD100, "epay", sortOrder = 28, parentName = "電子支付"),
+        PaymentMethodSeed("臺灣 Pay", "tpay", 0xFFE3007F, "epay", sortOrder = 29, parentName = "電子支付"),
 
         // Other
         PaymentMethodSeed("銀行轉帳", "bank_transfer", 0xFF6B7280, "other", sortOrder = 30, parentName = "其他")

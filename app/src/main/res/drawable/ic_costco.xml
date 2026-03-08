@@ -1,0 +1,14 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- Red C shape -->
+    <path
+        android:fillColor="#E31837"
+        android:pathData="M12,2C6.48,2 2,6.48 2,12s4.48,10 10,10c2.4,0 4.6,-0.85 6.32,-2.27l-1.99,-2.11C14.86,18.78 13.5,19.3 12,19.3c-4.03,0 -7.3,-3.27 -7.3,-7.3S7.97,4.7 12,4.7c1.5,0 2.86,0.52 4.33,1.68l1.99,-2.11C16.6,2.85 14.4,2 12,2Z"/>
+    <!-- Blue horizontal stripes -->
+    <path
+        android:fillColor="#005DAA"
+        android:pathData="M2,11h20v1.5H2z M2,14h20v0.8H2z M2,9.2h20v0.8H2z"/>
+</vector>

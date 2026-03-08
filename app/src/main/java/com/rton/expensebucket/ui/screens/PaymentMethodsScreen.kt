@@ -26,12 +26,14 @@ import com.rton.expensebucket.ui.util.PaymentIconMapper
 fun PaymentMethodsScreen(
     paymentMethods: List<PaymentMethod>,
     onAdd: (PaymentMethod) -> Unit,
+    onEdit: (PaymentMethod) -> Unit,
     onDelete: (PaymentMethod) -> Unit,
     onSetDefault: (Long) -> Unit,
     onBack: () -> Unit = {}
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
     var selectedParentIdForAdd by remember { mutableStateOf<Long?>(null) }
+    var methodToEdit by remember { mutableStateOf<PaymentMethod?>(null) }
 
     // Group methods: Parents first, then map parentId to their children
     val parents = remember(paymentMethods) {
@@ -67,6 +69,7 @@ fun PaymentMethodsScreen(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = {
+                    methodToEdit = null
                     selectedParentIdForAdd = null
                     showAddDialog = true
                 },
@@ -100,6 +103,17 @@ fun PaymentMethodsScreen(
                             modifier = Modifier.weight(1f)
                         )
                         IconButton(onClick = {
+                            methodToEdit = parent
+                            showAddDialog = true
+                        }) {
+                            Icon(
+                                Icons.Filled.Edit,
+                                contentDescription = "編輯父項目",
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        IconButton(onClick = {
+                            methodToEdit = null
                             selectedParentIdForAdd = parent.id
                             showAddDialog = true
                         }) {
@@ -126,6 +140,10 @@ fun PaymentMethodsScreen(
                     items(children, key = { "child_${it.id}" }) { method ->
                         PaymentMethodItem(
                             method = method,
+                            onEdit = {
+                                methodToEdit = method
+                                showAddDialog = true
+                            },
                             onDelete = { onDelete(method) },
                             onSetDefault = { onSetDefault(method.id) }
                         )
@@ -139,10 +157,19 @@ fun PaymentMethodsScreen(
     if (showAddDialog) {
         AddPaymentMethodDialog(
             parentId = selectedParentIdForAdd,
-            onDismiss = { showAddDialog = false },
-            onConfirm = { method ->
-                onAdd(method)
+            initialMethod = methodToEdit,
+            onDismiss = {
                 showAddDialog = false
+                methodToEdit = null
+            },
+            onConfirm = { method ->
+                if (methodToEdit != null) {
+                    onEdit(method)
+                } else {
+                    onAdd(method)
+                }
+                showAddDialog = false
+                methodToEdit = null
             }
         )
     }
@@ -151,6 +178,7 @@ fun PaymentMethodsScreen(
 @Composable
 private fun PaymentMethodItem(
     method: PaymentMethod,
+    onEdit: () -> Unit,
     onDelete: () -> Unit,
     onSetDefault: () -> Unit
 ) {
@@ -229,6 +257,14 @@ private fun PaymentMethodItem(
                 }
             }
 
+            IconButton(onClick = onEdit) {
+                Icon(
+                    Icons.Filled.Edit,
+                    contentDescription = "編輯",
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+
             IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Filled.DeleteOutline,
@@ -244,30 +280,51 @@ private fun PaymentMethodItem(
 @Composable
 private fun AddPaymentMethodDialog(
     parentId: Long?,
+    initialMethod: PaymentMethod? = null,
     onDismiss: () -> Unit,
     onConfirm: (PaymentMethod) -> Unit
 ) {
-    var name by remember { mutableStateOf("") }
-    var selectedType by remember { mutableStateOf("epay") }
-    var selectedIcon by remember { mutableStateOf("other") }
-    var selectedColorIndex by remember { mutableStateOf(0) }
-
-    val types = listOf("cash" to "現金", "credit" to "信用卡", "epay" to "電子支付", "other" to "其他")
+    var name by remember(initialMethod) { mutableStateOf(initialMethod?.name ?: "") }
+    var selectedType by remember(initialMethod) { mutableStateOf(initialMethod?.type ?: "epay") }
+    var selectedIcon by remember(initialMethod) { mutableStateOf(initialMethod?.icon ?: "other") }
+    
     val presetColors = listOf(
         0xFF4ADE80, 0xFF60A5FA, 0xFFF59E0B, 0xFFEC4899,
-        0xFF818CF8, 0xFF10B981, 0xFFFF8C00, 0xFF6B7280
+        0xFF818CF8, 0xFF10B981, 0xFFFF8C00, 0xFF6B7280,
+        0xFF1434CB, 0xFFFF5F00, 0xFF003E94, 0xFFE31837,
+        0xFF06C755, 0xFF3B82F6, 0xFF000000, 0xFF4285F4, 
+        0xFF1428A0, 0xFF00457C, 0xFF0EA5E9
     )
+    
+    var selectedColorIndex by remember(initialMethod) { 
+        mutableStateOf(
+            if (initialMethod != null) {
+                val index = presetColors.indexOf(initialMethod.color)
+                if (index != -1) index else -1 // -1 means custom color
+            } else 0
+        ) 
+    }
+
+    var customHex by remember(initialMethod) {
+        mutableStateOf(
+            if (initialMethod != null && presetColors.indexOf(initialMethod.color) == -1) {
+                String.format("#%06X", 0xFFFFFF and initialMethod.color.toInt())
+            } else ""
+        )
+    }
+
+    val types = listOf("cash" to "現金", "credit" to "信用卡", "epay" to "電子支付", "other" to "其他")
 
     // Icon picker — group by type relevance
     val iconChoices = listOf(
-        "cash", "credit_card", "jko", "linepay", "easycard",
-        "applepay", "googlepay", "pi", "pay_full", "bank_transfer",
-        "richart", "esun", "cathay", "other"
+        "cash", "credit_card", "visa", "mastercard", "jcb",
+        "applepay", "googlepay", "samsungpay", "linepay", "paypal",
+        "tpay", "jko", "easycard", "pi", "pay_full", "bank_transfer", "other"
     )
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("新增支付工具") },
+        title = { Text(if (initialMethod != null) "編輯支付工具" else "新增支付工具") },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedTextField(
@@ -280,7 +337,7 @@ private fun AddPaymentMethodDialog(
                     shape = RoundedCornerShape(12.dp)
                 )
 
-                if (parentId == null) {
+                if (parentId == null && initialMethod == null) {
                     // Type picker for parents only
                     Text("類型", style = MaterialTheme.typography.labelLarge)
                     SingleChoiceSegmentedButtonRow(modifier = Modifier.fillMaxWidth()) {
@@ -324,8 +381,22 @@ private fun AddPaymentMethodDialog(
                     }
                 }
 
+                // Custom Color Input
+                Text("自訂顏色", style = MaterialTheme.typography.labelLarge)
+                OutlinedTextField(
+                    value = customHex,
+                    onValueChange = { 
+                        customHex = it
+                        selectedColorIndex = -1 // Switch to custom color mode
+                    },
+                    label = { Text("輸入色碼 (例如 #FF0000)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
                 // Color picker
-                Text("顏色", style = MaterialTheme.typography.labelLarge)
+                Text("預設顏色", style = MaterialTheme.typography.labelLarge)
                 FlowRow(
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                     verticalArrangement = Arrangement.spacedBy(8.dp)
@@ -343,7 +414,10 @@ private fun AddPaymentMethodDialog(
                             contentAlignment = Alignment.Center
                         ) {
                             IconButton(
-                                onClick = { selectedColorIndex = index },
+                                onClick = {
+                                    selectedColorIndex = index
+                                    customHex = "" // Clear custom hex
+                                },
                                 modifier = Modifier.fillMaxSize()
                             ) {
                                 if (isSelected) {
@@ -362,18 +436,34 @@ private fun AddPaymentMethodDialog(
         confirmButton = {
             Button(
                 onClick = {
-                    onConfirm(
-                        PaymentMethod(
-                            name = name.trim(),
-                            icon = selectedIcon,
-                            color = presetColors[selectedColorIndex],
-                            type = selectedType,
-                            parentId = parentId
-                        )
+                    val finalColor = if (selectedColorIndex >= 0) {
+                        presetColors[selectedColorIndex]
+                    } else {
+                        try {
+                            val parsed = android.graphics.Color.parseColor(
+                                if (!customHex.startsWith("#")) "#$customHex" else customHex
+                            )
+                            parsed.toLong() or 0xFF000000
+                        } catch (e: Exception) {
+                            presetColors[0] // fallback if invalid
+                        }
+                    }
+
+                    val finalMethod = initialMethod?.copy(
+                        name = name.trim(),
+                        icon = selectedIcon,
+                        color = finalColor
+                    ) ?: PaymentMethod(
+                        name = name.trim(),
+                        icon = selectedIcon,
+                        color = finalColor,
+                        type = selectedType,
+                        parentId = parentId
                     )
+                    onConfirm(finalMethod)
                 },
                 enabled = name.isNotBlank()
-            ) { Text("新增") }
+            ) { Text(if (initialMethod != null) "儲存" else "新增") }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) { Text("取消") }
