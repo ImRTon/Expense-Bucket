@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
@@ -27,6 +28,7 @@ class AppSettingsDataStore @Inject constructor(
     companion object {
         private val APP_THEME_KEY = stringPreferencesKey("app_theme")
         private val COMPARE_MODE_KEY = stringPreferencesKey("compare_mode")
+        private val FIRST_DAY_OF_WEEK_KEY = intPreferencesKey("first_day_of_week")
     }
 
     val theme: Flow<AppTheme> = context.appSettingsDataStore.data.map { prefs ->
@@ -51,6 +53,16 @@ class AppSettingsDataStore @Inject constructor(
     suspend fun setCompareMode(mode: String) {
         context.appSettingsDataStore.edit { prefs ->
             prefs[COMPARE_MODE_KEY] = mode
+        }
+    }
+
+    val firstDayOfWeek: Flow<Int> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[FIRST_DAY_OF_WEEK_KEY] ?: java.util.Calendar.MONDAY
+    }
+
+    suspend fun setFirstDayOfWeek(day: Int) {
+        context.appSettingsDataStore.edit { prefs ->
+            prefs[FIRST_DAY_OF_WEEK_KEY] = day
         }
     }
 }

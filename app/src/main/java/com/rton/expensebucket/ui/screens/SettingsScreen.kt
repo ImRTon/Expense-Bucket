@@ -34,6 +34,8 @@ fun SettingsScreen(
     onSetTheme: (AppTheme) -> Unit = {},
     monthlyBudget: Double = 0.0,
     onSetMonthlyBudget: (Double) -> Unit = {},
+    firstDayOfWeek: Int = java.util.Calendar.MONDAY,
+    onSetFirstDayOfWeek: (Int) -> Unit = {},
     onBack: () -> Unit = {},
     onNavigateToPaymentMethods: () -> Unit = {},
     onNavigateToCategories: () -> Unit = {},
@@ -42,6 +44,7 @@ fun SettingsScreen(
 ) {
     var showBudgetDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
+    var showFirstDayDialog by remember { mutableStateOf(false) }
 
     // ─── Theme Dialog ──────────────────────────────────────────
     if (showThemeDialog) {
@@ -87,6 +90,57 @@ fun SettingsScreen(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showThemeDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
+    // ─── First Day of Week Dialog ──────────────────────────────
+    if (showFirstDayDialog) {
+        AlertDialog(
+            onDismissRequest = { showFirstDayDialog = false },
+            title = {
+                Text(
+                    "每週起始日",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.SemiBold
+                    )
+                )
+            },
+            text = {
+                Column {
+                    val days = listOf(java.util.Calendar.SUNDAY to "星期日", java.util.Calendar.MONDAY to "星期一")
+                    days.forEach { (value, label) ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onSetFirstDayOfWeek(value)
+                                    showFirstDayDialog = false
+                                }
+                                .padding(vertical = 12.dp)
+                        ) {
+                            RadioButton(
+                                selected = (firstDayOfWeek == value),
+                                onClick = {
+                                    onSetFirstDayOfWeek(value)
+                                    showFirstDayDialog = false
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = label,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showFirstDayDialog = false }) {
                     Text("取消")
                 }
             }
@@ -223,6 +277,12 @@ fun SettingsScreen(
                 icon = Icons.Filled.AttachMoney,
                 title = "預設幣別",
                 subtitle = "TWD"
+            )
+            SettingsItem(
+                icon = Icons.Filled.CalendarToday,
+                title = "每週起始日",
+                subtitle = if (firstDayOfWeek == java.util.Calendar.SUNDAY) "星期日" else "星期一",
+                onClick = { showFirstDayDialog = true }
             )
             SettingsItem(
                 icon = Icons.Filled.AccountBalanceWallet,

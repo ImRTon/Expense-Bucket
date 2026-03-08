@@ -86,18 +86,86 @@ class MainViewModel @Inject constructor(
         _periodOffset.value += delta
     }
 
+    fun setPeriodDate(targetDateMillis: Long) {
+        if (_selectedPeriod.value == TimePeriod.ALL) return
+
+        val utcCalendar = Calendar.getInstance(java.util.TimeZone.getTimeZone("UTC")).apply { timeInMillis = targetDateMillis }
+        val target = Calendar.getInstance().apply {
+            set(Calendar.YEAR, utcCalendar.get(Calendar.YEAR))
+            set(Calendar.MONTH, utcCalendar.get(Calendar.MONTH))
+            set(Calendar.DAY_OF_MONTH, utcCalendar.get(Calendar.DAY_OF_MONTH))
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+        
+        val now = Calendar.getInstance()
+
+        val newOffset = when (_selectedPeriod.value) {
+            TimePeriod.TODAY -> {
+                now.set(Calendar.HOUR_OF_DAY, 0)
+                now.set(Calendar.MINUTE, 0)
+                now.set(Calendar.SECOND, 0)
+                now.set(Calendar.MILLISECOND, 0)
+
+                Math.round((target.timeInMillis - now.timeInMillis).toDouble() / (1000L * 60 * 60 * 24)).toInt()
+            }
+            TimePeriod.WEEK -> {
+                val currentFirstDay = firstDayOfWeek.value
+
+                // Find the exact start of the week for "now"
+                now.firstDayOfWeek = currentFirstDay
+                now.set(java.util.Calendar.DAY_OF_WEEK, currentFirstDay)
+                now.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                now.set(java.util.Calendar.MINUTE, 0)
+                now.set(java.util.Calendar.SECOND, 0)
+                now.set(java.util.Calendar.MILLISECOND, 0)
+
+                // Find the exact start of the week for "target"
+                target.firstDayOfWeek = currentFirstDay
+                target.set(java.util.Calendar.DAY_OF_WEEK, currentFirstDay)
+                target.set(java.util.Calendar.HOUR_OF_DAY, 0)
+                target.set(java.util.Calendar.MINUTE, 0)
+                target.set(java.util.Calendar.SECOND, 0)
+                target.set(java.util.Calendar.MILLISECOND, 0)
+
+                // By strictly aligning both to 00:00:00 of the same day-of-week based
+                // on the configured preference, we can just Math.round the difference in days over 7.
+                val diffMillis = target.timeInMillis - now.timeInMillis
+                Math.round(diffMillis.toDouble() / (1000L * 60 * 60 * 24 * 7)).toInt()
+            }
+            TimePeriod.MONTH -> {
+                val yearsDiff = target.get(Calendar.YEAR) - now.get(Calendar.YEAR)
+                val monthDiff = target.get(Calendar.MONTH) - now.get(Calendar.MONTH)
+                yearsDiff * 12 + monthDiff
+            }
+            TimePeriod.YEAR -> {
+                target.get(Calendar.YEAR) - now.get(Calendar.YEAR)
+            }
+            TimePeriod.ALL -> 0
+        }
+
+        _periodOffset.value = newOffset
+    }
+
+    // ─── First Day of Week (persisted) ──────────────────────────────
+    val firstDayOfWeek: StateFlow<Int> =
+        appSettingsDataStore.firstDayOfWeek
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), Calendar.MONDAY)
+
     /** Human-readable label for the current period+offset, e.g. "2026年3月", "3/1~3/7" */
     val currentPeriodLabel: StateFlow<String> = combine(
-        _selectedPeriod, _periodOffset
-    ) { period, offset ->
-        formatPeriodLabel(period, offset)
+        _selectedPeriod, _periodOffset, firstDayOfWeek
+    ) { period, offset, firstDay ->
+        formatPeriodLabel(period, offset, firstDay)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
 
     /** Transactions filtered by selected period + offset */
     val filteredTransactions: StateFlow<List<Transaction>> = combine(
-        _selectedPeriod, _periodOffset
-    ) { period, offset ->
-        getDateRangeForPeriod(period, offset)
+        _selectedPeriod, _periodOffset, firstDayOfWeek
+    ) { period, offset, firstDay ->
+        getDateRangeForPeriod(period, offset, firstDay)
     }.flatMapLatest { (start, end) ->
         repository.getTransactionsByDateRange(start, end)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
@@ -106,13 +174,13 @@ class MainViewModel @Inject constructor(
     // Reactive: selected period uses periodOffset, others use offset 0.
     /** Combined map of all period summaries for the WaterLevelCard. */
     val periodData: StateFlow<Map<TimePeriod, PeriodSummary>> = combine(
-        _selectedPeriod, _periodOffset
-    ) { selectedPeriod, offset ->
+        _selectedPeriod, _periodOffset, firstDayOfWeek
+    ) { selectedPeriod, offset, firstDay ->
         // Compute date ranges: the selected period uses the current offset,
         // all other periods use offset=0 (current).
         TimePeriod.entries.map { tp ->
             val tpOffset = if (tp == selectedPeriod) offset else 0
-            tp to getDateRangeForPeriod(tp, tpOffset)
+            tp to getDateRangeForPeriod(tp, tpOffset, firstDay)
         }
     }.flatMapLatest { rangesWithPeriod ->
         val flows = rangesWithPeriod.map { (tp, range) ->
@@ -158,6 +226,11 @@ class MainViewModel @Inject constructor(
 
     fun setCompareMode(mode: CompareMode) {
         viewModelScope.launch { appSettingsDataStore.setCompareMode(mode.name) }
+    }
+
+
+    fun setFirstDayOfWeek(day: Int) {
+        viewModelScope.launch { appSettingsDataStore.setFirstDayOfWeek(day) }
     }
 
     // ─── Projects ───────────────────────────────────────────────────
@@ -388,7 +461,7 @@ class MainViewModel @Inject constructor(
      * Computes the date range for a given [period] shifted by [offset].
      * offset=0 means current, -1 means previous, +1 means next.
      */
-    private fun getDateRangeForPeriod(period: TimePeriod, offset: Int): Pair<Long, Long> {
+    private fun getDateRangeForPeriod(period: TimePeriod, offset: Int, firstDayOfWeek: Int): Pair<Long, Long> {
         val cal = Calendar.getInstance()
         when (period) {
             TimePeriod.TODAY -> {
@@ -398,21 +471,31 @@ class MainViewModel @Inject constructor(
                 cal.set(Calendar.SECOND, 0)
                 cal.set(Calendar.MILLISECOND, 0)
                 val start = cal.timeInMillis
-                cal.add(Calendar.DAY_OF_YEAR, 1)
-                cal.add(Calendar.MILLISECOND, -1)
-                return start to cal.timeInMillis
+
+                cal.set(Calendar.HOUR_OF_DAY, 23)
+                cal.set(Calendar.MINUTE, 59)
+                cal.set(Calendar.SECOND, 59)
+                cal.set(Calendar.MILLISECOND, 999)
+                val end = cal.timeInMillis
+                return Pair(start, end)
             }
             TimePeriod.WEEK -> {
-                cal.set(Calendar.DAY_OF_WEEK, cal.firstDayOfWeek)
                 cal.add(Calendar.WEEK_OF_YEAR, offset)
+                cal.firstDayOfWeek = firstDayOfWeek
+                cal.set(Calendar.DAY_OF_WEEK, firstDayOfWeek)
                 cal.set(Calendar.HOUR_OF_DAY, 0)
                 cal.set(Calendar.MINUTE, 0)
                 cal.set(Calendar.SECOND, 0)
                 cal.set(Calendar.MILLISECOND, 0)
                 val start = cal.timeInMillis
-                cal.add(Calendar.WEEK_OF_YEAR, 1)
-                cal.add(Calendar.MILLISECOND, -1)
-                return start to cal.timeInMillis
+
+                cal.add(Calendar.DAY_OF_YEAR, 6)
+                cal.set(Calendar.HOUR_OF_DAY, 23)
+                cal.set(Calendar.MINUTE, 59)
+                cal.set(Calendar.SECOND, 59)
+                cal.set(Calendar.MILLISECOND, 999)
+                val end = cal.timeInMillis
+                return Pair(start, end)
             }
             TimePeriod.MONTH -> {
                 cal.add(Calendar.MONTH, offset)
@@ -444,7 +527,7 @@ class MainViewModel @Inject constructor(
     }
 
     /** Formats a human-readable label for the given period + offset. */
-    private fun formatPeriodLabel(period: TimePeriod, offset: Int): String {
+    private fun formatPeriodLabel(period: TimePeriod, offset: Int, firstDay: Int): String {
         val cal = Calendar.getInstance()
         return when (period) {
             TimePeriod.TODAY -> {
@@ -452,12 +535,13 @@ class MainViewModel @Inject constructor(
                 SimpleDateFormat("M/d (E)", Locale.TAIWAN).format(cal.time)
             }
             TimePeriod.WEEK -> {
-                cal.set(Calendar.DAY_OF_WEEK, cal.firstDayOfWeek)
                 cal.add(Calendar.WEEK_OF_YEAR, offset)
-                val start = SimpleDateFormat("M/d", Locale.TAIWAN).format(cal.time)
+                cal.firstDayOfWeek = firstDay
+                cal.set(Calendar.DAY_OF_WEEK, firstDay)
+                val startStr = SimpleDateFormat("MM/dd", Locale.getDefault()).format(cal.time)
                 cal.add(Calendar.DAY_OF_YEAR, 6)
-                val end = SimpleDateFormat("M/d", Locale.TAIWAN).format(cal.time)
-                "$start ~ $end"
+                val endStr = SimpleDateFormat("MM/dd", Locale.getDefault()).format(cal.time)
+                "$startStr ~ $endStr"
             }
             TimePeriod.MONTH -> {
                 cal.add(Calendar.MONTH, offset)

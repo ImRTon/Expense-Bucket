@@ -1,5 +1,6 @@
 package com.rton.expensebucket.ui.screens
 
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -42,6 +43,7 @@ fun HomeScreen(
     onTransactionClick: (Transaction) -> Unit,
     onDeleteTransaction: (Transaction) -> Unit,
     onNavigateToDrafts: () -> Unit,
+    onSetPeriodDate: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
     val categoryMap = remember(categories) { categories.associateBy { it.id } }
@@ -58,6 +60,8 @@ fun HomeScreen(
             cal.timeInMillis
         }.toSortedMap(compareByDescending { it })
     }
+
+    var showDatePicker by remember { mutableStateOf(false) }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -84,14 +88,20 @@ fun HomeScreen(
                                 modifier = Modifier.size(20.dp)
                             )
                         }
-                        Text(
-                            text = periodLabel,
-                            style = MaterialTheme.typography.labelLarge.copy(
-                                fontWeight = FontWeight.Medium,
-                                fontSize = 13.sp
-                            ),
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
+                        Box(
+                            modifier = Modifier
+                                .clickable { showDatePicker = true }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = periodLabel,
+                                style = MaterialTheme.typography.labelLarge.copy(
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 13.sp
+                                ),
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
                         IconButton(
                             onClick = { onStepPeriod(1) },
                             modifier = Modifier.size(32.dp)
@@ -229,6 +239,56 @@ fun HomeScreen(
 
             // Bottom spacing for FAB
             item { Spacer(modifier = Modifier.height(80.dp)) }
+        }
+    }
+
+    if (showDatePicker) {
+        val initialMillis = remember { System.currentTimeMillis() }
+
+        when (selectedPeriod) {
+            TimePeriod.MONTH -> {
+                com.rton.expensebucket.ui.components.YearMonthPickerDialog(
+                    initialTimeMillis = initialMillis,
+                    onDateSelected = { dateMillis ->
+                        onSetPeriodDate(dateMillis)
+                        showDatePicker = false
+                    },
+                    onDismiss = { showDatePicker = false }
+                )
+            }
+            TimePeriod.YEAR -> {
+                com.rton.expensebucket.ui.components.YearPickerDialog(
+                    initialTimeMillis = initialMillis,
+                    onDateSelected = { dateMillis ->
+                        onSetPeriodDate(dateMillis)
+                        showDatePicker = false
+                    },
+                    onDismiss = { showDatePicker = false }
+                )
+            }
+            else -> {
+                val datePickerState = rememberDatePickerState()
+                DatePickerDialog(
+                    onDismissRequest = { showDatePicker = false },
+                    confirmButton = {
+                        TextButton(onClick = {
+                            datePickerState.selectedDateMillis?.let { dateMillis ->
+                                onSetPeriodDate(dateMillis)
+                            }
+                            showDatePicker = false
+                        }) {
+                            Text("確定")
+                        }
+                    },
+                    dismissButton = {
+                        TextButton(onClick = { showDatePicker = false }) {
+                            Text("取消")
+                        }
+                    }
+                ) {
+                    DatePicker(state = datePickerState)
+                }
+            }
         }
     }
 }

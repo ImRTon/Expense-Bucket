@@ -325,7 +325,8 @@ fun ExpensesApp(
                         navController.navigate(Screen.EditTransaction.createRoute(transaction.id))
                     },
                     onDeleteTransaction = { viewModel.deleteTransaction(it) },
-                    onNavigateToDrafts = { navController.navigate(Screen.Drafts.route) }
+                    onNavigateToDrafts = { navController.navigate(Screen.Drafts.route) },
+                    onSetPeriodDate = { viewModel.setPeriodDate(it) }
                 )
             }
 
@@ -426,11 +427,14 @@ fun ExpensesApp(
 
             // ─── Settings ───────────────────────────────────────────
             composable(Screen.Settings.route) {
+                val firstDayOfWeek by viewModel.firstDayOfWeek.collectAsState()
                 SettingsScreen(
                     currentTheme = currentTheme,
                     onSetTheme = { viewModel.setTheme(it) },
                     monthlyBudget = monthlyBudget,
                     onSetMonthlyBudget = { viewModel.setMonthlyBudget(it) },
+                    firstDayOfWeek = firstDayOfWeek,
+                    onSetFirstDayOfWeek = { viewModel.setFirstDayOfWeek(it) },
                     onNavigateToPaymentMethods = {
                         navController.navigate(Screen.PaymentMethods.route) {
                             launchSingleTop = true
