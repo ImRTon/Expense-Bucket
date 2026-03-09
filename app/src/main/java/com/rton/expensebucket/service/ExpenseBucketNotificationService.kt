@@ -56,8 +56,10 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
             "com.cathaybk.mymobibank",  // 國泰世華
             "com.ctbcbank.ctbc",        // 中國信託
             "com.fubon.mobilebank",     // 富邦銀行
+            "com.fubon.aibank",         // 富邦銀行 (aibank)
             "com.sinopac.DaCard",       // 永豐大咖
             "wbank.ubot.com.tw",        // 聯邦銀行
+            "tw.gov.post.mpost",        // 郵局
 
             // Google Pay / Apple Pay (system-level)
             "com.google.android.apps.nbu.paisa.user",  // Google Pay
