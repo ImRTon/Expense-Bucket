@@ -85,9 +85,9 @@ class NotificationParser {
             merchantGroup = 1,
             paymentHint = "applepay" // will be overridden by package name
         ),
-        // 富邦：「【刷卡消費通知】您的信用卡末四碼xxxx於02/23 12:37:26商店名稱消費台幣1,234元」
+        // 富邦：「【刷卡消費通知】您的信用卡末四碼xxxx於02/23 12:37:26商店名稱消費臺幣1,234元」
         NotifPattern(
-            regex = Pattern.compile("""信用卡.*?[於在]\s*(\d{2}[/-]\d{2}\s+\d{1,2}:\d{1,2}(?::\d{1,2})?)\s*(.*?)\s*消費台幣\s*([\d,]+(?:\.\d+)?)\s*元"""),
+            regex = Pattern.compile("""信用卡.*?[於在]\s*(\d{2}[/-]\d{2}\s+\d{1,2}:\d{1,2}(?::\d{1,2})?)\s*(.*?)\s*消費臺幣\s*([\d,]+(?:\.\d+)?)\s*元"""),
             amountGroup = 3,
             merchantGroup = 2,
             paymentHint = "credit_card",
