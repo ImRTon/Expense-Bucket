@@ -220,6 +220,10 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
     }
 
     private fun isWatchedPackage(pkg: String): Boolean {
-        return WATCHED_PACKAGES.any { pkg.startsWith(it) || pkg.contains(it) }
+        val normalizedPkg = pkg.lowercase()
+        return WATCHED_PACKAGES.any { watched ->
+            val normalizedWatched = watched.lowercase()
+            normalizedPkg.startsWith(normalizedWatched) || normalizedPkg.contains(normalizedWatched)
+        }
     }
 }

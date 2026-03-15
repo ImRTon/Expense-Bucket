@@ -93,12 +93,13 @@ class NotificationParser {
             paymentHint = "credit_card",
             dateGroup = 1
         ),
-        // 永豐大咖/大戶：「xxxx感謝03/06 20:29刷卡台幣539元，商店名稱:悠遊付，實際xxxxx」
+        // 永豐大咖/大戶：「永豐貴賓您好，末四碼xxxx感謝03/15 12:05刷卡台幣123元，商店名稱:STORE_NAME，實際商店名稱請以xxxxxx」
         NotifPattern(
-            regex = Pattern.compile("""刷卡台幣\s*([\d,]+(?:\.\d+)?)\s*元.*?(?:商店名稱|商店)[：:\s]*([^，,]+)"""),
-            amountGroup = 1,
-            merchantGroup = 2,
-            paymentHint = "sinopac"
+            regex = Pattern.compile("""感謝\s*(\d{1,2}/\d{1,2}\s+\d{1,2}:\d{1,2})\s*刷卡(?:台幣|新台幣|NT\$?)\s*([\d,]+(?:\.\d+)?)\s*元.*?(?:商店名稱|商店)[：:\s]*([^，,]+)"""),
+            amountGroup = 2,
+            merchantGroup = 3,
+            paymentHint = "sinopac",
+            dateGroup = 1
         ),
         // 郵局：「您的郵政VISA金融卡於114/01/13 21:22:05消費新台幣8,521元(國外交易blablabla)，如有疑慮blablabla」
         NotifPattern(
@@ -166,19 +167,20 @@ class NotificationParser {
      */
     private fun detectPaymentHintFromPackage(packageName: String?): String? {
         if (packageName == null) return null
+        val normalizedPackage = packageName.lowercase()
         return when {
-            "jkopay" in packageName || "jko" in packageName -> "jko"
-            "linepay" in packageName || "line" in packageName -> "linepay"
-            "easycard" in packageName || "easygo" in packageName -> "easycard"
-            "taishin" in packageName || "richart" in packageName -> "richart"
-            "esunbank" in packageName -> "esun"
-            "cathaybk" in packageName -> "cathay"
-            "ctbcbank" in packageName -> "credit_card"
-            "fubon" in packageName -> "credit_card"
-            "sinopac" in packageName -> "sinopac"
-            "post" in packageName -> "post"
-            "apple" in packageName -> "applepay"
-            "google" in packageName && "pay" in packageName -> "googlepay"
+            "jkopay" in normalizedPackage || "jko" in normalizedPackage -> "jko"
+            "linepay" in normalizedPackage || "line" in normalizedPackage -> "linepay"
+            "easycard" in normalizedPackage || "easygo" in normalizedPackage -> "easycard"
+            "taishin" in normalizedPackage || "richart" in normalizedPackage -> "richart"
+            "esunbank" in normalizedPackage -> "esun"
+            "cathaybk" in normalizedPackage -> "cathay"
+            "ctbcbank" in normalizedPackage -> "credit_card"
+            "fubon" in normalizedPackage -> "credit_card"
+            "sinopac" in normalizedPackage -> "sinopac"
+            "post" in normalizedPackage -> "post"
+            "apple" in normalizedPackage -> "applepay"
+            "google" in normalizedPackage && "pay" in normalizedPackage -> "googlepay"
             else -> null
         }
     }
