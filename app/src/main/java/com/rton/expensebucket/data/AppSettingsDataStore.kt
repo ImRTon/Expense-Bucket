@@ -19,6 +19,11 @@ enum class AppTheme(val displayName: String) {
     DARK("深色主題")
 }
 
+enum class AppPalette(val displayName: String) {
+    DEFAULT("預設主題"),
+    LATTE("宇宙拿鐵")
+}
+
 private val Context.appSettingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "app_settings")
 
 @Singleton
@@ -27,6 +32,7 @@ class AppSettingsDataStore @Inject constructor(
 ) {
     companion object {
         private val APP_THEME_KEY = stringPreferencesKey("app_theme")
+        private val APP_PALETTE_KEY = stringPreferencesKey("app_palette")
         private val COMPARE_MODE_KEY = stringPreferencesKey("compare_mode")
         private val FIRST_DAY_OF_WEEK_KEY = intPreferencesKey("first_day_of_week")
     }
@@ -43,6 +49,21 @@ class AppSettingsDataStore @Inject constructor(
     suspend fun setTheme(theme: AppTheme) {
         context.appSettingsDataStore.edit { prefs ->
             prefs[APP_THEME_KEY] = theme.name
+        }
+    }
+
+    val palette: Flow<AppPalette> = context.appSettingsDataStore.data.map { prefs ->
+        val paletteName = prefs[APP_PALETTE_KEY] ?: AppPalette.DEFAULT.name
+        try {
+            AppPalette.valueOf(paletteName)
+        } catch (e: IllegalArgumentException) {
+            AppPalette.DEFAULT
+        }
+    }
+
+    suspend fun setPalette(palette: AppPalette) {
+        context.appSettingsDataStore.edit { prefs ->
+            prefs[APP_PALETTE_KEY] = palette.name
         }
     }
 

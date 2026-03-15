@@ -15,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -29,6 +30,7 @@ import com.rton.expensebucket.navigation.Screen
 import com.rton.expensebucket.ocr.OcrEngine
 import com.rton.expensebucket.ui.screens.*
 import com.rton.expensebucket.ui.theme.ExpensesTheme
+import com.rton.expensebucket.ui.theme.LatteSurfaceRaisedLight
 import com.rton.expensebucket.ui.viewmodel.MainViewModel
 import com.rton.expensebucket.ui.viewmodel.CompareMode
 import dagger.hilt.android.AndroidEntryPoint
@@ -82,8 +84,12 @@ class MainActivity : ComponentActivity() {
 
             val viewModel: MainViewModel = hiltViewModel()
             val currentTheme by viewModel.currentTheme.collectAsStateWithLifecycle()
+            val currentPalette by viewModel.currentPalette.collectAsStateWithLifecycle()
 
-            ExpensesTheme(appTheme = currentTheme) {
+            ExpensesTheme(
+                appTheme = currentTheme,
+                appPalette = currentPalette
+            ) {
                 ExpensesApp(
                     ocrEngine = ocrEngine,
                     sharedImageUri = sharedImageUri,
@@ -198,6 +204,7 @@ fun ExpensesApp(
     val periodData by viewModel.periodData.collectAsStateWithLifecycle()
     val monthlyBudget by viewModel.monthlyBudget.collectAsStateWithLifecycle()
     val currentTheme by viewModel.currentTheme.collectAsStateWithLifecycle()
+    val currentPalette by viewModel.currentPalette.collectAsStateWithLifecycle()
     val selectedPeriod by viewModel.selectedPeriod.collectAsStateWithLifecycle()
     val periodLabel by viewModel.currentPeriodLabel.collectAsStateWithLifecycle()
     val allProjects by viewModel.allProjects.collectAsStateWithLifecycle()
@@ -231,11 +238,35 @@ fun ExpensesApp(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentRoute = navBackStackEntry?.destination?.route
     val showBottomBar = currentRoute in bottomBarRoutes
+    val isDarkTheme = when (currentTheme) {
+        com.rton.expensebucket.data.AppTheme.SYSTEM -> androidx.compose.foundation.isSystemInDarkTheme()
+        com.rton.expensebucket.data.AppTheme.DARK -> true
+        com.rton.expensebucket.data.AppTheme.LIGHT -> false
+    }
+    val bottomBarContainerColor = if (
+        currentPalette == com.rton.expensebucket.data.AppPalette.LATTE && !isDarkTheme
+    ) {
+        LatteSurfaceRaisedLight
+    } else {
+        MaterialTheme.colorScheme.surface
+    }
+    val bottomBarItemColors = if (
+        currentPalette == com.rton.expensebucket.data.AppPalette.LATTE && !isDarkTheme
+    ) {
+        NavigationBarItemDefaults.colors(
+            indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+        )
+    } else {
+        NavigationBarItemDefaults.colors()
+    }
 
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar {
+                NavigationBar(
+                    containerColor = bottomBarContainerColor,
+                    tonalElevation = 0.dp
+                ) {
                     bottomNavItems.forEach { item ->
                         val selected = navBackStackEntry?.destination?.hierarchy?.any {
                             it.route == item.route
@@ -255,7 +286,8 @@ fun ExpensesApp(
                             icon = {
                                 Icon(item.icon, contentDescription = item.label)
                             },
-                            label = { Text(item.label) }
+                            label = { Text(item.label) },
+                            colors = bottomBarItemColors
                         )
                     }
                 }
@@ -314,6 +346,8 @@ fun ExpensesApp(
                     periodData = periodData,
                     monthlyBudget = monthlyBudget,
                     compareMode = compareMode,
+                    appPalette = currentPalette,
+                    appTheme = currentTheme,
                     onCompareModeChanged = { viewModel.setCompareMode(it) },
                     selectedPeriod = selectedPeriod,
                     periodLabel = periodLabel,
@@ -432,6 +466,8 @@ fun ExpensesApp(
                 SettingsScreen(
                     currentTheme = currentTheme,
                     onSetTheme = { viewModel.setTheme(it) },
+                    currentPalette = currentPalette,
+                    onSetPalette = { viewModel.setPalette(it) },
                     monthlyBudget = monthlyBudget,
                     onSetMonthlyBudget = { viewModel.setMonthlyBudget(it) },
                     firstDayOfWeek = firstDayOfWeek,

@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.rton.expensebucket.data.BudgetDataStore
 import com.rton.expensebucket.data.AppTheme
+import com.rton.expensebucket.data.AppPalette
 import com.rton.expensebucket.data.AppSettingsDataStore
 import com.rton.expensebucket.data.DefaultCategories
 import com.rton.expensebucket.data.DefaultPaymentMethods
@@ -216,6 +217,15 @@ class MainViewModel @Inject constructor(
 
     fun setTheme(theme: AppTheme) {
         viewModelScope.launch { appSettingsDataStore.setTheme(theme) }
+    }
+
+    // ─── App Palette ────────────────────────────────────────────────
+    val currentPalette: StateFlow<AppPalette> =
+        appSettingsDataStore.palette
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppPalette.DEFAULT)
+
+    fun setPalette(palette: AppPalette) {
+        viewModelScope.launch { appSettingsDataStore.setPalette(palette) }
     }
 
     // ─── Compare Mode (persisted) ───────────────────────────────────

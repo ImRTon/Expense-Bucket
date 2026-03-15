@@ -33,6 +33,26 @@ val SurfaceDark = Color(0xFF0C1220)
 val SurfaceDarkElevated = Color(0xFF162032)
 val SurfaceDarkCard = Color(0xFF1A2740)
 
+// ─── Latte "宇宙拿鐵" palette ──────────────────────────────────
+val LatteSurfaceLight = Color(0xFFFFF8E7)
+val LatteSurfaceRaisedLight = Color(0xFFF8F0DE)
+val LatteSurfaceSoftLight = Color(0xFFF1E6D1)
+val LatteSurfaceDark = Color(0xFF1C1A16)
+
+val LatteSageLight = Color(0xFF6F9767)
+val LatteSageDark = Color(0xFFA2C5A2)
+
+val LatteHojichaLight = Color(0xFF8C7D40)
+val LatteOatDark = Color(0xFFD4C58D)
+
+val LatteCaramelLight = Color(0xFFA96B36)
+val LatteCaramelDark = Color(0xFFEBB07D)
+
+val LatteTerracottaLight = Color(0xFF9A463D)
+val LatteTerracottaDark = Color(0xFFFFB4AB)
+
+val LatteContainerStroke = Color(0xFF3D523D)
+
 // Category colors
 val CategoryFood = Color(0xFFF97316)
 val CategoryTransport = Color(0xFF3B82F6)

@@ -29,6 +29,8 @@ import androidx.compose.ui.unit.sp
 import com.rton.expensebucket.ui.viewmodel.CompareMode
 import com.rton.expensebucket.ui.viewmodel.PeriodSummary
 import com.rton.expensebucket.ui.viewmodel.TimePeriod
+import com.rton.expensebucket.data.AppPalette
+import com.rton.expensebucket.ui.theme.*
 import kotlinx.coroutines.isActive
 import java.text.NumberFormat
 import java.util.*
@@ -42,6 +44,8 @@ fun WaterLevelCard(
     periodData: Map<TimePeriod, PeriodSummary>,
     monthlyBudget: Double,
     compareMode: CompareMode,
+    appPalette: AppPalette = AppPalette.DEFAULT,
+    isDarkTheme: Boolean = false,
     onCompareModeChanged: (CompareMode) -> Unit,
     selectedPage: Int = 2,
     onPageChanged: (Int) -> Unit = {},
@@ -90,12 +94,7 @@ fun WaterLevelCard(
     )
 
     val waterColor by animateColorAsState(
-        targetValue = when {
-            displayData.level > 0.6 -> Color(0xFF4ADE80)
-            displayData.level > 0.35 -> Color(0xFFFBBF24)
-            displayData.level > 0.15 -> Color(0xFFFB923C)
-            else -> Color(0xFFFB7185)
-        },
+        targetValue = getLevelColor(displayData.level, appPalette, isDarkTheme),
         animationSpec = tween(800),
         label = "waterColor"
     )
@@ -219,12 +218,7 @@ fun WaterLevelCard(
                             else pageDisplay.level.toFloat()
                 val waterHeight = h * level * 0.95f
 
-                val color = when {
-                    pageDisplay.level > 0.6 -> Color(0xFF4ADE80)
-                    pageDisplay.level > 0.35 -> Color(0xFFFBBF24)
-                    pageDisplay.level > 0.15 -> Color(0xFFFB923C)
-                    else -> Color(0xFFFB7185)
-                }
+                val color = getLevelColor(pageDisplay.level, appPalette, isDarkTheme)
 
                 val glowAlpha = 0.08f + level * 0.12f
                 val glowBrush = Brush.verticalGradient(
@@ -248,12 +242,21 @@ fun WaterLevelCard(
                 val maxDisplacement = min(waterHeight, h - (h - waterHeight))
                 val tiltOffset = rawTiltOffset.coerceIn(-maxDisplacement, maxDisplacement)
 
-                drawFluidLayer(w, h, waterHeight, tiltOffset, sloshOffset, angularVelocity, wavePhase,
-                    12f, 1.8f, 0f, 1.0f, color.copy(alpha = 0.3f))
-                drawFluidLayer(w, h, waterHeight, tiltOffset, sloshOffset, angularVelocity, wavePhase + 1.8f,
-                    9f, 2.5f, 5f, 0.88f, color.copy(alpha = 0.45f))
-                drawFluidLayer(w, h, waterHeight, tiltOffset, sloshOffset, angularVelocity, wavePhase + 3.5f,
-                    7f, 3.2f, 10f, 0.75f, color.copy(alpha = 0.6f))
+                if (appPalette == AppPalette.LATTE) {
+                    drawFluidLayer(w, h, waterHeight, tiltOffset, sloshOffset, angularVelocity, wavePhase,
+                        12f, 1.8f, 0f, 1.0f, color.copy(alpha = 0.4f))
+                    drawFluidLayer(w, h, waterHeight, tiltOffset, sloshOffset, angularVelocity, wavePhase + 1.8f,
+                        9f, 2.5f, 5f, 0.88f, color.copy(alpha = 0.5f))
+                    drawFluidLayer(w, h, waterHeight, tiltOffset, sloshOffset, angularVelocity, wavePhase + 3.5f,
+                        7f, 3.2f, 10f, 0.75f, color)
+                } else {
+                    drawFluidLayer(w, h, waterHeight, tiltOffset, sloshOffset, angularVelocity, wavePhase,
+                        12f, 1.8f, 0f, 1.0f, color.copy(alpha = 0.3f))
+                    drawFluidLayer(w, h, waterHeight, tiltOffset, sloshOffset, angularVelocity, wavePhase + 1.8f,
+                        9f, 2.5f, 5f, 0.88f, color.copy(alpha = 0.45f))
+                    drawFluidLayer(w, h, waterHeight, tiltOffset, sloshOffset, angularVelocity, wavePhase + 3.5f,
+                        7f, 3.2f, 10f, 0.75f, color.copy(alpha = 0.6f))
+                }
             }
 
             // ─── Text Content Overlay ────────────────────────────
@@ -358,10 +361,7 @@ fun WaterLevelCard(
                             val isSelected = index == pagerState.currentPage
                             val dotColor = when {
                                 !isSelected -> MaterialTheme.colorScheme.onSurface.copy(alpha = 0.2f)
-                                displayData.level > 0.6 -> Color(0xFF4ADE80)
-                                displayData.level > 0.35 -> Color(0xFFFBBF24)
-                                displayData.level > 0.15 -> Color(0xFFFB923C)
-                                else -> Color(0xFFFB7185)
+                                else -> getLevelColor(displayData.level, appPalette, isDarkTheme)
                             }
                             Box(
                                 modifier = Modifier
@@ -375,6 +375,49 @@ fun WaterLevelCard(
                 }
             }
         }
+    }
+}
+
+private fun getLevelColor(level: Double, palette: AppPalette, isDarkTheme: Boolean): Color {
+    val l = level.toFloat().coerceIn(0f, 1f)
+    if (palette == AppPalette.LATTE) {
+        val (c1, c2, c3, c4) = if (isDarkTheme) {
+            listOf(LatteSageDark, LatteOatDark, LatteCaramelDark, LatteTerracottaDark)
+        } else {
+            listOf(LatteSageLight, LatteHojichaLight, LatteCaramelLight, LatteTerracottaLight)
+        }
+        return interpolateColors(l, c1, c2, c3, c4)
+    } else {
+        val c1 = Color(0xFF4ADE80)
+        val c2 = Color(0xFFFBBF24)
+        val c3 = Color(0xFFFB923C)
+        val c4 = Color(0xFFFB7185)
+        return interpolateColors(l, c1, c2, c3, c4)
+    }
+}
+
+/**
+ * Linearly interpolates between the 4 stage colors based on current level.
+ * [0.6 ~ 1.0] -> blends between c2 and c1
+ * [0.35 ~ 0.6] -> blends between c3 and c2
+ * [0.15 ~ 0.35] -> blends between c4 and c3
+ * [0.0 ~ 0.15] -> fixed at c4
+ */
+private fun interpolateColors(level: Float, c1: Color, c2: Color, c3: Color, c4: Color): Color {
+    return when {
+        level >= 0.6f -> {
+            val fraction = (level - 0.6f) / (1f - 0.6f)
+            androidx.compose.ui.graphics.lerp(c2, c1, fraction)
+        }
+        level >= 0.35f -> {
+            val fraction = (level - 0.35f) / (0.6f - 0.35f)
+            androidx.compose.ui.graphics.lerp(c3, c2, fraction)
+        }
+        level >= 0.15f -> {
+            val fraction = (level - 0.15f) / (0.35f - 0.15f)
+            androidx.compose.ui.graphics.lerp(c4, c3, fraction)
+        }
+        else -> c4
     }
 }
 

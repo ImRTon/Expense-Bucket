@@ -15,6 +15,7 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
+import com.rton.expensebucket.data.AppPalette
 import com.rton.expensebucket.data.AppTheme
 
 private val DarkColorScheme = darkColorScheme(
@@ -59,9 +60,52 @@ private val LightColorScheme = lightColorScheme(
     outline = Slate50
 )
 
+private val LatteDarkColorScheme = darkColorScheme(
+    primary = LatteSageDark,
+    onPrimary = LatteSurfaceDark,
+    primaryContainer = LatteContainerStroke,
+    onPrimaryContainer = LatteSageDark,
+    secondary = LatteCaramelDark,
+    onSecondary = LatteSurfaceDark,
+    secondaryContainer = LatteSurfaceDark,
+    onSecondaryContainer = LatteCaramelDark,
+    tertiary = Sky60,
+    background = LatteSurfaceDark,
+    onBackground = LatteSurfaceLight,
+    surface = LatteSurfaceDark,
+    onSurface = LatteSurfaceLight,
+    surfaceVariant = LatteSurfaceDark,
+    onSurfaceVariant = LatteSurfaceLight,
+    error = LatteTerracottaDark,
+    onError = LatteSurfaceDark,
+    outline = LatteContainerStroke
+)
+
+private val LatteLightColorScheme = lightColorScheme(
+    primary = LatteSageLight,
+    onPrimary = LatteSurfaceLight,
+    primaryContainer = LatteSageLight,
+    onPrimaryContainer = LatteSurfaceLight,
+    secondary = LatteCaramelLight,
+    onSecondary = LatteSurfaceLight,
+    secondaryContainer = LatteCaramelLight,
+    onSecondaryContainer = LatteSurfaceLight,
+    tertiary = Sky60,
+    background = LatteSurfaceLight,
+    onBackground = LatteSurfaceDark,
+    surface = LatteSurfaceLight,
+    onSurface = LatteSurfaceDark,
+    surfaceVariant = LatteSurfaceSoftLight,
+    onSurfaceVariant = LatteSurfaceDark,
+    error = LatteTerracottaLight,
+    onError = LatteSurfaceLight,
+    outline = LatteContainerStroke
+)
+
 @Composable
 fun ExpensesTheme(
     appTheme: AppTheme = AppTheme.SYSTEM,
+    appPalette: AppPalette = AppPalette.DEFAULT,
     dynamicColor: Boolean = true,
     content: @Composable () -> Unit
 ) {
@@ -72,6 +116,7 @@ fun ExpensesTheme(
     }
 
     val colorScheme = when {
+        appPalette == AppPalette.LATTE -> if (darkTheme) LatteDarkColorScheme else LatteLightColorScheme
         dynamicColor && Build.VERSION.SDK_INT >= Build.VERSION_CODES.S -> {
             val context = LocalContext.current
             if (darkTheme) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)

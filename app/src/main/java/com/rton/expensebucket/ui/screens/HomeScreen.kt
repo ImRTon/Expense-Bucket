@@ -22,6 +22,9 @@ import com.rton.expensebucket.ui.components.TransactionListItem
 import com.rton.expensebucket.ui.viewmodel.CompareMode
 import com.rton.expensebucket.ui.viewmodel.PeriodSummary
 import com.rton.expensebucket.ui.viewmodel.TimePeriod
+import com.rton.expensebucket.data.AppPalette
+import com.rton.expensebucket.data.AppTheme
+import androidx.compose.foundation.isSystemInDarkTheme
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -33,6 +36,8 @@ fun HomeScreen(
     periodData: Map<TimePeriod, PeriodSummary>,
     monthlyBudget: Double,
     compareMode: CompareMode,
+    appPalette: AppPalette,
+    appTheme: AppTheme,
     onCompareModeChanged: (CompareMode) -> Unit,
     selectedPeriod: TimePeriod,
     periodLabel: String,
@@ -62,6 +67,12 @@ fun HomeScreen(
     }
 
     var showDatePicker by remember { mutableStateOf(false) }
+
+    val isDarkTheme = when(appTheme) {
+        AppTheme.SYSTEM -> isSystemInDarkTheme()
+        AppTheme.DARK -> true
+        AppTheme.LIGHT -> false
+    }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -170,6 +181,8 @@ fun HomeScreen(
                     periodData = periodData,
                     monthlyBudget = monthlyBudget,
                     compareMode = compareMode,
+                    appPalette = appPalette,
+                    isDarkTheme = isDarkTheme,
                     onCompareModeChanged = onCompareModeChanged,
                     selectedPage = TimePeriod.entries.indexOf(selectedPeriod),
                     onPageChanged = { pageIndex ->

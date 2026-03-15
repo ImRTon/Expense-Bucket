@@ -28,6 +28,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.rton.expensebucket.service.ExpenseBucketNotificationService
 import com.rton.expensebucket.data.AppTheme
+import com.rton.expensebucket.data.AppPalette
 import java.text.NumberFormat
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -35,6 +36,8 @@ import java.text.NumberFormat
 fun SettingsScreen(
     currentTheme: AppTheme = AppTheme.SYSTEM,
     onSetTheme: (AppTheme) -> Unit = {},
+    currentPalette: AppPalette = AppPalette.DEFAULT,
+    onSetPalette: (AppPalette) -> Unit = {},
     monthlyBudget: Double = 0.0,
     onSetMonthlyBudget: (Double) -> Unit = {},
     firstDayOfWeek: Int = java.util.Calendar.MONDAY,
@@ -48,6 +51,7 @@ fun SettingsScreen(
 ) {
     var showBudgetDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
+    var showPaletteDialog by remember { mutableStateOf(false) }
     var showFirstDayDialog by remember { mutableStateOf(false) }
 
     // ─── Theme Dialog ──────────────────────────────────────────
@@ -94,6 +98,56 @@ fun SettingsScreen(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showThemeDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
+    }
+
+    // ─── Palette Dialog ──────────────────────────────────────────
+    if (showPaletteDialog) {
+        AlertDialog(
+            onDismissRequest = { showPaletteDialog = false },
+            title = {
+                Text(
+                    "選擇主題色彩",
+                    style = MaterialTheme.typography.titleLarge.copy(
+                        fontWeight = FontWeight.SemiBold
+                    )
+                )
+            },
+            text = {
+                Column {
+                    AppPalette.entries.forEach { paletteOption ->
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable {
+                                    onSetPalette(paletteOption)
+                                    showPaletteDialog = false
+                                }
+                                .padding(vertical = 12.dp)
+                        ) {
+                            RadioButton(
+                                selected = (currentPalette == paletteOption),
+                                onClick = {
+                                    onSetPalette(paletteOption)
+                                    showPaletteDialog = false
+                                }
+                            )
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                text = paletteOption.displayName,
+                                style = MaterialTheme.typography.bodyLarge
+                            )
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showPaletteDialog = false }) {
                     Text("取消")
                 }
             }
@@ -268,7 +322,13 @@ fun SettingsScreen(
 
             SettingsItem(
                 icon = Icons.Filled.Palette,
-                title = "主題",
+                title = "主題色彩",
+                subtitle = currentPalette.displayName,
+                onClick = { showPaletteDialog = true }
+            )
+            SettingsItem(
+                icon = Icons.Filled.BrightnessMedium,
+                title = "深淺模式",
                 subtitle = currentTheme.displayName,
                 onClick = { showThemeDialog = true }
             )
