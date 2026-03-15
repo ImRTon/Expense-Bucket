@@ -29,6 +29,7 @@ coroutines = "1.9.0"
 # ML Kit
 mlkitTextRecognition = "16.0.1"
 mlkitTextRecognitionChinese = "16.0.1"
+mlkitTextRecognitionJapanese = "16.0.1"
 mlkitLanguageId = "17.0.6"
 mlkitTranslate = "17.0.3"
 # Coil (image loading for Compose)
@@ -77,6 +78,7 @@ kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 # ML Kit
 mlkit-text-recognition = { group = "com.google.mlkit", name = "text-recognition", version.ref = "mlkitTextRecognition" }
 mlkit-text-recognition-chinese = { group = "com.google.mlkit", name = "text-recognition-chinese", version.ref = "mlkitTextRecognitionChinese" }
+mlkit-text-recognition-japanese = { group = "com.google.mlkit", name = "text-recognition-japanese", version.ref = "mlkitTextRecognitionJapanese" }
 mlkit-language-id = { group = "com.google.mlkit", name = "language-id", version.ref = "mlkitLanguageId" }
 mlkit-translate = { group = "com.google.mlkit", name = "translate", version.ref = "mlkitTranslate" }
 # Coil

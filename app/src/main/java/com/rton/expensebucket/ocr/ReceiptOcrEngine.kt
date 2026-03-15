@@ -11,6 +11,7 @@ import com.google.mlkit.vision.common.InputImage
 import com.google.mlkit.vision.text.TextRecognition
 import com.google.mlkit.vision.text.TextRecognizer
 import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
+import com.google.mlkit.vision.text.japanese.JapaneseTextRecognizerOptions
 import com.google.mlkit.vision.text.latin.TextRecognizerOptions
 import kotlinx.coroutines.async
 import kotlinx.coroutines.coroutineScope
@@ -26,6 +27,9 @@ class ReceiptOcrEngine @Inject constructor() {
     private val chineseRecognizer = TextRecognition.getClient(
         ChineseTextRecognizerOptions.Builder().build()
     )
+    private val japaneseRecognizer = TextRecognition.getClient(
+        JapaneseTextRecognizerOptions.Builder().build()
+    )
     private val latinRecognizer = TextRecognition.getClient(
         TextRecognizerOptions.DEFAULT_OPTIONS
     )
@@ -34,11 +38,17 @@ class ReceiptOcrEngine @Inject constructor() {
     suspend fun processReceipt(context: Context, imageUri: Uri): ReceiptOcrResult = coroutineScope {
         val image = InputImage.fromFilePath(context, imageUri)
         val chineseTextDeferred = async { recognizeText(chineseRecognizer, image) }
+        val japaneseTextDeferred = async { recognizeText(japaneseRecognizer, image) }
         val latinTextDeferred = async { recognizeText(latinRecognizer, image) }
 
         val chineseText = chineseTextDeferred.await()
+        val japaneseText = japaneseTextDeferred.await()
         val latinText = latinTextDeferred.await()
-        val rawText = selectBestText(chineseText, latinText)
+        val rawText = selectBestText(
+            RecognizedTextCandidate(chineseText, RecognizerHint.CHINESE),
+            RecognizedTextCandidate(japaneseText, RecognizerHint.JAPANESE),
+            RecognizedTextCandidate(latinText, RecognizerHint.LATIN)
+        )
         val detectedLanguage = identifyLanguage(rawText)
         buildResult(
             rawText = rawText,
@@ -141,13 +151,30 @@ class ReceiptOcrEngine @Inject constructor() {
         }
     }
 
-    private fun selectBestText(chineseText: String, latinText: String): String {
-        return listOf(chineseText, latinText)
-            .maxByOrNull { candidate ->
-                candidate.count { !it.isWhitespace() }
-            }
+    private fun selectBestText(vararg candidates: RecognizedTextCandidate): String {
+        return candidates
+            .maxByOrNull { candidate -> scoreCandidate(candidate) }
+            ?.text
             ?.trim()
             .orEmpty()
+    }
+
+    private fun scoreCandidate(candidate: RecognizedTextCandidate): Int {
+        val text = candidate.text.trim()
+        if (text.isEmpty()) return Int.MIN_VALUE
+
+        val visibleChars = text.count { !it.isWhitespace() }
+        val digits = text.count { it.isDigit() }
+        val cjkChars = text.count { it.code in 0x4E00..0x9FFF }
+        val japaneseKana = text.count { it.code in 0x3040..0x30FF }
+
+        val recognizerBonus = when (candidate.hint) {
+            RecognizerHint.CHINESE -> cjkChars * 2
+            RecognizerHint.JAPANESE -> (cjkChars * 2) + (japaneseKana * 4)
+            RecognizerHint.LATIN -> if (cjkChars == 0 && japaneseKana == 0) 24 else 0
+        }
+
+        return visibleChars + (digits / 2) + recognizerBonus
     }
 
     private suspend fun identifyLanguage(text: String): String? {
@@ -162,6 +189,17 @@ class ReceiptOcrEngine @Inject constructor() {
                 }
         }
     }
+}
+
+private data class RecognizedTextCandidate(
+    val text: String,
+    val hint: RecognizerHint
+)
+
+private enum class RecognizerHint {
+    CHINESE,
+    JAPANESE,
+    LATIN
 }
 
 data class ReceiptOcrResult(
@@ -183,11 +221,15 @@ private data class ParsedReceiptDetails(
 
 private object ReceiptTextParser {
     private val totalKeywords = listOf(
-        "總計", "合計", "總額", "應付", "實付", "total", "amount due", "grand total", "subtotal"
+        "總計", "合計", "合計金額", "總額", "應付", "實付",
+        "お会計", "お支払", "ご請求額", "領収金額", "現計", "税込",
+        "total", "amount due", "grand total", "subtotal"
     )
     private val amountRegex = Regex("""(\d[\d,]*(?:\.\d{1,2})?)""")
     private val metadataKeywords = listOf(
         "發票", "統編", "電話", "地址", "交易", "卡號", "信用卡", "簽帳", "付款", "找零", "折扣", "稅",
+        "領収書", "レシート", "電話", "住所", "取引", "カード", "クレジット", "税率", "小計",
+        "内税", "外税", "値引", "返品", "担当", "登録番号", "日時",
         "invoice", "tax", "change", "payment", "card", "receipt", "tel", "phone", "store"
     )
 

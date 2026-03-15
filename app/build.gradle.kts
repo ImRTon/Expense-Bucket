@@ -93,6 +93,7 @@ dependencies {
     // ML Kit OCR
     implementation(libs.mlkit.text.recognition)
     implementation(libs.mlkit.text.recognition.chinese)
+    implementation(libs.mlkit.text.recognition.japanese)
     implementation(libs.mlkit.language.id)
     implementation(libs.mlkit.translate)
 
