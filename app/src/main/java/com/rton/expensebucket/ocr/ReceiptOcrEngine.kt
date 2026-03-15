@@ -1,0 +1,258 @@
+package com.rton.expensebucket.ocr
+
+import android.content.Context
+import android.net.Uri
+import com.google.mlkit.common.model.DownloadConditions
+import com.google.mlkit.nl.languageid.LanguageIdentification
+import com.google.mlkit.nl.translate.TranslateLanguage
+import com.google.mlkit.nl.translate.Translation
+import com.google.mlkit.nl.translate.TranslatorOptions
+import com.google.mlkit.vision.common.InputImage
+import com.google.mlkit.vision.text.TextRecognition
+import com.google.mlkit.vision.text.TextRecognizer
+import com.google.mlkit.vision.text.chinese.ChineseTextRecognizerOptions
+import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+import kotlinx.coroutines.async
+import kotlinx.coroutines.coroutineScope
+import kotlinx.coroutines.suspendCancellableCoroutine
+import javax.inject.Inject
+import javax.inject.Singleton
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
+
+@Singleton
+class ReceiptOcrEngine @Inject constructor() {
+
+    private val chineseRecognizer = TextRecognition.getClient(
+        ChineseTextRecognizerOptions.Builder().build()
+    )
+    private val latinRecognizer = TextRecognition.getClient(
+        TextRecognizerOptions.DEFAULT_OPTIONS
+    )
+    private val languageIdentifier = LanguageIdentification.getClient()
+
+    suspend fun processReceipt(context: Context, imageUri: Uri): ReceiptOcrResult = coroutineScope {
+        val image = InputImage.fromFilePath(context, imageUri)
+        val chineseTextDeferred = async { recognizeText(chineseRecognizer, image) }
+        val latinTextDeferred = async { recognizeText(latinRecognizer, image) }
+
+        val chineseText = chineseTextDeferred.await()
+        val latinText = latinTextDeferred.await()
+        val rawText = selectBestText(chineseText, latinText)
+        val detectedLanguage = identifyLanguage(rawText)
+        buildResult(
+            rawText = rawText,
+            detectedLanguageTag = detectedLanguage,
+            translatedText = null
+        )
+    }
+
+    suspend fun translateToLanguage(
+        text: String,
+        sourceLanguageTag: String?,
+        targetLanguageTag: String
+    ): String? {
+        if (text.isBlank() || sourceLanguageTag.isNullOrBlank()) return null
+
+        val normalizedSource = sourceLanguageTag.lowercase()
+        val normalizedTarget = targetLanguageTag.lowercase()
+        if (normalizedSource.startsWith(normalizedTarget.substringBefore('-'))) return null
+        if (normalizedSource.startsWith("zh") && normalizedTarget.startsWith("zh")) return null
+
+        val sourceLanguage = TranslateLanguage.fromLanguageTag(sourceLanguageTag) ?: return null
+        val targetLanguage = TranslateLanguage.fromLanguageTag(targetLanguageTag)
+            ?: TranslateLanguage.CHINESE
+
+        val translator = Translation.getClient(
+            TranslatorOptions.Builder()
+                .setSourceLanguage(sourceLanguage)
+                .setTargetLanguage(targetLanguage)
+                .build()
+        )
+
+        return try {
+            suspendCancellableCoroutine { continuation ->
+                translator.downloadModelIfNeeded(DownloadConditions.Builder().build())
+                    .addOnSuccessListener {
+                        translator.translate(text)
+                            .addOnSuccessListener { translated ->
+                                continuation.resume(translated)
+                            }
+                            .addOnFailureListener {
+                                continuation.resume(null)
+                            }
+                    }
+                    .addOnFailureListener {
+                        continuation.resume(null)
+                    }
+            }
+        } finally {
+            translator.close()
+        }
+    }
+
+    fun applyTranslation(
+        rawText: String,
+        detectedLanguageTag: String?,
+        translatedText: String?
+    ): ReceiptOcrResult {
+        return buildResult(
+            rawText = rawText,
+            detectedLanguageTag = detectedLanguageTag,
+            translatedText = translatedText
+        )
+    }
+
+    private fun buildResult(
+        rawText: String,
+        detectedLanguageTag: String?,
+        translatedText: String?
+    ): ReceiptOcrResult {
+        val analysisText = translatedText ?: rawText
+        val parsedReceipt = ReceiptTextParser.parse(
+            sourceText = analysisText,
+            fallbackSourceText = rawText
+        )
+
+        return ReceiptOcrResult(
+            rawText = rawText,
+            detectedLanguageTag = detectedLanguageTag,
+            translatedText = translatedText,
+            displayText = analysisText,
+            totalAmount = parsedReceipt.totalAmount,
+            lineItems = parsedReceipt.lineItems,
+            note = parsedReceipt.note,
+            wasTranslated = translatedText != null
+        )
+    }
+
+    private suspend fun recognizeText(
+        recognizer: TextRecognizer,
+        image: InputImage
+    ): String {
+        return suspendCancellableCoroutine { continuation ->
+            recognizer.process(image)
+                .addOnSuccessListener { visionText ->
+                    continuation.resume(visionText.text)
+                }
+                .addOnFailureListener { exception ->
+                    continuation.resumeWithException(exception)
+                }
+        }
+    }
+
+    private fun selectBestText(chineseText: String, latinText: String): String {
+        return listOf(chineseText, latinText)
+            .maxByOrNull { candidate ->
+                candidate.count { !it.isWhitespace() }
+            }
+            ?.trim()
+            .orEmpty()
+    }
+
+    private suspend fun identifyLanguage(text: String): String? {
+        if (text.isBlank()) return null
+        return suspendCancellableCoroutine { continuation ->
+            languageIdentifier.identifyLanguage(text)
+                .addOnSuccessListener { languageCode ->
+                    continuation.resume(languageCode.takeUnless { it == "und" })
+                }
+                .addOnFailureListener {
+                    continuation.resume(null)
+                }
+        }
+    }
+}
+
+data class ReceiptOcrResult(
+    val rawText: String,
+    val detectedLanguageTag: String?,
+    val translatedText: String?,
+    val displayText: String,
+    val totalAmount: Double?,
+    val lineItems: List<String>,
+    val note: String,
+    val wasTranslated: Boolean
+)
+
+private data class ParsedReceiptDetails(
+    val totalAmount: Double?,
+    val lineItems: List<String>,
+    val note: String
+)
+
+private object ReceiptTextParser {
+    private val totalKeywords = listOf(
+        "總計", "合計", "總額", "應付", "實付", "total", "amount due", "grand total", "subtotal"
+    )
+    private val amountRegex = Regex("""(\d[\d,]*(?:\.\d{1,2})?)""")
+    private val metadataKeywords = listOf(
+        "發票", "統編", "電話", "地址", "交易", "卡號", "信用卡", "簽帳", "付款", "找零", "折扣", "稅",
+        "invoice", "tax", "change", "payment", "card", "receipt", "tel", "phone", "store"
+    )
+
+    fun parse(sourceText: String, fallbackSourceText: String): ParsedReceiptDetails {
+        val normalizedLines = normalizeLines(sourceText)
+        val fallbackLines = normalizeLines(fallbackSourceText)
+        val totalAmount = extractTotal(normalizedLines) ?: extractTotal(fallbackLines)
+        val lineItems = extractLineItems(normalizedLines, totalAmount).ifEmpty {
+            extractLineItems(fallbackLines, totalAmount)
+        }
+        val note = lineItems.joinToString("\n").ifBlank {
+            normalizedLines.take(6).joinToString("\n")
+        }
+
+        return ParsedReceiptDetails(
+            totalAmount = totalAmount,
+            lineItems = lineItems,
+            note = note
+        )
+    }
+
+    private fun normalizeLines(text: String): List<String> {
+        return text.lines()
+            .map { it.replace("\\s+".toRegex(), " ").trim() }
+            .filter { it.isNotBlank() }
+    }
+
+    private fun extractTotal(lines: List<String>): Double? {
+        val keywordMatches = lines.mapIndexedNotNull { index, line ->
+            val lowerLine = line.lowercase()
+            if (totalKeywords.none { it in lowerLine }) return@mapIndexedNotNull null
+            amountRegex.findAll(line)
+                .mapNotNull { it.groupValues[1].replace(",", "").toDoubleOrNull() }
+                .filter { it in 1.0..1_000_000.0 }
+                .maxOrNull()
+                ?.let { Triple(index, line, it) }
+        }
+
+        if (keywordMatches.isNotEmpty()) {
+            return keywordMatches.maxByOrNull { it.first }?.third
+        }
+
+        return lines.takeLast(8)
+            .flatMap { line ->
+                amountRegex.findAll(line)
+                    .mapNotNull { it.groupValues[1].replace(",", "").toDoubleOrNull() }
+                    .filter { it in 1.0..1_000_000.0 }
+                    .toList()
+            }
+            .maxOrNull()
+    }
+
+    private fun extractLineItems(lines: List<String>, totalAmount: Double?): List<String> {
+        val totalText = totalAmount?.let { "%.2f".format(it) }
+        return lines
+            .filter { line ->
+                val lowerLine = line.lowercase()
+                metadataKeywords.none { it in lowerLine } &&
+                    totalKeywords.none { it in lowerLine } &&
+                    line.any { char -> char.isLetter() || char.code in 0x4E00..0x9FFF } &&
+                    line.length in 2..48
+            }
+            .filterNot { line ->
+                totalText != null && line.contains(totalText.removeSuffix(".00"))
+            }
+            .take(8)
+    }
+}

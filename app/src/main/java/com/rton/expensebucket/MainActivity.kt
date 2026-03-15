@@ -28,6 +28,8 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.rton.expensebucket.navigation.Screen
 import com.rton.expensebucket.ocr.OcrEngine
+import com.rton.expensebucket.ocr.ReceiptOcrEngine
+import com.rton.expensebucket.ui.model.TransactionPrefill
 import com.rton.expensebucket.ui.screens.*
 import com.rton.expensebucket.ui.theme.ExpensesTheme
 import com.rton.expensebucket.ui.theme.LatteSurfaceRaisedLight
@@ -47,6 +49,7 @@ import java.io.File
 class MainActivity : ComponentActivity() {
 
     @Inject lateinit var ocrEngine: OcrEngine
+    @Inject lateinit var receiptOcrEngine: ReceiptOcrEngine
 
     /** Reactive state for shared image URI — drives navigation + OCR without recreate(). */
     private val _sharedImageUri = MutableStateFlow<Uri?>(null)
@@ -92,6 +95,7 @@ class MainActivity : ComponentActivity() {
             ) {
                 ExpensesApp(
                     ocrEngine = ocrEngine,
+                    receiptOcrEngine = receiptOcrEngine,
                     sharedImageUri = sharedImageUri,
                     navigateTo = navigateTo,
                     onSharedImageConsumed = { _sharedImageUri.value = null },
@@ -187,6 +191,7 @@ private val bottomBarRoutes = bottomNavItems.map { it.route }.toSet()
 @Composable
 fun ExpensesApp(
     ocrEngine: OcrEngine,
+    receiptOcrEngine: ReceiptOcrEngine,
     sharedImageUri: Uri? = null,
     navigateTo: String? = null,
     onSharedImageConsumed: () -> Unit = {},
@@ -194,6 +199,7 @@ fun ExpensesApp(
 ) {
     val navController = rememberNavController()
     val viewModel: MainViewModel = hiltViewModel()
+    var transactionPrefill by remember { mutableStateOf<TransactionPrefill?>(null) }
 
     // Collect states
     val transactions by viewModel.allTransactions.collectAsStateWithLifecycle()
@@ -354,7 +360,12 @@ fun ExpensesApp(
                     draftCount = draftTransactions.size,
                     onSelectPeriod = { viewModel.setSelectedPeriod(it) },
                     onStepPeriod = { viewModel.stepPeriod(it) },
-                    onAddClick = { navController.navigate(Screen.AddTransaction.route) },
+                    onAddClick = {
+                        transactionPrefill = null
+                        navController.navigate(Screen.AddTransaction.route)
+                    },
+                    onReceiptOcrClick = { navController.navigate(Screen.ReceiptOcr.route) },
+                    onInvoiceOcrClick = { navController.navigate(Screen.InvoiceOcr.route) },
                     onTransactionClick = { transaction ->
                         navController.navigate(Screen.EditTransaction.createRoute(transaction.id))
                     },
@@ -370,8 +381,15 @@ fun ExpensesApp(
                     categories = allCategories,
                     projects = activeProjects,
                     paymentMethods = allPaymentMethods,
-                    onSave = { transaction -> viewModel.addTransaction(transaction) },
-                    onBack = { navController.popBackStack() }
+                    prefill = transactionPrefill,
+                    onSave = { transaction ->
+                        transactionPrefill = null
+                        viewModel.addTransaction(transaction)
+                    },
+                    onBack = {
+                        transactionPrefill = null
+                        navController.popBackStack()
+                    }
                 )
             }
 
@@ -516,6 +534,33 @@ fun ExpensesApp(
                         onSharedImageConsumed()
                         navController.popBackStack()
                     }
+                )
+            }
+
+            composable(Screen.ReceiptOcr.route) {
+                ReceiptOcrScreen(
+                    receiptOcrEngine = receiptOcrEngine,
+                    onApplyPrefill = { prefill ->
+                        transactionPrefill = prefill
+                        navController.popBackStack()
+                        navController.navigate(Screen.AddTransaction.route)
+                    },
+                    onBack = { navController.popBackStack() }
+                )
+            }
+
+            composable(Screen.InvoiceOcr.route) {
+                ReceiptOcrScreen(
+                    receiptOcrEngine = receiptOcrEngine,
+                    title = "發票辨識",
+                    emptyStateTitle = "拍一張台灣發票或從相簿選圖",
+                    emptyStateSubtitle = "會自動抓發票總額與品項備註",
+                    onApplyPrefill = { prefill ->
+                        transactionPrefill = prefill
+                        navController.popBackStack()
+                        navController.navigate(Screen.AddTransaction.route)
+                    },
+                    onBack = { navController.popBackStack() }
                 )
             }
 

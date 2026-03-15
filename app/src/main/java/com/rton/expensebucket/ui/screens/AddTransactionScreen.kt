@@ -29,6 +29,7 @@ import com.rton.expensebucket.data.model.PaymentMethod
 import com.rton.expensebucket.data.model.Project
 import com.rton.expensebucket.data.model.Transaction
 import com.rton.expensebucket.ui.components.ExpenseNumpad
+import com.rton.expensebucket.ui.model.TransactionPrefill
 import com.rton.expensebucket.ui.util.CurrencyFormats
 import com.rton.expensebucket.ui.util.ExpressionEvaluator
 import com.rton.expensebucket.ui.util.PaymentIconMapper
@@ -42,36 +43,50 @@ fun AddTransactionScreen(
     projects: List<Project> = emptyList(),
     paymentMethods: List<PaymentMethod> = emptyList(),
     existingTransaction: Transaction? = null,
+    prefill: TransactionPrefill? = null,
     onSave: (Transaction) -> Unit,
     onBack: () -> Unit
 ) {
     val isEditMode = existingTransaction != null
+    val initialAmount = existingTransaction?.amount ?: prefill?.amount
+    val initialNote = existingTransaction?.note ?: prefill?.note.orEmpty()
+    val initialIsExpense = existingTransaction?.isExpense ?: prefill?.isExpense ?: true
 
     var amountText by remember {
-        mutableStateOf(existingTransaction?.amount?.let {
+        mutableStateOf(initialAmount?.let {
             if (it == it.toLong().toDouble()) it.toLong().toString() else it.toString()
         } ?: "")
     }
     var selectedCategory by remember { mutableStateOf<Category?>(
         existingTransaction?.categoryId?.let { catId -> categories.find { it.id == catId } }
     ) }
-    var isExpense by remember { mutableStateOf(existingTransaction?.isExpense ?: true) }
-    var note by remember { mutableStateOf(existingTransaction?.note ?: "") }
-    var showNoteField by remember { mutableStateOf(existingTransaction?.note?.isNotBlank() == true) }
+    var isExpense by remember { mutableStateOf(initialIsExpense) }
+    var note by remember { mutableStateOf(initialNote) }
+    var showNoteField by remember { mutableStateOf(initialNote.isNotBlank()) }
     var selectedProjectId by remember { mutableStateOf(existingTransaction?.projectId) }
     var showProjectDropdown by remember { mutableStateOf(false) }
     val initialSettlementCurrency = existingTransaction?.projectId
         ?.let { projectId -> projects.find { it.id == projectId }?.defaultCurrency }
         ?: "TWD"
-    var selectedCurrency by remember { mutableStateOf(existingTransaction?.currency ?: initialSettlementCurrency) }
+    var selectedCurrency by remember {
+        mutableStateOf(existingTransaction?.currency ?: prefill?.currency ?: initialSettlementCurrency)
+    }
     var exchangeRateText by remember {
-        mutableStateOf(CurrencyFormats.formatRate(existingTransaction?.exchangeRate ?: 1.0))
+        mutableStateOf(CurrencyFormats.formatRate(existingTransaction?.exchangeRate ?: prefill?.exchangeRate ?: 1.0))
     }
     var showCurrencyMenu by remember { mutableStateOf(false) }
     var previousSettlementCurrency by remember { mutableStateOf(initialSettlementCurrency) }
     var isFetchingExchangeRate by remember { mutableStateOf(false) }
     var exchangeRateError by remember { mutableStateOf<String?>(null) }
-    var skipInitialRateFetch by remember { mutableStateOf(existingTransaction != null) }
+    var skipInitialRateFetch by remember {
+        mutableStateOf(
+            existingTransaction != null || (
+                prefill != null &&
+                    prefill.currency != initialSettlementCurrency &&
+                    prefill.exchangeRate > 0
+                )
+        )
+    }
 
     // Auto-select project whose date range covers today (only in add mode)
     LaunchedEffect(projects) {
@@ -108,7 +123,9 @@ fun AddTransactionScreen(
         }
     }
 
-    var selectedDateTime by remember { mutableStateOf(existingTransaction?.date ?: System.currentTimeMillis()) }
+    var selectedDateTime by remember {
+        mutableStateOf(existingTransaction?.date ?: prefill?.date ?: System.currentTimeMillis())
+    }
     
     var showDatePicker by remember { mutableStateOf(false) }
     var showTimePicker by remember { mutableStateOf(false) }
@@ -239,7 +256,7 @@ fun AddTransactionScreen(
             categoryId = selectedCategory?.id,
             isExpense = isExpense,
             date = selectedDateTime,
-            source = existingTransaction?.source ?: "manual",
+            source = existingTransaction?.source ?: prefill?.source ?: "manual",
             projectId = selectedProjectId,
             paymentMethodId = selectedPaymentMethodId,
             currency = selectedCurrency,

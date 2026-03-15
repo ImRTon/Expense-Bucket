@@ -19,6 +19,7 @@ import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.Transaction
 import com.rton.expensebucket.ui.components.WaterLevelCard
 import com.rton.expensebucket.ui.components.TransactionListItem
+import com.rton.expensebucket.ui.components.QuickAddFab
 import com.rton.expensebucket.ui.viewmodel.CompareMode
 import com.rton.expensebucket.ui.viewmodel.PeriodSummary
 import com.rton.expensebucket.ui.viewmodel.TimePeriod
@@ -45,6 +46,8 @@ fun HomeScreen(
     onSelectPeriod: (TimePeriod) -> Unit,
     onStepPeriod: (Int) -> Unit,
     onAddClick: () -> Unit,
+    onReceiptOcrClick: () -> Unit,
+    onInvoiceOcrClick: () -> Unit,
     onTransactionClick: (Transaction) -> Unit,
     onDeleteTransaction: (Transaction) -> Unit,
     onNavigateToDrafts: () -> Unit,
@@ -154,18 +157,11 @@ fun HomeScreen(
             )
         },
         floatingActionButton = {
-            FloatingActionButton(
-                onClick = onAddClick,
-                containerColor = MaterialTheme.colorScheme.primary,
-                shape = CircleShape,
-                modifier = Modifier.size(64.dp)
-            ) {
-                Icon(
-                    Icons.Filled.Add,
-                    contentDescription = "新增記帳",
-                    modifier = Modifier.size(28.dp)
-                )
-            }
+            QuickAddFab(
+                onAddClick = onAddClick,
+                onReceiptOcrClick = onReceiptOcrClick,
+                onInvoiceOcrClick = onInvoiceOcrClick
+            )
         }
     ) { padding ->
         LazyColumn(

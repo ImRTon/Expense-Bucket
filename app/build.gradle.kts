@@ -93,6 +93,8 @@ dependencies {
     // ML Kit OCR
     implementation(libs.mlkit.text.recognition)
     implementation(libs.mlkit.text.recognition.chinese)
+    implementation(libs.mlkit.language.id)
+    implementation(libs.mlkit.translate)
 
     // Coil (image loading)
     implementation(libs.coil.compose)
