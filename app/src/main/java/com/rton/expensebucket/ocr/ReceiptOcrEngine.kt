@@ -81,21 +81,14 @@ class ReceiptOcrEngine @Inject constructor() {
         )
 
         return try {
-            suspendCancellableCoroutine { continuation ->
+            val modelReady = suspendCancellableCoroutine<Boolean> { continuation ->
                 translator.downloadModelIfNeeded(DownloadConditions.Builder().build())
-                    .addOnSuccessListener {
-                        translator.translate(text)
-                            .addOnSuccessListener { translated ->
-                                continuation.resume(translated)
-                            }
-                            .addOnFailureListener {
-                                continuation.resume(null)
-                            }
-                    }
-                    .addOnFailureListener {
-                        continuation.resume(null)
-                    }
+                    .addOnSuccessListener { continuation.resume(true) }
+                    .addOnFailureListener { continuation.resume(false) }
             }
+            if (!modelReady) return null
+
+            translatePreservingLines(translator, text)
         } finally {
             translator.close()
         }
@@ -121,7 +114,8 @@ class ReceiptOcrEngine @Inject constructor() {
         val analysisText = translatedText ?: rawText
         val parsedReceipt = ReceiptTextParser.parse(
             sourceText = analysisText,
-            fallbackSourceText = rawText
+            fallbackAmountText = rawText,
+            fallbackLineItemText = if (translatedText != null) analysisText else rawText
         )
 
         return ReceiptOcrResult(
@@ -149,6 +143,32 @@ class ReceiptOcrEngine @Inject constructor() {
                     continuation.resumeWithException(exception)
                 }
         }
+    }
+
+    private suspend fun translatePreservingLines(
+        translator: com.google.mlkit.nl.translate.Translator,
+        text: String
+    ): String? {
+        val lines = text.split('\n')
+        if (lines.isEmpty()) return null
+
+        val translatedLines = mutableListOf<String>()
+        for (line in lines) {
+            if (line.isBlank()) {
+                translatedLines += ""
+                continue
+            }
+
+            val translatedLine = suspendCancellableCoroutine<String?> { continuation ->
+                translator.translate(line)
+                    .addOnSuccessListener { translated -> continuation.resume(translated) }
+                    .addOnFailureListener { continuation.resume(null) }
+            } ?: line
+
+            translatedLines += translatedLine
+        }
+
+        return translatedLines.joinToString("\n")
     }
 
     private fun selectBestText(vararg candidates: RecognizedTextCandidate): String {
@@ -233,15 +253,22 @@ private object ReceiptTextParser {
         "invoice", "tax", "change", "payment", "card", "receipt", "tel", "phone", "store"
     )
 
-    fun parse(sourceText: String, fallbackSourceText: String): ParsedReceiptDetails {
+    fun parse(
+        sourceText: String,
+        fallbackAmountText: String,
+        fallbackLineItemText: String
+    ): ParsedReceiptDetails {
         val normalizedLines = normalizeLines(sourceText)
-        val fallbackLines = normalizeLines(fallbackSourceText)
-        val totalAmount = extractTotal(normalizedLines) ?: extractTotal(fallbackLines)
+        val fallbackAmountLines = normalizeLines(fallbackAmountText)
+        val fallbackLineItemLines = normalizeLines(fallbackLineItemText)
+        val totalAmount = extractTotal(normalizedLines) ?: extractTotal(fallbackAmountLines)
         val lineItems = extractLineItems(normalizedLines, totalAmount).ifEmpty {
-            extractLineItems(fallbackLines, totalAmount)
+            extractLineItems(fallbackLineItemLines, totalAmount)
         }
         val note = lineItems.joinToString("\n").ifBlank {
-            normalizedLines.take(6).joinToString("\n")
+            normalizedLines.take(6).joinToString("\n").ifBlank {
+                fallbackLineItemLines.take(6).joinToString("\n")
+            }
         }
 
         return ParsedReceiptDetails(

@@ -17,6 +17,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -58,6 +59,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.core.content.FileProvider
 import coil.compose.rememberAsyncImagePainter
@@ -87,7 +89,9 @@ fun ReceiptOcrScreen(
 
     var imageUri by remember { mutableStateOf<Uri?>(null) }
     var captureUri by remember { mutableStateOf<Uri?>(null) }
-    var receiptResult by remember { mutableStateOf<ReceiptOcrResult?>(null) }
+    var rawReceiptResult by remember { mutableStateOf<ReceiptOcrResult?>(null) }
+    var translatedReceiptResult by remember { mutableStateOf<ReceiptOcrResult?>(null) }
+    var showTranslatedResult by remember { mutableStateOf(false) }
     var amountText by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
     var errorMessage by remember { mutableStateOf<String?>(null) }
@@ -129,7 +133,6 @@ fun ReceiptOcrScreen(
     }
 
     fun applyAnalysis(result: ReceiptOcrResult) {
-        receiptResult = result
         amountText = result.totalAmount?.let { formatEditableAmount(it) }.orEmpty()
         note = result.note
     }
@@ -145,10 +148,13 @@ fun ReceiptOcrScreen(
         val uri = imageUri ?: return@LaunchedEffect
         isProcessing = true
         errorMessage = null
-        receiptResult = null
+        rawReceiptResult = null
+        translatedReceiptResult = null
+        showTranslatedResult = false
         runCatching {
             receiptOcrEngine.processReceipt(context, uri)
         }.onSuccess { result ->
+            rawReceiptResult = result
             applyAnalysis(result)
         }.onFailure { throwable ->
             errorMessage = throwable.localizedMessage ?: "收據辨識失敗"
@@ -156,13 +162,18 @@ fun ReceiptOcrScreen(
         isProcessing = false
     }
 
+    val receiptResult = if (showTranslatedResult) {
+        translatedReceiptResult ?: rawReceiptResult
+    } else {
+        rawReceiptResult
+    }
     val parsedAmount = amountText.toDoubleOrNull()
     val canContinue = parsedAmount?.let { it > 0 } == true
-    val canTranslate = receiptResult?.let {
+    val canTranslate = rawReceiptResult?.let {
         shouldOfferTranslation(
             detectedLanguageTag = it.detectedLanguageTag,
             targetLanguageTag = appLanguageTag,
-            translatedText = it.translatedText
+            translatedText = translatedReceiptResult?.translatedText
         )
     } == true
 
@@ -303,7 +314,7 @@ fun ReceiptOcrScreen(
             }
 
             receiptResult?.let { result ->
-                if (canTranslate) {
+                if (canTranslate && !isTranslating) {
                     FilledTonalButton(
                         onClick = {
                             isTranslating = true
@@ -328,19 +339,21 @@ fun ReceiptOcrScreen(
                     if (translated.isNullOrBlank()) {
                         errorMessage = "翻譯失敗，請直接使用原文辨識結果"
                     } else {
-                        applyAnalysis(
-                            receiptOcrEngine.applyTranslation(
-                                rawText = result.rawText,
-                                detectedLanguageTag = result.detectedLanguageTag,
-                                translatedText = translated
-                            )
+                        val translatedResult = receiptOcrEngine.applyTranslation(
+                            rawText = result.rawText,
+                            detectedLanguageTag = result.detectedLanguageTag,
+                            translatedText = translated
                         )
+                        translatedReceiptResult = translatedResult
+                        showTranslatedResult = true
+                        applyAnalysis(translatedResult)
                     }
                     isTranslating = false
                 }
 
-                if (result.wasTranslated) {
+                if (translatedReceiptResult != null) {
                     Card(
+                        modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(14.dp),
                         colors = CardDefaults.cardColors(
                             containerColor = MaterialTheme.colorScheme.tertiaryContainer.copy(alpha = 0.45f)
@@ -354,21 +367,39 @@ fun ReceiptOcrScreen(
                         ) {
                             Icon(Icons.Filled.Translate, contentDescription = null)
                             Text(
-                                "已翻譯為 $appLanguageLabel",
+                                if (showTranslatedResult) "目前顯示翻譯結果" else "目前顯示原文結果",
                                 modifier = Modifier.padding(start = 8.dp)
                             )
+                            Spacer(modifier = Modifier.weight(1f))
+                            TextButton(
+                                onClick = {
+                                    showTranslatedResult = !showTranslatedResult
+                                    applyAnalysis(
+                                        if (showTranslatedResult) {
+                                            translatedReceiptResult ?: rawReceiptResult ?: result
+                                        } else {
+                                            rawReceiptResult ?: result
+                                        }
+                                    )
+                                }
+                            ) {
+                                Text(if (showTranslatedResult) "切回原文" else "查看翻譯")
+                            }
                         }
                     }
                 }
 
                 Card(
+                    modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f)
                     )
                 ) {
                     Column(
-                        modifier = Modifier.padding(16.dp),
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -402,6 +433,7 @@ fun ReceiptOcrScreen(
                     },
                     label = { Text("收據總額") },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp)
                 )
