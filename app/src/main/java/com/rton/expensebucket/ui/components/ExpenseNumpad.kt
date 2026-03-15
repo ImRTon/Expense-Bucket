@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -56,12 +57,17 @@ fun ExpenseNumpad(
         }
     } else null
 
-    Column(
+    Surface(
         modifier = modifier
             .fillMaxWidth()
-            .imePadding()
-            .navigationBarsPadding()
+            .imePadding(),
+        color = MaterialTheme.colorScheme.surface
     ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(MaterialTheme.colorScheme.surface)
+        ) {
         Surface(
             modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
@@ -186,6 +192,10 @@ fun ExpenseNumpad(
                 Spacer(modifier = Modifier.height(4.dp))
             }
             }
+        }
+            Spacer(
+                modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars)
+            )
         }
     }
 }

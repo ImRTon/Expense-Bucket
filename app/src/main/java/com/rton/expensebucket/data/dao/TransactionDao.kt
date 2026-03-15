@@ -22,10 +22,10 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE categoryId = :categoryId AND isDraft = 0 ORDER BY date DESC")
     fun getTransactionsByCategory(categoryId: Long): Flow<List<Transaction>>
 
-    @Query("SELECT SUM(amount) FROM transactions WHERE isExpense = 1 AND isDraft = 0 AND projectId IS NULL AND date BETWEEN :startDate AND :endDate")
+    @Query("SELECT SUM(amount * exchangeRate) FROM transactions WHERE isExpense = 1 AND isDraft = 0 AND projectId IS NULL AND date BETWEEN :startDate AND :endDate")
     fun getTotalExpenseByDateRange(startDate: Long, endDate: Long): Flow<Double?>
 
-    @Query("SELECT SUM(amount) FROM transactions WHERE isExpense = 0 AND isDraft = 0 AND projectId IS NULL AND date BETWEEN :startDate AND :endDate")
+    @Query("SELECT SUM(amount * exchangeRate) FROM transactions WHERE isExpense = 0 AND isDraft = 0 AND projectId IS NULL AND date BETWEEN :startDate AND :endDate")
     fun getTotalIncomeByDateRange(startDate: Long, endDate: Long): Flow<Double?>
 
     @Query("SELECT SUM(amount * exchangeRate) FROM transactions WHERE projectId = :projectId AND isExpense = 1 AND isDraft = 0")

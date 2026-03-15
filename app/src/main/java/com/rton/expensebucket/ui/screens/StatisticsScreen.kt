@@ -107,7 +107,7 @@ fun StatisticsScreen(
         filteredTransactions
             .filter { it.isExpense && !it.isDraft }
             .groupBy { it.categoryId }
-            .mapValues { (_, txs) -> txs.sumOf { it.amount } }
+            .mapValues { (_, txs) -> txs.sumOf { it.amount * it.exchangeRate } }
             .entries
             .sortedByDescending { it.value }
     }

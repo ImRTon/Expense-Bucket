@@ -10,6 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.rton.expensebucket.data.model.Project
+import com.rton.expensebucket.ui.util.CurrencyFormats
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -29,7 +30,7 @@ fun ProjectFormDialog(
     } ?: ""
     var budgetText by remember { mutableStateOf(initialBudgetStr) }
     
-    val currencies = listOf("JPY", "USD", "EUR", "KRW", "GBP", "THB", "VND", "TWD")
+    val currencies = CurrencyFormats.supportedCurrencies
 
     // Date states
     var startDate by remember { mutableStateOf(initialProject?.startDate) }

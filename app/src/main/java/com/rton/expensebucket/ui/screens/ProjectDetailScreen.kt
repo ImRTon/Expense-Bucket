@@ -20,6 +20,7 @@ import com.rton.expensebucket.data.model.Project
 import com.rton.expensebucket.data.model.Transaction
 import com.rton.expensebucket.ui.components.ProjectFormDialog
 import com.rton.expensebucket.ui.components.TransactionListItem
+import com.rton.expensebucket.ui.util.CurrencyFormats
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
@@ -37,7 +38,7 @@ fun ProjectDetailScreen(
     onDeleteProject: (Project) -> Unit,
     onTransactionClick: (Transaction) -> Unit
 ) {
-    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("zh", "TW")) }
+    val settlementCurrency = project?.defaultCurrency ?: "TWD"
     val categoryMap = remember(categories) { categories.associateBy { it.id } }
     val categoryStats = remember(transactions) {
         transactions
@@ -112,7 +113,7 @@ fun ProjectDetailScreen(
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            currencyFormat.format(totalExpense),
+                            CurrencyFormats.formatAmount(settlementCurrency, totalExpense),
                             style = MaterialTheme.typography.headlineMedium.copy(
                                 fontWeight = FontWeight.Bold
                             ),
@@ -209,6 +210,7 @@ fun ProjectDetailScreen(
                     val category = categoryMap[categoryId]
                     CategoryStatItem(
                         category = category,
+                        settlementCurrency = settlementCurrency,
                         totalAmount = total,
                         totalExpense = totalExpense
                     )
@@ -230,6 +232,7 @@ fun ProjectDetailScreen(
                 TransactionListItem(
                     transaction = transaction,
                     category = categoryMap[transaction.categoryId],
+                    settlementCurrency = settlementCurrency,
                     onDelete = { /* TODO: delete from project */ },
                     onClick = { onTransactionClick(transaction) }
                 )
@@ -278,10 +281,10 @@ fun ProjectDetailScreen(
 @Composable
 private fun CategoryStatItem(
     category: Category?,
+    settlementCurrency: String,
     totalAmount: Double,
     totalExpense: Double
 ) {
-    val currencyFormat = remember { java.text.NumberFormat.getCurrencyInstance(java.util.Locale("zh", "TW")) }
     val ratio = if (totalExpense > 0) (totalAmount / totalExpense).toFloat() else 0f
     
     Card(
@@ -327,7 +330,7 @@ private fun CategoryStatItem(
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
                     )
                     Text(
-                        text = currencyFormat.format(totalAmount),
+                        text = CurrencyFormats.formatAmount(settlementCurrency, totalAmount),
                         style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
                     )
                 }

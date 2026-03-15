@@ -22,11 +22,13 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
+import com.rton.expensebucket.data.HistoricalCashRateProvider
 import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.PaymentMethod
 import com.rton.expensebucket.data.model.Transaction
 import com.rton.expensebucket.ocr.OcrEngine
 import com.rton.expensebucket.ocr.OcrResult
+import com.rton.expensebucket.ui.util.CurrencyFormats
 import com.rton.expensebucket.ui.util.PaymentIconMapper
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -50,6 +52,11 @@ fun OcrPreviewScreen(
     var isExpense by remember { mutableStateOf(true) }
     var selectedCategory by remember { mutableStateOf<Category?>(null) }
     var selectedPaymentMethodId by remember { mutableStateOf<Long?>(null) }
+    var selectedCurrency by remember { mutableStateOf("TWD") }
+    var exchangeRateText by remember { mutableStateOf("1") }
+    var showCurrencyMenu by remember { mutableStateOf(false) }
+    var isFetchingExchangeRate by remember { mutableStateOf(false) }
+    var exchangeRateError by remember { mutableStateOf<String?>(null) }
 
     // ─── Two-level category and payment methods state ────────────────────────────
     var expandedParentId by remember { mutableStateOf<Long?>(null) }
@@ -116,6 +123,37 @@ fun OcrPreviewScreen(
     }
     val childCategoriesMap = remember(categories) {
         categories.filter { it.parentId != null }.groupBy { it.parentId }
+    }
+    val requiresExchangeRate = selectedCurrency != "TWD"
+    val parsedAmount = amount.toDoubleOrNull()
+    val parsedExchangeRate = if (requiresExchangeRate) exchangeRateText.toDoubleOrNull() else 1.0
+    val convertedAmount = if (parsedAmount != null && parsedExchangeRate != null) {
+        parsedAmount * parsedExchangeRate
+    } else {
+        null
+    }
+
+    LaunchedEffect(selectedCurrency) {
+        if (selectedCurrency == "TWD") {
+            isFetchingExchangeRate = false
+            exchangeRateError = null
+            exchangeRateText = "1"
+            return@LaunchedEffect
+        }
+
+        isFetchingExchangeRate = true
+        exchangeRateError = null
+        HistoricalCashRateProvider.getExchangeRate(
+            fromCurrency = selectedCurrency,
+            toCurrency = "TWD",
+            dateMillis = System.currentTimeMillis()
+        ).onSuccess { fetchedRate ->
+            exchangeRateText = CurrencyFormats.formatRate(fetchedRate)
+        }.onFailure {
+            exchangeRateText = ""
+            exchangeRateError = "歷史現鈔匯率抓取失敗，可手動修正"
+        }
+        isFetchingExchangeRate = false
     }
 
     Scaffold(
@@ -325,7 +363,9 @@ fun OcrPreviewScreen(
                 leadingIcon = {
                     Icon(Icons.Filled.Store, contentDescription = null)
                 },
-                singleLine = true,
+                singleLine = false,
+                minLines = 2,
+                maxLines = 5,
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
             )
@@ -524,12 +564,124 @@ fun OcrPreviewScreen(
                 }
             }
 
+            Box(modifier = Modifier.fillMaxWidth()) {
+                OutlinedCard(
+                    onClick = { showCurrencyMenu = true },
+                    shape = RoundedCornerShape(12.dp),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 12.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                Icons.Filled.SwapHoriz,
+                                contentDescription = null,
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                            Column {
+                                Text(
+                                    "記帳幣別",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                                Text(
+                                    if (requiresExchangeRate) "$selectedCurrency -> TWD" else selectedCurrency,
+                                    style = MaterialTheme.typography.bodyLarge.copy(
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                )
+                            }
+                        }
+                        Icon(Icons.Filled.ExpandMore, contentDescription = null)
+                    }
+                }
+
+                DropdownMenu(
+                    expanded = showCurrencyMenu,
+                    onDismissRequest = { showCurrencyMenu = false }
+                ) {
+                    CurrencyFormats.supportedCurrencies.forEach { currency ->
+                        DropdownMenuItem(
+                            text = { Text(currency) },
+                            onClick = {
+                                selectedCurrency = currency
+                                if (currency == "TWD") {
+                                    exchangeRateText = "1"
+                                } else if (exchangeRateText == "1") {
+                                    exchangeRateText = ""
+                                }
+                                showCurrencyMenu = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            AnimatedVisibility(visible = requiresExchangeRate) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        OutlinedTextField(
+                            value = exchangeRateText,
+                            onValueChange = { newValue ->
+                                if (newValue.isEmpty() || newValue.all { it.isDigit() || it == '.' }) {
+                                    exchangeRateText = newValue
+                                }
+                            },
+                            label = { Text("現鈔匯率") },
+                            placeholder = { Text("1 $selectedCurrency = ? TWD") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
+                            ),
+                            supportingText = {
+                                Text(
+                                    when {
+                                        isFetchingExchangeRate -> "正在抓取歷史現鈔匯率..."
+                                        exchangeRateError != null -> exchangeRateError!!
+                                        else -> "已依日期自動帶入歷史現鈔匯率，會用這個匯率換算回 TWD。"
+                                    }
+                                )
+                            }
+                        )
+
+                        convertedAmount?.let {
+                            Text(
+                                "換算後約 ${CurrencyFormats.formatAmount("TWD", it)}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(8.dp))
 
             // Save button
             Button(
                 onClick = {
-                    val amountValue = amount.toDoubleOrNull() ?: return@Button
+                    val amountValue = parsedAmount ?: return@Button
+                    val exchangeRate = parsedExchangeRate ?: return@Button
                     onSave(
                         Transaction(
                             amount = amountValue,
@@ -537,6 +689,8 @@ fun OcrPreviewScreen(
                             categoryId = selectedCategory?.id,
                             paymentMethodId = selectedPaymentMethodId,
                             isExpense = isExpense,
+                            currency = selectedCurrency,
+                            exchangeRate = exchangeRate,
                             source = "ocr",
                             isDraft = false,
                             date = System.currentTimeMillis(),
@@ -549,7 +703,7 @@ fun OcrPreviewScreen(
                     .fillMaxWidth()
                     .height(52.dp),
                 shape = RoundedCornerShape(14.dp),
-                enabled = amount.toDoubleOrNull() != null && (amount.toDoubleOrNull() ?: 0.0) > 0
+                enabled = parsedAmount != null && parsedAmount > 0 && parsedExchangeRate != null && parsedExchangeRate > 0
             ) {
                 Icon(Icons.Filled.Check, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))

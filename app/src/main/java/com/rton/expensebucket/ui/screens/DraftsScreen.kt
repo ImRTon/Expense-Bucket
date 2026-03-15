@@ -21,9 +21,9 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.Transaction
-import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
+import com.rton.expensebucket.ui.util.CurrencyFormats
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -35,7 +35,6 @@ fun DraftsScreen(
     onEdit: (Transaction) -> Unit,
     onBack: () -> Unit
 ) {
-    val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("zh", "TW")) }
     val dateFormat = remember { SimpleDateFormat("MM/dd HH:mm", Locale.getDefault()) }
     val categoryMap = remember(categories) { categories.associateBy { it.id } }
 
@@ -107,7 +106,6 @@ fun DraftsScreen(
                     DraftItem(
                         draft = draft,
                         category = categoryMap[draft.categoryId],
-                        currencyFormat = currencyFormat,
                         dateFormat = dateFormat,
                         onConfirm = { onConfirm(draft.id) },
                         onDelete = { onDelete(draft) },
@@ -123,7 +121,6 @@ fun DraftsScreen(
 private fun DraftItem(
     draft: Transaction,
     category: Category?,
-    currencyFormat: NumberFormat,
     dateFormat: SimpleDateFormat,
     onConfirm: () -> Unit,
     onDelete: () -> Unit,
@@ -143,7 +140,7 @@ private fun DraftItem(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = currencyFormat.format(draft.amount),
+                    text = CurrencyFormats.formatAmount(draft.currency, draft.amount),
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold
                     ),

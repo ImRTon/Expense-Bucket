@@ -23,11 +23,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.rton.expensebucket.data.HistoricalCashRateProvider
 import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.PaymentMethod
 import com.rton.expensebucket.data.model.Project
 import com.rton.expensebucket.data.model.Transaction
 import com.rton.expensebucket.ui.components.ExpenseNumpad
+import com.rton.expensebucket.ui.util.CurrencyFormats
 import com.rton.expensebucket.ui.util.ExpressionEvaluator
 import com.rton.expensebucket.ui.util.PaymentIconMapper
 import java.text.SimpleDateFormat
@@ -58,6 +60,18 @@ fun AddTransactionScreen(
     var showNoteField by remember { mutableStateOf(existingTransaction?.note?.isNotBlank() == true) }
     var selectedProjectId by remember { mutableStateOf(existingTransaction?.projectId) }
     var showProjectDropdown by remember { mutableStateOf(false) }
+    val initialSettlementCurrency = existingTransaction?.projectId
+        ?.let { projectId -> projects.find { it.id == projectId }?.defaultCurrency }
+        ?: "TWD"
+    var selectedCurrency by remember { mutableStateOf(existingTransaction?.currency ?: initialSettlementCurrency) }
+    var exchangeRateText by remember {
+        mutableStateOf(CurrencyFormats.formatRate(existingTransaction?.exchangeRate ?: 1.0))
+    }
+    var showCurrencyMenu by remember { mutableStateOf(false) }
+    var previousSettlementCurrency by remember { mutableStateOf(initialSettlementCurrency) }
+    var isFetchingExchangeRate by remember { mutableStateOf(false) }
+    var exchangeRateError by remember { mutableStateOf<String?>(null) }
+    var skipInitialRateFetch by remember { mutableStateOf(existingTransaction != null) }
 
     // Auto-select project whose date range covers today (only in add mode)
     LaunchedEffect(projects) {
@@ -144,6 +158,10 @@ fun AddTransactionScreen(
     val childPaymentMethodsMap = remember(paymentMethods) {
         paymentMethods.filter { it.parentId != null }.groupBy { it.parentId }
     }
+    val selectedProject = remember(selectedProjectId, projects) {
+        projects.find { it.id == selectedProjectId }
+    }
+    val settlementCurrency = selectedProject?.defaultCurrency ?: "TWD"
 
     // Resolve selected payment method parent for UI initialization
     LaunchedEffect(selectedPaymentMethodId, paymentMethods) {
@@ -155,16 +173,63 @@ fun AddTransactionScreen(
         }
     }
 
+    LaunchedEffect(settlementCurrency) {
+        if (selectedCurrency == previousSettlementCurrency) {
+            selectedCurrency = settlementCurrency
+        }
+        if (selectedCurrency == settlementCurrency) {
+            exchangeRateText = "1"
+        }
+        previousSettlementCurrency = settlementCurrency
+    }
+
+    LaunchedEffect(selectedCurrency, settlementCurrency, selectedDateTime) {
+        if (skipInitialRateFetch) {
+            skipInitialRateFetch = false
+            return@LaunchedEffect
+        }
+
+        if (selectedCurrency == settlementCurrency) {
+            isFetchingExchangeRate = false
+            exchangeRateError = null
+            exchangeRateText = "1"
+            return@LaunchedEffect
+        }
+
+        isFetchingExchangeRate = true
+        exchangeRateError = null
+        HistoricalCashRateProvider.getExchangeRate(
+            fromCurrency = selectedCurrency,
+            toCurrency = settlementCurrency,
+            dateMillis = selectedDateTime
+        ).onSuccess { fetchedRate ->
+            exchangeRateText = CurrencyFormats.formatRate(fetchedRate)
+        }.onFailure {
+            exchangeRateText = ""
+            exchangeRateError = "歷史現鈔匯率抓取失敗，可手動修正"
+        }
+        isFetchingExchangeRate = false
+    }
+
     // Can save?
     val resolvedAmount = if (amountText.any { it in "+−×÷" }) {
         ExpressionEvaluator.evaluate(amountText)
     } else {
         amountText.toDoubleOrNull()
     }
-    val canSave = resolvedAmount?.let { it > 0 } == true
+    val requiresExchangeRate = selectedCurrency != settlementCurrency
+    val parsedExchangeRate = if (requiresExchangeRate) exchangeRateText.toDoubleOrNull() else 1.0
+    val convertedAmount = if (resolvedAmount != null && parsedExchangeRate != null) {
+        resolvedAmount * parsedExchangeRate
+    } else {
+        null
+    }
+    val canSave = resolvedAmount?.let { it > 0 } == true &&
+        parsedExchangeRate?.let { it > 0 } == true
 
     fun doSave() {
         val amount = resolvedAmount ?: return
+        val exchangeRate = parsedExchangeRate ?: return
         if (amount <= 0) return
 
         val transaction = Transaction(
@@ -177,6 +242,8 @@ fun AddTransactionScreen(
             source = existingTransaction?.source ?: "manual",
             projectId = selectedProjectId,
             paymentMethodId = selectedPaymentMethodId,
+            currency = selectedCurrency,
+            exchangeRate = exchangeRate,
             isDraft = false,
             createdAt = existingTransaction?.createdAt ?: System.currentTimeMillis()
         )
@@ -294,8 +361,8 @@ fun AddTransactionScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                "$",
-                                style = MaterialTheme.typography.headlineMedium.copy(
+                                selectedCurrency,
+                                style = MaterialTheme.typography.titleLarge.copy(
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.primary
                                 )
@@ -697,7 +764,14 @@ fun AddTransactionScreen(
                                 }
                                 if (selectedProjectId != null) {
                                     IconButton(
-                                        onClick = { selectedProjectId = null },
+                                        onClick = {
+                                            val oldSettlementCurrency = settlementCurrency
+                                            selectedProjectId = null
+                                            if (selectedCurrency == oldSettlementCurrency) {
+                                                selectedCurrency = "TWD"
+                                                exchangeRateText = "1"
+                                            }
+                                        },
                                         modifier = Modifier.size(20.dp)
                                     ) {
                                         Icon(
@@ -720,12 +794,151 @@ fun AddTransactionScreen(
                                         Text("${project.name}  (${project.defaultCurrency})")
                                     },
                                     onClick = {
+                                        val oldSettlementCurrency = settlementCurrency
                                         selectedProjectId = project.id
+                                        if (selectedCurrency == oldSettlementCurrency) {
+                                            selectedCurrency = project.defaultCurrency
+                                            exchangeRateText = "1"
+                                        }
                                         showProjectDropdown = false
                                     },
                                     leadingIcon = {
                                         Icon(Icons.Filled.Luggage, contentDescription = null)
                                     }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 4.dp)
+                ) {
+                    OutlinedCard(
+                        onClick = {
+                            showCurrencyMenu = true
+                            focusManager.clearFocus()
+                            showNumpad = false
+                        },
+                        shape = RoundedCornerShape(12.dp),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 12.dp, vertical = 10.dp),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Icon(
+                                    Icons.Filled.SwapHoriz,
+                                    contentDescription = null,
+                                    modifier = Modifier.size(18.dp),
+                                    tint = MaterialTheme.colorScheme.primary
+                                )
+                                Column {
+                                    Text(
+                                        "記帳幣別",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        if (requiresExchangeRate) {
+                                            "$selectedCurrency -> $settlementCurrency"
+                                        } else {
+                                            selectedCurrency
+                                        },
+                                        style = MaterialTheme.typography.bodyLarge.copy(
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    )
+                                }
+                            }
+                            Icon(
+                                Icons.Filled.ExpandMore,
+                                contentDescription = null
+                            )
+                        }
+                    }
+
+                    DropdownMenu(
+                        expanded = showCurrencyMenu,
+                        onDismissRequest = { showCurrencyMenu = false }
+                    ) {
+                        CurrencyFormats.supportedCurrencies.forEach { currency ->
+                            DropdownMenuItem(
+                                text = { Text(currency) },
+                                onClick = {
+                                    selectedCurrency = currency
+                                    if (currency == settlementCurrency) {
+                                        exchangeRateText = "1"
+                                    } else if (exchangeRateText == "1") {
+                                        exchangeRateText = ""
+                                    }
+                                    showCurrencyMenu = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                AnimatedVisibility(visible = requiresExchangeRate) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(10.dp)
+                        ) {
+                            Text(
+                                "結算幣別: $settlementCurrency${selectedProject?.let { " (${it.name})" } ?: " (日常帳)"}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+
+                            OutlinedTextField(
+                                value = exchangeRateText,
+                                onValueChange = { newValue ->
+                                    if (newValue.isEmpty() || newValue.all { it.isDigit() || it == '.' }) {
+                                        exchangeRateText = newValue
+                                    }
+                                },
+                                label = { Text("現鈔匯率") },
+                                placeholder = { Text("1 $selectedCurrency = ? $settlementCurrency") },
+                                singleLine = true,
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
+                                ),
+                                supportingText = {
+                                    Text(
+                                        when {
+                                            isFetchingExchangeRate -> "正在依記帳日期抓取歷史現鈔匯率..."
+                                            exchangeRateError != null -> exchangeRateError!!
+                                            else -> "已依記帳日期自動帶入歷史現鈔匯率，之後統整與專案預算都用它換算。"
+                                        }
+                                    )
+                                }
+                            )
+
+                            convertedAmount?.let {
+                                Text(
+                                    "換算後約 ${CurrencyFormats.formatAmount(settlementCurrency, it)}",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary
                                 )
                             }
                         }
@@ -738,7 +951,9 @@ fun AddTransactionScreen(
                         value = note,
                         onValueChange = { note = it },
                         placeholder = { Text("備註...") },
-                        singleLine = true,
+                        singleLine = false,
+                        minLines = 3,
+                        maxLines = 6,
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 4.dp),

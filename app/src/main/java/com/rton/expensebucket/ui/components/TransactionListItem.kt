@@ -23,8 +23,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.Transaction
+import com.rton.expensebucket.ui.util.CurrencyFormats
 import com.rton.expensebucket.ui.util.IconMapper
-import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
 
@@ -36,11 +36,11 @@ import java.util.*
 fun TransactionListItem(
     transaction: Transaction,
     category: Category?,
+    settlementCurrency: String = "TWD",
     onDelete: () -> Unit,
     onClick: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
-    val currencyFormat = NumberFormat.getCurrencyInstance(Locale("zh", "TW"))
     val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
 
     val itemWidth = remember { mutableFloatStateOf(0f) }
@@ -62,6 +62,13 @@ fun TransactionListItem(
         }
     )
     stateHolder.value = dismissState
+
+    val originalAmountText = remember(transaction.amount, transaction.currency) {
+        CurrencyFormats.formatAmount(transaction.currency, transaction.amount)
+    }
+    val convertedAmountText = remember(transaction.amount, transaction.exchangeRate, settlementCurrency) {
+        CurrencyFormats.formatAmount(settlementCurrency, transaction.amount * transaction.exchangeRate)
+    }
 
     SwipeToDismissBox(
         state = dismissState,
@@ -162,11 +169,18 @@ fun TransactionListItem(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
+                    if (transaction.currency != settlementCurrency || transaction.exchangeRate != 1.0) {
+                        Text(
+                            text = "約 $convertedAmountText",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
                 }
 
                 // Amount
                 Text(
-                    text = "${if (transaction.isExpense) "-" else "+"}${currencyFormat.format(transaction.amount)}",
+                    text = "${if (transaction.isExpense) "-" else "+"}$originalAmountText",
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold
                     ),
