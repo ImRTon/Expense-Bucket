@@ -550,11 +550,8 @@ fun ExpensesApp(
             }
 
             composable(Screen.InvoiceOcr.route) {
-                ReceiptOcrScreen(
+                InvoiceQrScannerScreen(
                     receiptOcrEngine = receiptOcrEngine,
-                    title = "發票辨識",
-                    emptyStateTitle = "拍一張台灣發票或從相簿選圖",
-                    emptyStateSubtitle = "會自動抓發票總額與品項備註",
                     onApplyPrefill = { prefill ->
                         transactionPrefill = prefill
                         navController.popBackStack()

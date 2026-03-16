@@ -96,6 +96,13 @@ dependencies {
     implementation(libs.mlkit.text.recognition.japanese)
     implementation(libs.mlkit.language.id)
     implementation(libs.mlkit.translate)
+    implementation(libs.mlkit.barcode.scanning)
+
+    // CameraX realtime scan
+    implementation(libs.androidx.camera.core)
+    implementation(libs.androidx.camera.camera2)
+    implementation(libs.androidx.camera.lifecycle)
+    implementation(libs.androidx.camera.view)
 
     // Coil (image loading)
     implementation(libs.coil.compose)

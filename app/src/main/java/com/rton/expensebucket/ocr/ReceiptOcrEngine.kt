@@ -1,5 +1,6 @@
 package com.rton.expensebucket.ocr
 
+import android.graphics.Bitmap
 import android.content.Context
 import android.net.Uri
 import com.google.mlkit.common.model.DownloadConditions
@@ -36,24 +37,19 @@ class ReceiptOcrEngine @Inject constructor() {
     private val languageIdentifier = LanguageIdentification.getClient()
 
     suspend fun processReceipt(context: Context, imageUri: Uri): ReceiptOcrResult = coroutineScope {
-        val image = InputImage.fromFilePath(context, imageUri)
-        val chineseTextDeferred = async { recognizeText(chineseRecognizer, image) }
-        val japaneseTextDeferred = async { recognizeText(japaneseRecognizer, image) }
-        val latinTextDeferred = async { recognizeText(latinRecognizer, image) }
-
-        val chineseText = chineseTextDeferred.await()
-        val japaneseText = japaneseTextDeferred.await()
-        val latinText = latinTextDeferred.await()
-        val rawText = selectBestText(
-            RecognizedTextCandidate(chineseText, RecognizerHint.CHINESE),
-            RecognizedTextCandidate(japaneseText, RecognizerHint.JAPANESE),
-            RecognizedTextCandidate(latinText, RecognizerHint.LATIN)
+        processImage(
+            image = InputImage.fromFilePath(context, imageUri),
+            includeJapaneseRecognizer = true
         )
-        val detectedLanguage = identifyLanguage(rawText)
-        buildResult(
-            rawText = rawText,
-            detectedLanguageTag = detectedLanguage,
-            translatedText = null
+    }
+
+    suspend fun processBitmap(
+        bitmap: Bitmap,
+        includeJapaneseRecognizer: Boolean = true
+    ): ReceiptOcrResult = coroutineScope {
+        processImage(
+            image = InputImage.fromBitmap(bitmap, 0),
+            includeJapaneseRecognizer = includeJapaneseRecognizer
         )
     }
 
@@ -206,8 +202,38 @@ class ReceiptOcrEngine @Inject constructor() {
                 }
                 .addOnFailureListener {
                     continuation.resume(null)
-                }
+            }
         }
+    }
+
+    private suspend fun processImage(
+        image: InputImage,
+        includeJapaneseRecognizer: Boolean
+    ): ReceiptOcrResult = coroutineScope {
+        val chineseTextDeferred = async { recognizeText(chineseRecognizer, image) }
+        val latinTextDeferred = async { recognizeText(latinRecognizer, image) }
+        val japaneseTextDeferred = if (includeJapaneseRecognizer) {
+            async { recognizeText(japaneseRecognizer, image) }
+        } else {
+            null
+        }
+
+        val chineseText = chineseTextDeferred.await()
+        val latinText = latinTextDeferred.await()
+        val candidates = buildList {
+            add(RecognizedTextCandidate(chineseText, RecognizerHint.CHINESE))
+            japaneseTextDeferred?.await()?.let { add(RecognizedTextCandidate(it, RecognizerHint.JAPANESE)) }
+            add(RecognizedTextCandidate(latinText, RecognizerHint.LATIN))
+        }
+        val rawText = selectBestText(
+            *candidates.toTypedArray()
+        )
+        val detectedLanguage = identifyLanguage(rawText)
+        buildResult(
+            rawText = rawText,
+            detectedLanguageTag = detectedLanguage,
+            translatedText = null
+        )
     }
 }
 
