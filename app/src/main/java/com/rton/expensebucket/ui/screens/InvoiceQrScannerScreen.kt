@@ -437,11 +437,10 @@ private fun InvoiceScannerOverlay(
 
         Row(
             modifier = Modifier
-                .width(totalWidthDp)
-                .align(Alignment.TopStart)
-                .padding(start = startPaddingDp, top = 300.dp)
-                ,
-            horizontalArrangement = Arrangement.Start
+                .fillMaxWidth()
+                .align(Alignment.TopCenter)
+                .padding(top = (maxHeight * 0.24f) + (maxWidth * 0.3f) + 12.dp),
+            horizontalArrangement = Arrangement.Center
         ) {
             Box(
                 modifier = Modifier.width(boxWidthDp),
