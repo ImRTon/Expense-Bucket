@@ -15,7 +15,7 @@ import com.rton.expensebucket.data.model.Transaction
 
 @Database(
     entities = [Transaction::class, Category::class, Project::class, PaymentMethod::class],
-    version = 7,
+    version = 8,
     exportSchema = true
 )
 abstract class ExpenseBucketDatabase : RoomDatabase() {
@@ -177,6 +177,17 @@ abstract class ExpenseBucketDatabase : RoomDatabase() {
                 )
                 database.execSQL(
                     "ALTER TABLE `payment_methods` ADD COLUMN `billingLimitAmount` REAL DEFAULT NULL"
+                )
+            }
+        }
+
+        /**
+         * Migration from v7 → v8: adds personalAmount to transactions for per-person accounting.
+         */
+        val MIGRATION_7_8 = object : Migration(7, 8) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE `transactions` ADD COLUMN `personalAmount` REAL DEFAULT NULL"
                 )
             }
         }

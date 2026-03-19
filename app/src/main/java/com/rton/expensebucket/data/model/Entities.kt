@@ -110,6 +110,7 @@ data class Project(
 data class Transaction(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val amount: Double,
+    val personalAmount: Double? = null,
     val note: String = "",
     val categoryId: Long? = null,
     val projectId: Long? = null,

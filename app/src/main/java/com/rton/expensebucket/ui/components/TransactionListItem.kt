@@ -23,6 +23,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.Transaction
+import com.rton.expensebucket.data.model.effectiveAmount
+import com.rton.expensebucket.data.model.effectiveConvertedAmount
 import com.rton.expensebucket.ui.util.CurrencyFormats
 import com.rton.expensebucket.ui.util.IconMapper
 import java.text.SimpleDateFormat
@@ -63,11 +65,14 @@ fun TransactionListItem(
     )
     stateHolder.value = dismissState
 
-    val originalAmountText = remember(transaction.amount, transaction.currency) {
-        CurrencyFormats.formatAmount(transaction.currency, transaction.amount)
+    val displayAmount = remember(transaction.amount, transaction.personalAmount) {
+        transaction.effectiveAmount()
     }
-    val convertedAmountText = remember(transaction.amount, transaction.exchangeRate, settlementCurrency) {
-        CurrencyFormats.formatAmount(settlementCurrency, transaction.amount * transaction.exchangeRate)
+    val originalAmountText = remember(displayAmount, transaction.currency) {
+        CurrencyFormats.formatAmount(transaction.currency, displayAmount)
+    }
+    val convertedAmountText = remember(transaction.amount, transaction.personalAmount, transaction.exchangeRate, settlementCurrency) {
+        CurrencyFormats.formatAmount(settlementCurrency, transaction.effectiveConvertedAmount())
     }
 
     SwipeToDismissBox(
@@ -169,6 +174,13 @@ fun TransactionListItem(
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
+                    if (transaction.personalAmount != null && transaction.personalAmount != transaction.amount) {
+                        Text(
+                            text = "支出總額 ${CurrencyFormats.formatAmount(transaction.currency, transaction.amount)}",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                        )
+                    }
                     if (transaction.currency != settlementCurrency || transaction.exchangeRate != 1.0) {
                         Text(
                             text = "約 $convertedAmountText",

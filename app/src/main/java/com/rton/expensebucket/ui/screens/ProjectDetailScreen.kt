@@ -18,6 +18,7 @@ import androidx.compose.ui.unit.dp
 import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.Project
 import com.rton.expensebucket.data.model.Transaction
+import com.rton.expensebucket.data.model.effectiveConvertedAmount
 import com.rton.expensebucket.ui.components.ProjectFormDialog
 import com.rton.expensebucket.ui.components.TransactionListItem
 import com.rton.expensebucket.ui.util.CurrencyFormats
@@ -36,6 +37,7 @@ fun ProjectDetailScreen(
     onBack: () -> Unit,
     onUpdateProject: (Project) -> Unit,
     onDeleteProject: (Project) -> Unit,
+    onDeleteTransaction: (Transaction) -> Unit,
     onTransactionClick: (Transaction) -> Unit
 ) {
     val settlementCurrency = project?.defaultCurrency ?: "TWD"
@@ -44,7 +46,7 @@ fun ProjectDetailScreen(
         transactions
             .filter { it.isExpense }
             .groupBy { it.categoryId }
-            .mapValues { (_, txs) -> txs.sumOf { it.amount * it.exchangeRate } }
+            .mapValues { (_, txs) -> txs.sumOf { it.effectiveConvertedAmount() } }
             .toList()
             .sortedByDescending { it.second }
     }
@@ -233,7 +235,7 @@ fun ProjectDetailScreen(
                     transaction = transaction,
                     category = categoryMap[transaction.categoryId],
                     settlementCurrency = settlementCurrency,
-                    onDelete = { /* TODO: delete from project */ },
+                    onDelete = { onDeleteTransaction(transaction) },
                     onClick = { onTransactionClick(transaction) }
                 )
             }

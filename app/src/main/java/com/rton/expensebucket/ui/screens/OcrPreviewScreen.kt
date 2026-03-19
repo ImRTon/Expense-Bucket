@@ -2,12 +2,15 @@ package com.rton.expensebucket.ui.screens
 
 import android.net.Uri
 import androidx.compose.animation.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
@@ -17,9 +20,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import coil.compose.rememberAsyncImagePainter
 import com.rton.expensebucket.data.HistoricalCashRateProvider
@@ -48,6 +55,8 @@ fun OcrPreviewScreen(
 
     // Editable fields from OCR result
     var amount by remember { mutableStateOf("") }
+    var personalAmountText by remember { mutableStateOf("") }
+    var showPersonalAmountDialog by remember { mutableStateOf(false) }
     var note by remember { mutableStateOf("") }
     var isExpense by remember { mutableStateOf(true) }
     var selectedCategory by remember { mutableStateOf<Category?>(null) }
@@ -126,11 +135,34 @@ fun OcrPreviewScreen(
     }
     val requiresExchangeRate = selectedCurrency != "TWD"
     val parsedAmount = amount.toDoubleOrNull()
+    val parsedPersonalAmount = if (isExpense) personalAmountText.toDoubleOrNull() else null
     val parsedExchangeRate = if (requiresExchangeRate) exchangeRateText.toDoubleOrNull() else 1.0
     val convertedAmount = if (parsedAmount != null && parsedExchangeRate != null) {
         parsedAmount * parsedExchangeRate
     } else {
         null
+    }
+    val personalAmountError = when {
+        parsedPersonalAmount == null && personalAmountText.isNotBlank() -> "請輸入正確金額"
+        parsedPersonalAmount != null && parsedPersonalAmount <= 0 -> "我的花費需大於 0"
+        parsedPersonalAmount != null && parsedAmount != null && parsedPersonalAmount > parsedAmount ->
+            "我的花費不能大於支出總額"
+        else -> null
+    }
+
+    fun openPersonalAmountEditor() {
+        if (!isExpense) return
+        if (parsedAmount == null || parsedAmount <= 0) {
+            personalAmountText = ""
+        }
+        showPersonalAmountDialog = true
+    }
+
+    LaunchedEffect(isExpense) {
+        if (!isExpense) {
+            personalAmountText = ""
+            showPersonalAmountDialog = false
+        }
     }
 
     LaunchedEffect(selectedCurrency) {
@@ -345,15 +377,54 @@ fun OcrPreviewScreen(
             )
 
             // Amount
-            OutlinedTextField(
-                value = amount,
-                onValueChange = { amount = it },
-                label = { Text("金額") },
-                leadingIcon = { Text("$", style = MaterialTheme.typography.titleMedium) },
-                singleLine = true,
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp)
-            )
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    if (isExpense) {
+                        PersonalAmountHandle(
+                            isActive = parsedPersonalAmount != null,
+                            onTrigger = { openPersonalAmountEditor() }
+                        )
+                    }
+                    Text(
+                        if (isExpense) "支出總額" else "收入金額",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                OutlinedTextField(
+                    value = amount,
+                    onValueChange = { amount = it },
+                    label = { Text("總額") },
+                    leadingIcon = { Text("$", style = MaterialTheme.typography.titleMedium) },
+                    singleLine = true,
+                    isError = isExpense && personalAmountError != null,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    supportingText = {
+                        if (isExpense && parsedPersonalAmount != null) {
+                            Text("我的花費 ${CurrencyFormats.formatAmount(selectedCurrency, parsedPersonalAmount)}")
+                        } else if (isExpense) {
+                            Text("可設定實際由你負擔的金額；預算與一般統計會優先使用它")
+                        }
+                    },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
+                )
+            }
+
+            if (isExpense) personalAmountError?.let { error ->
+                Text(
+                    text = error,
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.error
+                )
+            }
 
             // Note / merchant
             OutlinedTextField(
@@ -650,8 +721,8 @@ fun OcrPreviewScreen(
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
+                            keyboardOptions = KeyboardOptions(
+                                keyboardType = KeyboardType.Decimal
                             ),
                             supportingText = {
                                 Text(
@@ -685,6 +756,7 @@ fun OcrPreviewScreen(
                     onSave(
                         Transaction(
                             amount = amountValue,
+                            personalAmount = if (isExpense) parsedPersonalAmount?.takeIf { it > 0 } else null,
                             note = note,
                             categoryId = selectedCategory?.id,
                             paymentMethodId = selectedPaymentMethodId,
@@ -704,6 +776,7 @@ fun OcrPreviewScreen(
                     .height(52.dp),
                 shape = RoundedCornerShape(14.dp),
                 enabled = parsedAmount != null && parsedAmount > 0 && parsedExchangeRate != null && parsedExchangeRate > 0
+                    && (!isExpense || personalAmountError == null)
             ) {
                 Icon(Icons.Filled.Check, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
@@ -712,5 +785,153 @@ fun OcrPreviewScreen(
 
             Spacer(modifier = Modifier.height(16.dp))
         }
+    }
+
+    if (showPersonalAmountDialog && isExpense) {
+        PersonalAmountDialog(
+            currency = selectedCurrency,
+            totalAmount = parsedAmount,
+            initialValue = personalAmountText,
+            onDismiss = { showPersonalAmountDialog = false },
+            onConfirm = { updatedValue ->
+                personalAmountText = updatedValue
+                showPersonalAmountDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun PersonalAmountHandle(
+    isActive: Boolean,
+    onTrigger: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val thresholdPx = with(LocalDensity.current) { 28.dp.toPx() }
+    var dragDistance by remember { mutableStateOf(0f) }
+    val contentColor = if (isActive) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f)
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .pointerInput(isActive) {
+                detectHorizontalDragGestures(
+                    onDragEnd = { dragDistance = 0f },
+                    onHorizontalDrag = { change, dragAmount ->
+                        dragDistance += dragAmount
+                        if (dragDistance >= thresholdPx) {
+                            dragDistance = 0f
+                            change.consume()
+                            onTrigger()
+                        }
+                    }
+                )
+            }
+            .clickable(onClick = onTrigger)
+            .padding(horizontal = 2.dp, vertical = 1.dp)
+    ) {
+        Icon(
+            imageVector = if (isActive) Icons.Filled.People else Icons.Filled.Person,
+            contentDescription = "設定我的花費",
+            tint = contentColor,
+            modifier = Modifier.size(16.dp)
+        )
+        Text(
+            text = if (isActive) "分攤" else "我的花費",
+            style = MaterialTheme.typography.labelSmall,
+            color = contentColor,
+            textDecoration = if (isActive) null else TextDecoration.Underline
+        )
+    }
+}
+
+@Composable
+private fun PersonalAmountDialog(
+    currency: String,
+    totalAmount: Double?,
+    initialValue: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var tempValue by remember(initialValue) { mutableStateOf(initialValue) }
+    val parsedValue = tempValue.toDoubleOrNull()
+    val errorText = when {
+        tempValue.isBlank() -> null
+        parsedValue == null -> "請輸入正確金額"
+        parsedValue <= 0 -> "我的花費需大於 0"
+        totalAmount != null && parsedValue > totalAmount -> "我的花費不能大於支出總額"
+        else -> null
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("設定我的花費") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "支出總額會用於支付工具額度統計；這裡填的金額則會用於預算與一般統計。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                totalAmount?.let {
+                    Text(
+                        "支出總額 ${CurrencyFormats.formatAmount(currency, it)}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                OutlinedTextField(
+                    value = tempValue,
+                    onValueChange = { newValue ->
+                        tempValue = sanitizePersonalAmountInput(newValue)
+                    },
+                    label = { Text("我的花費") },
+                    placeholder = { Text("留空代表全額都算在自己") },
+                    singleLine = true,
+                    isError = errorText != null,
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Decimal
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    supportingText = {
+                        Text(errorText ?: "例如聚餐刷卡 1200，你只要記 300")
+                    }
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(tempValue) },
+                enabled = errorText == null
+            ) {
+                Text("確定")
+            }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = { onConfirm("") }) {
+                    Text("清除")
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("取消")
+                }
+            }
+        }
+    )
+}
+
+private fun sanitizePersonalAmountInput(input: String): String {
+    val filtered = input.filter { it.isDigit() || it == '.' }
+    val parts = filtered.split('.')
+    return when {
+        parts.isEmpty() -> ""
+        parts.size == 1 -> parts[0]
+        else -> parts.first() + "." + parts.drop(1).joinToString("").take(2)
     }
 }

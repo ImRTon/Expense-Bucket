@@ -2,6 +2,8 @@ package com.rton.expensebucket.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -12,13 +14,17 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.ui.platform.LocalView
-import androidx.compose.ui.platform.LocalFocusManager
 import android.view.HapticFeedbackConstants
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalFocusManager
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -49,6 +55,9 @@ fun AddTransactionScreen(
 ) {
     val isEditMode = existingTransaction != null
     val initialAmount = existingTransaction?.amount ?: prefill?.amount
+    val initialPersonalAmount = existingTransaction
+        ?.takeIf { it.isExpense }
+        ?.personalAmount
     val initialNote = existingTransaction?.note ?: prefill?.note.orEmpty()
     val initialIsExpense = existingTransaction?.isExpense ?: prefill?.isExpense ?: true
 
@@ -57,6 +66,10 @@ fun AddTransactionScreen(
             if (it == it.toLong().toDouble()) it.toLong().toString() else it.toString()
         } ?: "")
     }
+    var personalAmountText by remember {
+        mutableStateOf(initialPersonalAmount?.let { formatEditableTransactionAmount(it) } ?: "")
+    }
+    var showPersonalAmountDialog by remember { mutableStateOf(false) }
     var selectedCategory by remember { mutableStateOf<Category?>(
         existingTransaction?.categoryId?.let { catId -> categories.find { it.id == catId } }
     ) }
@@ -64,6 +77,9 @@ fun AddTransactionScreen(
     var note by remember { mutableStateOf(initialNote) }
     var showNoteField by remember { mutableStateOf(initialNote.isNotBlank()) }
     var selectedProjectId by remember { mutableStateOf(existingTransaction?.projectId) }
+    var hasUserEditedProjectSelection by remember {
+        mutableStateOf(existingTransaction?.projectId != null)
+    }
     var showProjectDropdown by remember { mutableStateOf(false) }
     val initialSettlementCurrency = existingTransaction?.projectId
         ?.let { projectId -> projects.find { it.id == projectId }?.defaultCurrency }
@@ -88,17 +104,6 @@ fun AddTransactionScreen(
         )
     }
 
-    // Auto-select project whose date range covers today (only in add mode)
-    LaunchedEffect(projects) {
-        if (existingTransaction == null && selectedProjectId == null) {
-            val now = System.currentTimeMillis()
-            val match = projects.firstOrNull { p ->
-                p.isActive && p.startDate != null && p.endDate != null
-                    && now >= p.startDate && now <= p.endDate
-            }
-            if (match != null) selectedProjectId = match.id
-        }
-    }
     var selectedPaymentMethodId by remember {
         mutableStateOf(
             existingTransaction?.paymentMethodId
@@ -141,6 +146,28 @@ fun AddTransactionScreen(
 
     val view = LocalView.current
     val focusManager = LocalFocusManager.current
+
+    // Auto-select active travel project that covers the selected transaction date.
+    LaunchedEffect(projects, selectedDateTime, existingTransaction, hasUserEditedProjectSelection) {
+        if (existingTransaction != null || hasUserEditedProjectSelection) return@LaunchedEffect
+
+        val match = projects
+            .filter { project ->
+                project.isActive &&
+                    project.startDate != null &&
+                    project.endDate != null &&
+                    isWithinProjectDateRange(
+                        targetDateTime = selectedDateTime,
+                        startDate = project.startDate,
+                        endDate = project.endDate
+                    )
+            }
+            .minByOrNull { project ->
+                (project.endDate ?: Long.MAX_VALUE) - (project.startDate ?: Long.MIN_VALUE)
+            }
+
+        selectedProjectId = match?.id
+    }
     
     LaunchedEffect(timePickerState.hour, timePickerState.minute) {
         view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
@@ -151,6 +178,13 @@ fun AddTransactionScreen(
         if (!isEditMode && selectedCategory != null) {
             val matchesType = categories.find { it.id == selectedCategory?.id }
             if (matchesType == null) selectedCategory = null
+        }
+    }
+
+    LaunchedEffect(isExpense) {
+        if (!isExpense) {
+            personalAmountText = ""
+            showPersonalAmountDialog = false
         }
     }
 
@@ -236,13 +270,29 @@ fun AddTransactionScreen(
     }
     val requiresExchangeRate = selectedCurrency != settlementCurrency
     val parsedExchangeRate = if (requiresExchangeRate) exchangeRateText.toDoubleOrNull() else 1.0
+    val parsedPersonalAmount = if (isExpense) personalAmountText.toDoubleOrNull() else null
     val convertedAmount = if (resolvedAmount != null && parsedExchangeRate != null) {
         resolvedAmount * parsedExchangeRate
     } else {
         null
     }
+    val personalAmountError = when {
+        parsedPersonalAmount == null && personalAmountText.isNotBlank() -> "請輸入正確金額"
+        parsedPersonalAmount != null && parsedPersonalAmount <= 0 -> "我的花費需大於 0"
+        parsedPersonalAmount != null && resolvedAmount != null && parsedPersonalAmount > resolvedAmount ->
+            "我的花費不能大於支出總額"
+        else -> null
+    }
     val canSave = resolvedAmount?.let { it > 0 } == true &&
-        parsedExchangeRate?.let { it > 0 } == true
+        parsedExchangeRate?.let { it > 0 } == true &&
+        personalAmountError == null
+
+    fun openPersonalAmountEditor() {
+        if (!isExpense) return
+        focusManager.clearFocus()
+        showNumpad = false
+        showPersonalAmountDialog = true
+    }
 
     fun doSave() {
         val amount = resolvedAmount ?: return
@@ -252,6 +302,7 @@ fun AddTransactionScreen(
         val transaction = Transaction(
             id = existingTransaction?.id ?: 0,
             amount = amount,
+            personalAmount = if (isExpense) parsedPersonalAmount?.takeIf { it > 0 } else null,
             note = note,
             categoryId = selectedCategory?.id,
             isExpense = isExpense,
@@ -350,79 +401,117 @@ fun AddTransactionScreen(
                     .padding(bottom = 8.dp)
             ) {
                 // ─── Amount Display (tappable) ───────────────────
-                Card(
-                    onClick = { 
-                        focusManager.clearFocus()
-                        showNumpad = true 
-                    },
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
-                    )
+                        .padding(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 20.dp, vertical = 16.dp)
-                    ) {
-                        Text(
-                            "金額",
-                            style = MaterialTheme.typography.labelMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                    Card(
+                        onClick = {
+                            focusManager.clearFocus()
+                            showNumpad = true
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(20.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
                         )
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 20.dp, vertical = 16.dp),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
                         ) {
-                            Text(
-                                selectedCurrency,
-                                style = MaterialTheme.typography.titleLarge.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.primary
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                if (isExpense) {
+                                    PersonalAmountHandle(
+                                        isActive = parsedPersonalAmount != null,
+                                        onTrigger = { openPersonalAmountEditor() }
+                                    )
+                                }
+                                Text(
+                                    if (isExpense) "支出總額" else "收入金額",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                            )
-                            Spacer(modifier = Modifier.width(4.dp))
-                            Column(
-                                modifier = Modifier.weight(1f),
-                                horizontalAlignment = Alignment.End
+                                if (isExpense && parsedPersonalAmount != null) {
+                                    Text(
+                                        "已設定我的花費",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
+                                }
+                            }
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
                             ) {
                                 Text(
-                                    text = if (amountText.isEmpty()) "0" else amountText,
-                                    style = MaterialTheme.typography.displaySmall.copy(
+                                    selectedCurrency,
+                                    style = MaterialTheme.typography.titleLarge.copy(
                                         fontWeight = FontWeight.Bold,
-                                        letterSpacing = (-1).sp
-                                    ),
-                                    color = if (amountText.isEmpty())
-                                        MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                                    else
-                                        MaterialTheme.colorScheme.onSurface,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    textAlign = TextAlign.End
+                                        color = MaterialTheme.colorScheme.primary
+                                    )
                                 )
-                                // Show calculated result when expression
-                                if (amountText.any { it in "+−×÷" }) {
-                                    resolvedAmount?.let { result ->
+                                Spacer(modifier = Modifier.width(4.dp))
+                                Column(
+                                    modifier = Modifier.weight(1f),
+                                    horizontalAlignment = Alignment.End
+                                ) {
+                                    Text(
+                                        text = if (amountText.isEmpty()) "0" else amountText,
+                                        style = MaterialTheme.typography.displaySmall.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            letterSpacing = (-1).sp
+                                        ),
+                                        color = if (amountText.isEmpty())
+                                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
+                                        else
+                                            MaterialTheme.colorScheme.onSurface,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        textAlign = TextAlign.End
+                                    )
+                                    if (amountText.any { it in "+−×÷" }) {
+                                        resolvedAmount?.let { result ->
+                                            Text(
+                                                "= ${ExpressionEvaluator.formatResult(result)}",
+                                                style = MaterialTheme.typography.titleSmall,
+                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                                textAlign = TextAlign.End,
+                                                modifier = Modifier.fillMaxWidth()
+                                            )
+                                        }
+                                    }
+                                    if (isExpense) parsedPersonalAmount?.let {
                                         Text(
-                                            "= ${ExpressionEvaluator.formatResult(result)}",
-                                            style = MaterialTheme.typography.titleSmall,
-                                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
+                                            "我的花費 ${CurrencyFormats.formatAmount(selectedCurrency, it)}",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
                                             textAlign = TextAlign.End,
                                             modifier = Modifier.fillMaxWidth()
                                         )
                                     }
                                 }
+                                if (!showNumpad) {
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Icon(
+                                        Icons.Filled.Edit,
+                                        contentDescription = "編輯金額",
+                                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
                             }
-                            if (!showNumpad) {
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Icon(
-                                    Icons.Filled.Edit,
-                                    contentDescription = "編輯金額",
-                                    tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                                    modifier = Modifier.size(20.dp)
+                            if (isExpense) personalAmountError?.let { error ->
+                                Text(
+                                    error,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.error
                                 )
                             }
                         }
@@ -783,6 +872,7 @@ fun AddTransactionScreen(
                                     IconButton(
                                         onClick = {
                                             val oldSettlementCurrency = settlementCurrency
+                                            hasUserEditedProjectSelection = true
                                             selectedProjectId = null
                                             if (selectedCurrency == oldSettlementCurrency) {
                                                 selectedCurrency = "TWD"
@@ -812,6 +902,7 @@ fun AddTransactionScreen(
                                     },
                                     onClick = {
                                         val oldSettlementCurrency = settlementCurrency
+                                        hasUserEditedProjectSelection = true
                                         selectedProjectId = project.id
                                         if (selectedCurrency == oldSettlementCurrency) {
                                             selectedCurrency = project.defaultCurrency
@@ -1102,4 +1193,184 @@ fun AddTransactionScreen(
             }
         )
     }
+
+    if (showPersonalAmountDialog && isExpense) {
+        PersonalAmountDialog(
+            currency = selectedCurrency,
+            totalAmount = resolvedAmount,
+            initialValue = personalAmountText,
+            onDismiss = { showPersonalAmountDialog = false },
+            onConfirm = { updatedValue ->
+                personalAmountText = updatedValue
+                showPersonalAmountDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun PersonalAmountHandle(
+    isActive: Boolean,
+    onTrigger: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    val thresholdPx = with(LocalDensity.current) { 28.dp.toPx() }
+    var dragDistance by remember { mutableStateOf(0f) }
+    val contentColor = if (isActive) {
+        MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f)
+    }
+
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(4.dp),
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .pointerInput(isActive) {
+                detectHorizontalDragGestures(
+                    onDragEnd = { dragDistance = 0f },
+                    onHorizontalDrag = { change, dragAmount ->
+                        dragDistance += dragAmount
+                        if (dragDistance >= thresholdPx) {
+                            dragDistance = 0f
+                            change.consume()
+                            onTrigger()
+                        }
+                    }
+                )
+            }
+            .clickable(onClick = onTrigger)
+            .padding(horizontal = 2.dp, vertical = 1.dp)
+    ) {
+        Icon(
+            imageVector = if (isActive) Icons.Filled.People else Icons.Filled.Person,
+            contentDescription = "設定我的花費",
+            tint = contentColor,
+            modifier = Modifier.size(16.dp)
+        )
+        Text(
+            text = if (isActive) "分攤" else "我的花費",
+            style = MaterialTheme.typography.labelSmall,
+            color = contentColor,
+            textDecoration = if (isActive) null else TextDecoration.Underline
+        )
+    }
+}
+
+@Composable
+private fun PersonalAmountDialog(
+    currency: String,
+    totalAmount: Double?,
+    initialValue: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    var tempValue by remember(initialValue) { mutableStateOf(initialValue) }
+    val parsedValue = tempValue.toDoubleOrNull()
+    val errorText = when {
+        tempValue.isBlank() -> null
+        parsedValue == null -> "請輸入正確金額"
+        parsedValue <= 0 -> "我的花費需大於 0"
+        totalAmount != null && parsedValue > totalAmount -> "我的花費不能大於支出總額"
+        else -> null
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("設定我的花費") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(
+                    "支出總額會用於支付工具額度統計；這裡填的金額則會用於預算與一般統計。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                totalAmount?.let {
+                    Text(
+                        "支出總額 ${CurrencyFormats.formatAmount(currency, it)}",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
+                OutlinedTextField(
+                    value = tempValue,
+                    onValueChange = { newValue ->
+                        tempValue = sanitizePersonalAmountInput(newValue)
+                    },
+                    label = { Text("我的花費") },
+                    placeholder = { Text("留空代表全額都算在自己") },
+                    singleLine = true,
+                    isError = errorText != null,
+                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
+                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
+                    ),
+                    modifier = Modifier.fillMaxWidth(),
+                    supportingText = {
+                        Text(errorText ?: "例如聚餐刷卡 1200，你只要記 300")
+                    }
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(tempValue) },
+                enabled = errorText == null
+            ) {
+                Text("確定")
+            }
+        },
+        dismissButton = {
+            Row {
+                TextButton(onClick = { onConfirm("") }) {
+                    Text("清除")
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("取消")
+                }
+            }
+        }
+    )
+}
+
+private fun sanitizePersonalAmountInput(input: String): String {
+    val filtered = input.filter { it.isDigit() || it == '.' }
+    val parts = filtered.split('.')
+    return when {
+        parts.isEmpty() -> ""
+        parts.size == 1 -> parts[0]
+        else -> parts.first() + "." + parts.drop(1).joinToString("").take(2)
+    }
+}
+
+private fun formatEditableTransactionAmount(amount: Double): String =
+    if (amount == amount.toLong().toDouble()) amount.toLong().toString() else amount.toString()
+
+private fun isWithinProjectDateRange(
+    targetDateTime: Long,
+    startDate: Long?,
+    endDate: Long?
+): Boolean {
+    if (startDate == null || endDate == null) return false
+    val rangeStart = startOfDay(startDate)
+    val rangeEnd = endOfDay(endDate)
+    return targetDateTime in rangeStart..rangeEnd
+}
+
+private fun startOfDay(timeMillis: Long): Long = Calendar.getInstance().run {
+    timeInMillis = timeMillis
+    set(Calendar.HOUR_OF_DAY, 0)
+    set(Calendar.MINUTE, 0)
+    set(Calendar.SECOND, 0)
+    set(Calendar.MILLISECOND, 0)
+    timeInMillis
+}
+
+private fun endOfDay(timeMillis: Long): Long = Calendar.getInstance().run {
+    timeInMillis = timeMillis
+    set(Calendar.HOUR_OF_DAY, 23)
+    set(Calendar.MINUTE, 59)
+    set(Calendar.SECOND, 59)
+    set(Calendar.MILLISECOND, 999)
+    timeInMillis
 }

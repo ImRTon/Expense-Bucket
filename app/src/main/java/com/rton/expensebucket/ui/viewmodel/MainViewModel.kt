@@ -478,7 +478,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             val result = dataExportImportManager.importFromCsv(context, uri)
             if (result.isSuccess) {
-                onResult(true, "成功匯入 ${result.getOrNull()} 筆資料")
+                onResult(true, result.getOrNull()?.toUserMessage())
             } else {
                 onResult(false, result.exceptionOrNull()?.message)
             }

@@ -26,6 +26,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.Transaction
+import com.rton.expensebucket.data.model.effectiveConvertedAmount
 import com.rton.expensebucket.ui.util.IconMapper
 import java.text.NumberFormat
 import java.util.*
@@ -107,7 +108,7 @@ fun StatisticsScreen(
         filteredTransactions
             .filter { it.isExpense && !it.isDraft }
             .groupBy { it.categoryId }
-            .mapValues { (_, txs) -> txs.sumOf { it.amount * it.exchangeRate } }
+            .mapValues { (_, txs) -> txs.sumOf { it.effectiveConvertedAmount() } }
             .entries
             .sortedByDescending { it.value }
     }

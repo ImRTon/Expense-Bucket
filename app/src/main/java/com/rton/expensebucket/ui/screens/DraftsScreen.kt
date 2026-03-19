@@ -21,6 +21,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.Transaction
+import com.rton.expensebucket.data.model.effectiveAmount
 import java.text.SimpleDateFormat
 import java.util.*
 import com.rton.expensebucket.ui.util.CurrencyFormats
@@ -140,12 +141,19 @@ private fun DraftItem(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = CurrencyFormats.formatAmount(draft.currency, draft.amount),
+                    text = CurrencyFormats.formatAmount(draft.currency, draft.effectiveAmount()),
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.Bold
                     ),
                     color = MaterialTheme.colorScheme.error
                 )
+                if (draft.personalAmount != null && draft.personalAmount != draft.amount) {
+                    Text(
+                        text = "支出總額 ${CurrencyFormats.formatAmount(draft.currency, draft.amount)}",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    )
+                }
                 Text(
                     text = "${category?.name ?: "未分類"} · 來源: ${
                         when (draft.source) {
