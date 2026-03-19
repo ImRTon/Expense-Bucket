@@ -1,5 +1,6 @@
 package com.rton.expensebucket.ui.components
 
+import android.view.HapticFeedbackConstants
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.clickable
@@ -17,8 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
-import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -47,7 +47,15 @@ fun ExpenseNumpad(
     onConfirm: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val haptic = LocalHapticFeedback.current
+    val view = LocalView.current
+
+    fun performKeyHaptic() {
+        view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+    }
+
+    fun performConfirmHaptic() {
+        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+    }
 
     // Calculate result preview if expression has operators
     val hasOperator = displayAmount.any { it in "+−×÷" }
@@ -144,7 +152,7 @@ fun ExpenseNumpad(
                                 isOperator = isOperator,
                                 isBackspace = isBackspace,
                                 onClick = {
-                                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                    performKeyHaptic()
                                     when (key) {
                                         "⌫" -> onBackspaceClick()
                                         "." -> onDotClick()
@@ -163,7 +171,7 @@ fun ExpenseNumpad(
                 // ─── Confirm Button ─────────────────────────────────────
                 Button(
                     onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                        performConfirmHaptic()
                         onConfirm()
                     },
                     modifier = Modifier
