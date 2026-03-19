@@ -7,6 +7,9 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface TransactionDao {
 
+    @Query("SELECT * FROM transactions WHERE isDraft = 0 ORDER BY date DESC")
+    fun getAllConfirmedTransactions(): Flow<List<Transaction>>
+
     @Query("SELECT * FROM transactions WHERE isDraft = 0 AND projectId IS NULL ORDER BY date DESC")
     fun getAllTransactions(): Flow<List<Transaction>>
 

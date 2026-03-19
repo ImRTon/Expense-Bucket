@@ -43,7 +43,6 @@ fun SettingsScreen(
     firstDayOfWeek: Int = java.util.Calendar.MONDAY,
     onSetFirstDayOfWeek: (Int) -> Unit = {},
     onBack: () -> Unit = {},
-    onNavigateToPaymentMethods: () -> Unit = {},
     onNavigateToCategories: () -> Unit = {},
     onNavigateToDrafts: () -> Unit = {},
     onExportData: (Context, Uri, (Boolean, String?) -> Unit) -> Unit = { _, _, _ -> },
@@ -364,12 +363,6 @@ fun SettingsScreen(
                 subtitle = "新增、編輯子母分類",
                 onClick = onNavigateToCategories
             )
-            SettingsItem(
-                icon = Icons.Filled.CreditCard,
-                title = "支付工具管理",
-                subtitle = "管理信用卡、電子支付",
-                onClick = onNavigateToPaymentMethods
-            )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
@@ -458,12 +451,6 @@ fun SettingsScreen(
                 title = "管理分類",
                 subtitle = "新增或編輯記帳分類",
                 onClick = onNavigateToCategories
-            )
-            SettingsItem(
-                icon = Icons.Filled.CreditCard,
-                title = "支付工具",
-                subtitle = "管理信用卡、電子支付等",
-                onClick = onNavigateToPaymentMethods
             )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))

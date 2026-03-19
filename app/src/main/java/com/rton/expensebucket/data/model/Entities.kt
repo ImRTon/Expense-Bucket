@@ -8,6 +8,26 @@ import androidx.room.PrimaryKey
 /**
  * Represents a payment method (cash, credit card, e-wallet, etc.)
  */
+enum class BillingCycleType(val value: String) {
+    NONE("none"),
+    MONTHLY_CLOSING_DAY("monthly_closing_day");
+
+    companion object {
+        fun fromValue(value: String?): BillingCycleType =
+            entries.firstOrNull { it.value == value } ?: NONE
+    }
+}
+
+enum class BillingLimitType(val value: String) {
+    CREDIT("credit"),
+    PROMO("promo");
+
+    companion object {
+        fun fromValue(value: String?): BillingLimitType =
+            entries.firstOrNull { it.value == value } ?: CREDIT
+    }
+}
+
 @Entity(tableName = "payment_methods")
 data class PaymentMethod(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
@@ -17,7 +37,11 @@ data class PaymentMethod(
     val type: String = "cash",       // "cash", "credit", "epay", "other"
     val isDefault: Boolean = false,  // only one should be default
     val parentId: Long? = null,      // null = parent, non-null = child of that parent
-    val sortOrder: Int = 0
+    val sortOrder: Int = 0,
+    val billingCycleType: String = BillingCycleType.NONE.value,
+    val billingCycleDay: Int? = null,
+    val billingLimitType: String = BillingLimitType.CREDIT.value,
+    val billingLimitAmount: Double? = null
 )
 
 /**

@@ -180,6 +180,7 @@ data class BottomNavItem(
 val bottomNavItems = listOf(
     BottomNavItem("首頁",     Icons.Filled.Home,       Screen.Home.route),
     BottomNavItem("統計",     Icons.Filled.PieChart,   Screen.Statistics.route),
+    BottomNavItem("支付工具", Icons.Filled.CreditCard, Screen.PaymentMethods.route),
     BottomNavItem("專案管理", Icons.Filled.Luggage,    Screen.Projects.route),
     BottomNavItem("設定",     Icons.Filled.Settings,   Screen.Settings.route)
 )
@@ -216,6 +217,7 @@ fun ExpensesApp(
     val allProjects by viewModel.allProjects.collectAsStateWithLifecycle()
     val activeProjects by viewModel.activeProjects.collectAsStateWithLifecycle()
     val allPaymentMethods by viewModel.allPaymentMethods.collectAsStateWithLifecycle()
+    val paymentMethodBillingSummaries by viewModel.paymentMethodBillingSummaries.collectAsStateWithLifecycle()
     val compareMode by viewModel.compareMode.collectAsStateWithLifecycle()
 
     val allCategories = remember(expenseCategories, incomeCategories) {
@@ -470,11 +472,11 @@ fun ExpensesApp(
             composable(Screen.PaymentMethods.route) {
                 PaymentMethodsScreen(
                     paymentMethods = allPaymentMethods,
+                    billingSummaries = paymentMethodBillingSummaries,
                     onAdd = { viewModel.addPaymentMethod(it) },
                     onEdit = { viewModel.updatePaymentMethod(it) },
                     onDelete = { viewModel.deletePaymentMethod(it) },
-                    onSetDefault = { viewModel.setDefaultPaymentMethod(it) },
-                    onBack = { navController.popBackStack() }
+                    onSetDefault = { viewModel.setDefaultPaymentMethod(it) }
                 )
             }
 
@@ -490,11 +492,6 @@ fun ExpensesApp(
                     onSetMonthlyBudget = { viewModel.setMonthlyBudget(it) },
                     firstDayOfWeek = firstDayOfWeek,
                     onSetFirstDayOfWeek = { viewModel.setFirstDayOfWeek(it) },
-                    onNavigateToPaymentMethods = {
-                        navController.navigate(Screen.PaymentMethods.route) {
-                            launchSingleTop = true
-                        }
-                    },
                     onNavigateToCategories = {
                         navController.navigate(Screen.CategoryManage.route) {
                             launchSingleTop = true

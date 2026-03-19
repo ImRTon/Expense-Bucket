@@ -10,11 +10,14 @@ import com.rton.expensebucket.data.AppPalette
 import com.rton.expensebucket.data.AppSettingsDataStore
 import com.rton.expensebucket.data.DefaultCategories
 import com.rton.expensebucket.data.DefaultPaymentMethods
+import com.rton.expensebucket.data.model.BillingCycleType
 import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.PaymentMethod
 import com.rton.expensebucket.data.model.Project
 import com.rton.expensebucket.data.model.Transaction
 import com.rton.expensebucket.data.repository.ExpenseBucketRepository
+import com.rton.expensebucket.util.PaymentMethodBillingCalculator
+import com.rton.expensebucket.util.PaymentMethodBillingSummary
 import com.rton.expensebucket.util.DataExportImportManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -64,6 +67,10 @@ class MainViewModel @Inject constructor(
     // ─── Transactions ───────────────────────────────────────────────
     val allTransactions: StateFlow<List<Transaction>> =
         repository.getAllTransactions()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val allConfirmedTransactions: StateFlow<List<Transaction>> =
+        repository.getAllConfirmedTransactions()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val draftTransactions: StateFlow<List<Transaction>> =
@@ -257,6 +264,15 @@ class MainViewModel @Inject constructor(
         repository.getAllPaymentMethods()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val paymentMethodBillingSummaries: StateFlow<Map<Long, PaymentMethodBillingSummary>> =
+        combine(allPaymentMethods, allConfirmedTransactions) { methods, transactions ->
+            methods.mapNotNull { method ->
+                PaymentMethodBillingCalculator.buildCurrentSummary(method, transactions)?.let {
+                    method.id to it
+                }
+            }.toMap()
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
     init {
         seedCategoriesIfEmpty()
         seedPaymentMethodsIfEmpty()
@@ -320,17 +336,19 @@ class MainViewModel @Inject constructor(
                     val parentIdMap = mutableMapOf<String, Long>()
                     for (parent in parents) {
                         val id = repository.insertPaymentMethod(
-                            PaymentMethod(
-                                name = parent.name,
-                                icon = parent.icon,
-                                color = parent.color,
-                                type = parent.type,
-                                isDefault = parent.isDefault,
-                                sortOrder = parent.sortOrder,
-                                parentId = null
-                            )
+                        PaymentMethod(
+                            name = parent.name,
+                            icon = parent.icon,
+                            color = parent.color,
+                            type = parent.type,
+                            isDefault = parent.isDefault,
+                            sortOrder = parent.sortOrder,
+                            parentId = null,
+                            billingCycleType = BillingCycleType.NONE.value,
+                            billingCycleDay = null
                         )
-                        parentIdMap[parent.name] = id
+                    )
+                    parentIdMap[parent.name] = id
                     }
 
                     // Insert children with correct parentId
@@ -343,7 +361,9 @@ class MainViewModel @Inject constructor(
                             type = child.type,
                             isDefault = child.isDefault,
                             sortOrder = child.sortOrder,
-                            parentId = parentId
+                            parentId = parentId,
+                            billingCycleType = BillingCycleType.NONE.value,
+                            billingCycleDay = null
                         )
                     }
                     repository.insertPaymentMethods(childMethods)

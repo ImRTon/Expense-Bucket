@@ -15,7 +15,7 @@ import com.rton.expensebucket.data.model.Transaction
 
 @Database(
     entities = [Transaction::class, Category::class, Project::class, PaymentMethod::class],
-    version = 5,
+    version = 7,
     exportSchema = true
 )
 abstract class ExpenseBucketDatabase : RoomDatabase() {
@@ -150,6 +150,34 @@ abstract class ExpenseBucketDatabase : RoomDatabase() {
 
                 val updateArgsOther = arrayOf(otherId, "other", cashId, creditId, epayId, otherId)
                 database.execSQL("UPDATE `payment_methods` SET `parentId` = ? WHERE `type` = ? AND `id` NOT IN (?, ?, ?, ?)", updateArgsOther)
+            }
+        }
+
+        /**
+         * Migration from v5 → v6: adds billing cycle settings to payment_methods.
+         */
+        val MIGRATION_5_6 = object : Migration(5, 6) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE `payment_methods` ADD COLUMN `billingCycleType` TEXT NOT NULL DEFAULT 'none'"
+                )
+                database.execSQL(
+                    "ALTER TABLE `payment_methods` ADD COLUMN `billingCycleDay` INTEGER DEFAULT NULL"
+                )
+            }
+        }
+
+        /**
+         * Migration from v6 → v7: adds billing limit settings to payment_methods.
+         */
+        val MIGRATION_6_7 = object : Migration(6, 7) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE `payment_methods` ADD COLUMN `billingLimitType` TEXT NOT NULL DEFAULT 'credit'"
+                )
+                database.execSQL(
+                    "ALTER TABLE `payment_methods` ADD COLUMN `billingLimitAmount` REAL DEFAULT NULL"
+                )
             }
         }
     }

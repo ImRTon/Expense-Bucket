@@ -20,6 +20,7 @@ class ExpenseBucketRepository @Inject constructor(
     private val paymentMethodDao: PaymentMethodDao
 ) {
     // ─── Transactions ───────────────────────────────────────────────
+    fun getAllConfirmedTransactions(): Flow<List<Transaction>> = transactionDao.getAllConfirmedTransactions()
     fun getAllTransactions(): Flow<List<Transaction>> = transactionDao.getAllTransactions()
     fun getDraftTransactions(): Flow<List<Transaction>> = transactionDao.getDraftTransactions()
     fun getTransactionsByProject(projectId: Long): Flow<List<Transaction>> =

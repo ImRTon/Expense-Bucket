@@ -21,6 +21,7 @@ android {
         // Room schema export
         ksp {
             arg("room.schemaLocation", "$projectDir/schemas")
+            arg("room.generateKotlin", "false")
         }
     }
 
