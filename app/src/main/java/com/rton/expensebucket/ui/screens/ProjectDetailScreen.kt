@@ -20,6 +20,7 @@ import com.rton.expensebucket.data.model.Project
 import com.rton.expensebucket.data.model.Transaction
 import com.rton.expensebucket.data.model.effectiveConvertedAmount
 import com.rton.expensebucket.ui.components.ProjectFormDialog
+import com.rton.expensebucket.ui.components.QuickAddFab
 import com.rton.expensebucket.ui.components.TransactionListItem
 import com.rton.expensebucket.ui.util.CurrencyFormats
 import java.text.NumberFormat
@@ -38,6 +39,9 @@ fun ProjectDetailScreen(
     onUpdateProject: (Project) -> Unit,
     onDeleteProject: (Project) -> Unit,
     onDeleteTransaction: (Transaction) -> Unit,
+    onAddTransaction: () -> Unit,
+    onReceiptOcrClick: () -> Unit,
+    onInvoiceOcrClick: () -> Unit,
     onTransactionClick: (Transaction) -> Unit
 ) {
     val settlementCurrency = project?.defaultCurrency ?: "TWD"
@@ -86,6 +90,15 @@ fun ProjectDetailScreen(
                     containerColor = MaterialTheme.colorScheme.background
                 )
             )
+        },
+        floatingActionButton = {
+            if (project != null) {
+                QuickAddFab(
+                    onAddClick = onAddTransaction,
+                    onReceiptOcrClick = onReceiptOcrClick,
+                    onInvoiceOcrClick = onInvoiceOcrClick
+                )
+            }
         }
     ) { padding ->
         LazyColumn(

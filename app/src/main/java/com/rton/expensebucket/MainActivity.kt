@@ -13,6 +13,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
@@ -201,6 +202,7 @@ fun ExpensesApp(
     val navController = rememberNavController()
     val viewModel: MainViewModel = hiltViewModel()
     var transactionPrefill by remember { mutableStateOf<TransactionPrefill?>(null) }
+    var addTransactionProjectId by rememberSaveable { mutableStateOf<Long?>(null) }
 
     // Collect states
     val transactions by viewModel.allTransactions.collectAsStateWithLifecycle()
@@ -364,7 +366,8 @@ fun ExpensesApp(
                     onStepPeriod = { viewModel.stepPeriod(it) },
                     onAddClick = {
                         transactionPrefill = null
-                        navController.navigate(Screen.AddTransaction.route)
+                        addTransactionProjectId = null
+                        navController.navigate(Screen.AddTransaction.createRoute())
                     },
                     onReceiptOcrClick = { navController.navigate(Screen.ReceiptOcr.route) },
                     onInvoiceOcrClick = { navController.navigate(Screen.InvoiceOcr.route) },
@@ -378,18 +381,45 @@ fun ExpensesApp(
             }
 
             // ─── Add Transaction ────────────────────────────────────
-            composable(Screen.AddTransaction.route) {
+            composable(
+                route = Screen.AddTransaction.routeWithArgs,
+                arguments = listOf(
+                    navArgument(Screen.AddTransaction.projectIdArg) {
+                        type = NavType.StringType
+                        nullable = true
+                        defaultValue = null
+                    }
+                )
+            ) { backStackEntry ->
+                val routeProjectId = backStackEntry.arguments
+                    ?.getString(Screen.AddTransaction.projectIdArg)
+                    ?.toLongOrNull()
+                val initialProjectId = routeProjectId ?: addTransactionProjectId
+                val initialProject = initialProjectId?.let { projectId ->
+                    allProjects.find { it.id == projectId }
+                }
+                val addTransactionProjects = remember(activeProjects, initialProject) {
+                    when {
+                        initialProject == null -> activeProjects
+                        activeProjects.any { it.id == initialProject.id } -> activeProjects
+                        else -> activeProjects + initialProject
+                    }
+                }
+
                 AddTransactionScreen(
                     categories = allCategories,
-                    projects = activeProjects,
+                    projects = addTransactionProjects,
                     paymentMethods = allPaymentMethods,
                     prefill = transactionPrefill,
+                    initialProjectId = initialProjectId,
                     onSave = { transaction ->
                         transactionPrefill = null
+                        addTransactionProjectId = null
                         viewModel.addTransaction(transaction)
                     },
                     onBack = {
                         transactionPrefill = null
+                        addTransactionProjectId = null
                         navController.popBackStack()
                     }
                 )
@@ -463,6 +493,19 @@ fun ExpensesApp(
                     onUpdateProject = { viewModel.updateProject(it) },
                     onDeleteProject = { viewModel.deleteProject(it) },
                     onDeleteTransaction = { viewModel.deleteTransaction(it) },
+                    onAddTransaction = {
+                        transactionPrefill = null
+                        addTransactionProjectId = projectId
+                        navController.navigate(Screen.AddTransaction.createRoute(projectId))
+                    },
+                    onReceiptOcrClick = {
+                        addTransactionProjectId = projectId
+                        navController.navigate(Screen.ReceiptOcr.route)
+                    },
+                    onInvoiceOcrClick = {
+                        addTransactionProjectId = projectId
+                        navController.navigate(Screen.InvoiceOcr.route)
+                    },
                     onTransactionClick = { transaction ->
                         navController.navigate(Screen.EditTransaction.createRoute(transaction.id))
                     }
@@ -541,7 +584,7 @@ fun ExpensesApp(
                     onApplyPrefill = { prefill ->
                         transactionPrefill = prefill
                         navController.popBackStack()
-                        navController.navigate(Screen.AddTransaction.route)
+                        navController.navigate(Screen.AddTransaction.createRoute(addTransactionProjectId))
                     },
                     onBack = { navController.popBackStack() }
                 )
@@ -553,7 +596,7 @@ fun ExpensesApp(
                     onApplyPrefill = { prefill ->
                         transactionPrefill = prefill
                         navController.popBackStack()
-                        navController.navigate(Screen.AddTransaction.route)
+                        navController.navigate(Screen.AddTransaction.createRoute(addTransactionProjectId))
                     },
                     onBack = { navController.popBackStack() }
                 )

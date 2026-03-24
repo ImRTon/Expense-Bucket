@@ -50,10 +50,12 @@ fun AddTransactionScreen(
     paymentMethods: List<PaymentMethod> = emptyList(),
     existingTransaction: Transaction? = null,
     prefill: TransactionPrefill? = null,
+    initialProjectId: Long? = null,
     onSave: (Transaction) -> Unit,
     onBack: () -> Unit
 ) {
     val isEditMode = existingTransaction != null
+    val initialProjectSelectionId = existingTransaction?.projectId ?: initialProjectId
     val initialAmount = existingTransaction?.amount ?: prefill?.amount
     val initialPersonalAmount = existingTransaction
         ?.takeIf { it.isExpense }
@@ -76,12 +78,12 @@ fun AddTransactionScreen(
     var isExpense by remember { mutableStateOf(initialIsExpense) }
     var note by remember { mutableStateOf(initialNote) }
     var showNoteField by remember { mutableStateOf(initialNote.isNotBlank()) }
-    var selectedProjectId by remember { mutableStateOf(existingTransaction?.projectId) }
+    var selectedProjectId by remember { mutableStateOf(initialProjectSelectionId) }
     var hasUserEditedProjectSelection by remember {
-        mutableStateOf(existingTransaction?.projectId != null)
+        mutableStateOf(initialProjectSelectionId != null)
     }
     var showProjectDropdown by remember { mutableStateOf(false) }
-    val initialSettlementCurrency = existingTransaction?.projectId
+    val initialSettlementCurrency = initialProjectSelectionId
         ?.let { projectId -> projects.find { it.id == projectId }?.defaultCurrency }
         ?: "TWD"
     var selectedCurrency by remember {

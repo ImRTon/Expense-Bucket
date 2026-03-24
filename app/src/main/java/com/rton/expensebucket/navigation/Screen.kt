@@ -5,7 +5,13 @@ package com.rton.expensebucket.navigation
  */
 sealed class Screen(val route: String) {
     data object Home : Screen("home")
-    data object AddTransaction : Screen("add_transaction")
+    data object AddTransaction : Screen("add_transaction") {
+        const val projectIdArg = "projectId"
+        val routeWithArgs = "$route?$projectIdArg={$projectIdArg}"
+
+        fun createRoute(projectId: Long? = null): String =
+            if (projectId != null) "$route?$projectIdArg=$projectId" else route
+    }
     data object EditTransaction : Screen("edit_transaction/{transactionId}") {
         fun createRoute(transactionId: Long) = "edit_transaction/$transactionId"
     }
