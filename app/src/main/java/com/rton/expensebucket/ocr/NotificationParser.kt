@@ -12,6 +12,9 @@ import java.util.regex.Pattern
  */
 class NotificationParser {
 
+    private val twdCurrencyToken = """(?:NT?\$?|(?:新)?[台臺]幣)"""
+    private val genericAmountCurrencyToken = """(?:$twdCurrencyToken|\$)"""
+
     /**
      * Known notification patterns.
      * Each entry: regex pattern → group indices for (amount, merchant).
@@ -29,7 +32,7 @@ class NotificationParser {
         // 台新 Richart：「【信用卡消費通知】您的Richart卡(末三碼xxxx)於01/30-18:06網路刷卡約新台幣3,019元，實際消費xxxx」
         // 或是「【信用卡消費通知】您的Richart卡(末三碼xxxx)於01/30-18:06刷卡約新台幣3,019元，實際消費xxxx」
         NotifPattern(
-            regex = Pattern.compile("""Richart卡.*?[於在]\s*(\d{2}/\d{2}-\d{2}:\d{2})\s*(?:網路)?刷卡約新台幣\s*([\d,]+(?:\.\d+)?)"""),
+            regex = Pattern.compile("""Richart卡.*?[於在]\s*(\d{2}/\d{2}-\d{2}:\d{2})\s*(?:網路)?刷卡約\s*$twdCurrencyToken\s*([\d,]+(?:\.\d+)?)"""),
             amountGroup = 2,
             merchantGroup = -1,
             paymentHint = "richart",
@@ -51,21 +54,21 @@ class NotificationParser {
         ),
         // 信用卡通知：「消費通知 卡號末四碼1234 於 星巴克 消費 NT$165」
         NotifPattern(
-            regex = Pattern.compile("""[於在]\s*(.{2,20}?)\s*消費\s*NT?\$?\s*([\d,]+(?:\.\d+)?)"""),
+            regex = Pattern.compile("""[於在]\s*(.{2,20}?)\s*消費\s*$twdCurrencyToken\s*([\d,]+(?:\.\d+)?)"""),
             amountGroup = 2,
             merchantGroup = 1,
             paymentHint = "credit_card"
         ),
         // 銀行簡訊格式：「台新銀行通知：刷卡消費NT$1,234 商店：7-ELEVEN」
         NotifPattern(
-            regex = Pattern.compile("""刷卡消費\s*NT?\$?\s*([\d,]+(?:\.\d+)?)\s*.*?(?:商店|特約商店)[：:\s]*(.{2,20})"""),
+            regex = Pattern.compile("""刷卡消費\s*$twdCurrencyToken\s*([\d,]+(?:\.\d+)?)\s*.*?(?:商店|特約商店)[：:\s]*(.{2,20})"""),
             amountGroup = 1,
             merchantGroup = 2,
             paymentHint = "credit_card"
         ),
         // 國泰世華：「【刷卡通知】金額NT$1340元卡號末四碼xxxx於2026/03/08 20:52在商店名稱AAAA刷卡。立即以點數xxxxxx」
         NotifPattern(
-            regex = Pattern.compile("""金額\s*NT?\$?\s*([\d,]+(?:\.\d+)?)\s*元.*?[於在]\s*(\d{4}/\d{1,2}/\d{1,2}\s+\d{1,2}:\d{1,2})\s*[於在]\s*(.+?)\s*刷卡"""),
+            regex = Pattern.compile("""金額\s*$twdCurrencyToken\s*([\d,]+(?:\.\d+)?)\s*元.*?[於在]\s*(\d{4}/\d{1,2}/\d{1,2}\s+\d{1,2}:\d{1,2})\s*[於在]\s*(?:商店名稱)?\s*(.+?)\s*刷卡"""),
             amountGroup = 1,
             merchantGroup = 3,
             paymentHint = "cathay",
@@ -87,7 +90,7 @@ class NotificationParser {
         ),
         // 富邦：「【刷卡消費通知】您的信用卡末四碼xxxx於02/23 12:37:26商店名稱消費臺幣1,234元」
         NotifPattern(
-            regex = Pattern.compile("""信用卡.*?[於在]\s*(\d{2}[/-]\d{2}\s+\d{1,2}:\d{1,2}(?::\d{1,2})?)\s*(.*?)\s*消費臺幣\s*([\d,]+(?:\.\d+)?)\s*元"""),
+            regex = Pattern.compile("""信用卡.*?[於在]\s*(\d{2}[/-]\d{2}\s+\d{1,2}:\d{1,2}(?::\d{1,2})?)\s*(.*?)\s*消費\s*$twdCurrencyToken\s*([\d,]+(?:\.\d+)?)\s*元"""),
             amountGroup = 3,
             merchantGroup = 2,
             paymentHint = "credit_card",
@@ -95,7 +98,15 @@ class NotificationParser {
         ),
         // 永豐大咖/大戶：「永豐貴賓您好，末四碼xxxx感謝03/15 12:05刷卡台幣123元，商店名稱:STORE_NAME，實際商店名稱請以xxxxxx」
         NotifPattern(
-            regex = Pattern.compile("""感謝\s*(\d{1,2}/\d{1,2}\s+\d{1,2}:\d{1,2})\s*刷卡(?:台幣|新台幣|NT\$?)\s*([\d,]+(?:\.\d+)?)\s*元.*?(?:商店名稱|商店)[：:\s]*([^，,]+)"""),
+            regex = Pattern.compile("""感謝\s*(\d{1,2}/\d{1,2}\s+\d{1,2}:\d{1,2})\s*刷卡\s*$twdCurrencyToken\s*([\d,]+(?:\.\d+)?)\s*元.*?(?:商店名稱|商店)[：:\s]*([^，,]+)"""),
+            amountGroup = 2,
+            merchantGroup = 3,
+            paymentHint = "sinopac",
+            dateGroup = 1
+        ),
+        // 永豐信用卡新版：「永豐信用卡末四碼xxxx刷卡通知1150321_17:59金額日圓JPY$1,181.00，約當台幣$ 240元，商店名稱:XXXX，實際商店名稱......」
+        NotifPattern(
+            regex = Pattern.compile("""永豐信用卡末四碼\d{4}刷卡通知\s*((?:\d{3,4})(?:\d{2}){2}_\d{1,2}:\d{1,2}).*?約當\s*$twdCurrencyToken\s*\$?\s*([\d,]+(?:\.\d+)?)\s*元.*?商店名稱[：:\s]*([^，,\n]+)"""),
             amountGroup = 2,
             merchantGroup = 3,
             paymentHint = "sinopac",
@@ -103,7 +114,7 @@ class NotificationParser {
         ),
         // 郵局：「您的郵政VISA金融卡於114/01/13 21:22:05消費新台幣8,521元(國外交易blablabla)，如有疑慮blablabla」
         NotifPattern(
-            regex = Pattern.compile("""郵政.*?於\s*((?:\d{3,4})[/-]\d{1,2}[/-]\d{1,2}\s+\d{1,2}:\d{1,2}(?::\d{1,2})?)\s*消費新台幣\s*([\d,]+(?:\.\d+)?)"""),
+            regex = Pattern.compile("""郵政.*?於\s*((?:\d{3,4})[/-]\d{1,2}[/-]\d{1,2}\s+\d{1,2}:\d{1,2}(?::\d{1,2})?)\s*消費\s*$twdCurrencyToken\s*([\d,]+(?:\.\d+)?)"""),
             amountGroup = 2,
             merchantGroup = -1,
             paymentHint = "post",
@@ -111,7 +122,7 @@ class NotificationParser {
         ),
         // 通用格式：「消費 NT$1,234」 or 「扣款 $567」
         NotifPattern(
-            regex = Pattern.compile("""(?:消費|扣款|支付|付款)\s*NT?\$?\s*([\d,]+(?:\.\d+)?)"""),
+            regex = Pattern.compile("""(?:消費|扣款|支付|付款)\s*$genericAmountCurrencyToken\s*([\d,]+(?:\.\d+)?)"""),
             amountGroup = 1,
             merchantGroup = -1
         ),
@@ -191,10 +202,19 @@ class NotificationParser {
     private fun parseNotificationDate(dateStr: String?): Long? {
         if (dateStr == null) return null
         return try {
-            val regex = """(?:(\d{3,4})[/-])?(\d{1,2})[/-](\d{1,2})[\s-](\d{1,2}):(\d{1,2})(?::\d{1,2})?""".toRegex()
-            val match = regex.find(dateStr) ?: return null
+            val separatedRegex =
+                """(?:(\d{3,4})[/-])?(\d{1,2})[/-](\d{1,2})[\s-](\d{1,2}):(\d{1,2})(?::\d{1,2})?""".toRegex()
+            val compactRegex =
+                """(\d{3,4})(\d{2})(\d{2})_(\d{1,2}):(\d{1,2})""".toRegex()
 
-            val (yearStr, month, day, hour, minute) = match.destructured
+            val match = separatedRegex.find(dateStr)
+            val (yearStr, month, day, hour, minute) = when {
+                match != null -> match.destructured
+                else -> {
+                    val compactMatch = compactRegex.find(dateStr) ?: return null
+                    compactMatch.destructured
+                }
+            }
 
             val calendar = Calendar.getInstance()
             if (yearStr.isNotBlank()) {
