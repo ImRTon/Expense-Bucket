@@ -2,6 +2,7 @@ package com.rton.expensebucket.ui.components
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -33,6 +34,11 @@ import java.util.*
 /**
  * A single transaction list item with category icon, note, amount, and swipe-to-delete support.
  */
+enum class TransactionListItemStyle {
+    Card,
+    List
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TransactionListItem(
@@ -41,6 +47,8 @@ fun TransactionListItem(
     settlementCurrency: String = "TWD",
     onDelete: () -> Unit,
     onClick: () -> Unit = {},
+    style: TransactionListItemStyle = TransactionListItemStyle.Card,
+    showDivider: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val timeFormat = SimpleDateFormat("HH:mm", Locale.getDefault())
@@ -96,7 +104,13 @@ fun TransactionListItem(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .clip(RoundedCornerShape(16.dp))
+                    .then(
+                        if (style == TransactionListItemStyle.Card) {
+                            Modifier.clip(RoundedCornerShape(16.dp))
+                        } else {
+                            Modifier
+                        }
+                    )
                     .background(color)
                     .padding(horizontal = 24.dp),
                 contentAlignment = Alignment.CenterEnd
@@ -111,97 +125,144 @@ fun TransactionListItem(
         enableDismissFromStartToEnd = false,
         modifier = modifier
     ) {
-        Card(
-            onClick = onClick,
-            modifier = Modifier
-                .fillMaxWidth()
-                .onSizeChanged { size ->
-                    itemWidth.floatValue = size.width.toFloat()
-                },
-            shape = RoundedCornerShape(16.dp),
-            colors = CardDefaults.cardColors(
-                containerColor = MaterialTheme.colorScheme.surface
-            ),
-            elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
-        ) {
-            Row(
+        if (style == TransactionListItemStyle.Card) {
+            Card(
+                onClick = onClick,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                verticalAlignment = Alignment.CenterVertically
+                    .onSizeChanged { size ->
+                        itemWidth.floatValue = size.width.toFloat()
+                    },
+                shape = RoundedCornerShape(16.dp),
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surface
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
             ) {
-                // Category icon
-                Box(
+                TransactionListRowContent(
+                    transaction = transaction,
+                    category = category,
+                    settlementCurrency = settlementCurrency,
                     modifier = Modifier
-                        .size(44.dp)
-                        .clip(CircleShape)
-                        .background(
-                            Color(category?.color ?: 0xFF6B7280).copy(alpha = 0.15f)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Icon(
-                        IconMapper.getIcon(category?.icon ?: "MoreHoriz"),
-                        contentDescription = category?.name ?: "其他",
-                        tint = Color(category?.color ?: 0xFF6B7280),
-                        modifier = Modifier.size(22.dp)
+                        .padding(16.dp),
+                    timeFormat = timeFormat,
+                    originalAmountText = originalAmountText,
+                    convertedAmountText = convertedAmountText
+                )
+            }
+        } else {
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onClick)
+                    .onSizeChanged { size ->
+                        itemWidth.floatValue = size.width.toFloat()
+                    },
+                color = MaterialTheme.colorScheme.surfaceContainerLow
+            ) {
+                Column {
+                    TransactionListRowContent(
+                        transaction = transaction,
+                        category = category,
+                        settlementCurrency = settlementCurrency,
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                        timeFormat = timeFormat,
+                        originalAmountText = originalAmountText,
+                        convertedAmountText = convertedAmountText
                     )
-                }
-
-                Spacer(modifier = Modifier.width(14.dp))
-
-                // Name and time
-                Column(modifier = Modifier.weight(1f)) {
-                    Text(
-                        text = category?.name ?: "未分類",
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.SemiBold
-                        ),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                    if (transaction.note.isNotBlank()) {
-                        Text(
-                            text = transaction.note,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    }
-                    Text(
-                        text = timeFormat.format(Date(transaction.date)),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                    )
-                    if (transaction.personalAmount != null && transaction.personalAmount != transaction.amount) {
-                        Text(
-                            text = "支出總額 ${CurrencyFormats.formatAmount(transaction.currency, transaction.amount)}",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
-                        )
-                    }
-                    if (transaction.currency != settlementCurrency || transaction.exchangeRate != 1.0) {
-                        Text(
-                            text = "約 $convertedAmountText",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                    if (showDivider) {
+                        HorizontalDivider(
+                            modifier = Modifier.padding(start = 74.dp),
+                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
                         )
                     }
                 }
+            }
+        }
+    }
+}
 
-                // Amount
+@Composable
+private fun TransactionListRowContent(
+    transaction: Transaction,
+    category: Category?,
+    settlementCurrency: String,
+    modifier: Modifier,
+    timeFormat: SimpleDateFormat,
+    originalAmountText: String,
+    convertedAmountText: String
+) {
+    val categoryColor = Color(category?.color ?: 0xFF6B7280)
+
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .size(44.dp)
+                .clip(CircleShape)
+                .background(categoryColor.copy(alpha = 0.15f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                IconMapper.getIcon(category?.icon ?: "MoreHoriz"),
+                contentDescription = category?.name ?: "其他",
+                tint = categoryColor,
+                modifier = Modifier.size(22.dp)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(14.dp))
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = category?.name ?: "未分類",
+                style = MaterialTheme.typography.titleSmall.copy(
+                    fontWeight = FontWeight.SemiBold
+                ),
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            if (transaction.note.isNotBlank()) {
                 Text(
-                    text = "${if (transaction.isExpense) "-" else "+"}$originalAmountText",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.Bold
-                    ),
-                    color = if (transaction.isExpense)
-                        MaterialTheme.colorScheme.error
-                    else
-                        Color(0xFF10B981)
+                    text = transaction.note,
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Text(
+                text = timeFormat.format(Date(transaction.date)),
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+            )
+            if (transaction.personalAmount != null && transaction.personalAmount != transaction.amount) {
+                Text(
+                    text = "支出總額 ${CurrencyFormats.formatAmount(transaction.currency, transaction.amount)}",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                )
+            }
+            if (transaction.currency != settlementCurrency || transaction.exchangeRate != 1.0) {
+                Text(
+                    text = "約 $convertedAmountText",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                 )
             }
         }
+
+        Text(
+            text = "${if (transaction.isExpense) "-" else "+"}$originalAmountText",
+            style = MaterialTheme.typography.titleMedium.copy(
+                fontWeight = FontWeight.Bold
+            ),
+            color = if (transaction.isExpense)
+                MaterialTheme.colorScheme.error
+            else
+                Color(0xFF10B981)
+        )
     }
 }

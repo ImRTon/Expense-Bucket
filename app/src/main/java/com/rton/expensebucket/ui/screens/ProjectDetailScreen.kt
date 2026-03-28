@@ -1,16 +1,49 @@
 package com.rton.expensebucket.ui.screens
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -22,10 +55,14 @@ import com.rton.expensebucket.data.model.effectiveConvertedAmount
 import com.rton.expensebucket.ui.components.ProjectFormDialog
 import com.rton.expensebucket.ui.components.QuickAddFab
 import com.rton.expensebucket.ui.components.TransactionListItem
+import com.rton.expensebucket.ui.components.TransactionListItemStyle
 import com.rton.expensebucket.ui.util.CurrencyFormats
+import com.rton.expensebucket.ui.util.IconMapper
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -46,6 +83,7 @@ fun ProjectDetailScreen(
 ) {
     val settlementCurrency = project?.defaultCurrency ?: "TWD"
     val categoryMap = remember(categories) { categories.associateBy { it.id } }
+    val sortedTransactions = remember(transactions) { transactions.sortedByDescending { it.date } }
     val categoryStats = remember(transactions) {
         transactions
             .filter { it.isExpense }
@@ -53,6 +91,9 @@ fun ProjectDetailScreen(
             .mapValues { (_, txs) -> txs.sumOf { it.effectiveConvertedAmount() } }
             .toList()
             .sortedByDescending { it.second }
+    }
+    val transactionEntries: List<ProjectTransactionEntry> = remember(sortedTransactions) {
+        buildProjectTransactionEntries(sortedTransactions)
     }
     
     var showEditDialog by remember { mutableStateOf(false) }
@@ -106,7 +147,7 @@ fun ProjectDetailScreen(
                 .fillMaxSize()
                 .padding(padding),
             contentPadding = PaddingValues(16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // ─── Total + Budget Card ────────────────────────────
             item {
@@ -212,45 +253,82 @@ fun ProjectDetailScreen(
             // ─── Category Statistics ────────────────────────────
             if (categoryStats.isNotEmpty()) {
                 item {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text(
+                            "類別統計",
+                            style = MaterialTheme.typography.titleMedium.copy(
+                                fontWeight = FontWeight.SemiBold
+                            )
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(24.dp),
+                            color = MaterialTheme.colorScheme.surfaceContainerLow
+                        ) {
+                            Column {
+                                for (index in categoryStats.indices) {
+                                    val (categoryId, total) = categoryStats[index]
+                                    CategoryStatRow(
+                                        category = categoryMap[categoryId],
+                                        settlementCurrency = settlementCurrency,
+                                        totalAmount = total,
+                                        totalExpense = totalExpense
+                                    )
+                                    if (index < categoryStats.lastIndex) {
+                                        HorizontalDivider(
+                                            modifier = Modifier.padding(start = 72.dp),
+                                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
+                                        )
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            item {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                     Text(
-                        "類別統計",
+                        "交易明細",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
-                        modifier = Modifier.padding(top = 16.dp, bottom = 8.dp)
                     )
+                    Surface(
+                        shape = RoundedCornerShape(24.dp),
+                        color = MaterialTheme.colorScheme.surfaceContainerLow
+                    ) {
+                        if (transactionEntries.isEmpty()) {
+                            Text(
+                                text = "這個專案還沒有交易",
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp)
+                            )
+                        } else {
+                            Column {
+                                for (entry in transactionEntries) {
+                                    when (entry) {
+                                        is ProjectTransactionEntry.DateHeader -> {
+                                            ProjectDateDivider(label = entry.label)
+                                        }
+                                        is ProjectTransactionEntry.TransactionRow -> {
+                                            TransactionListItem(
+                                                transaction = entry.transaction,
+                                                category = categoryMap[entry.transaction.categoryId],
+                                                settlementCurrency = settlementCurrency,
+                                                onDelete = { onDeleteTransaction(entry.transaction) },
+                                                onClick = { onTransactionClick(entry.transaction) },
+                                                style = TransactionListItemStyle.List,
+                                                showDivider = entry.showDivider
+                                            )
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
                 }
-
-                items(categoryStats, key = { "stat_${it.first}" }) { (categoryId, total) ->
-                    val category = categoryMap[categoryId]
-                    CategoryStatItem(
-                        category = category,
-                        settlementCurrency = settlementCurrency,
-                        totalAmount = total,
-                        totalExpense = totalExpense
-                    )
-                }
-            }
-
-            // ─── Transaction List ───────────────────────────────
-            item {
-                Text(
-                    "交易明細",
-                    style = MaterialTheme.typography.titleMedium.copy(
-                        fontWeight = FontWeight.SemiBold
-                    ),
-                    modifier = Modifier.padding(top = 8.dp, bottom = 4.dp)
-                )
-            }
-
-            items(transactions, key = { it.id }) { transaction ->
-                TransactionListItem(
-                    transaction = transaction,
-                    category = categoryMap[transaction.categoryId],
-                    settlementCurrency = settlementCurrency,
-                    onDelete = { onDeleteTransaction(transaction) },
-                    onClick = { onTransactionClick(transaction) }
-                )
             }
 
             item { Spacer(modifier = Modifier.height(16.dp)) }
@@ -294,86 +372,128 @@ fun ProjectDetailScreen(
 }
 
 @Composable
-private fun CategoryStatItem(
+private fun CategoryStatRow(
     category: Category?,
     settlementCurrency: String,
     totalAmount: Double,
     totalExpense: Double
 ) {
     val ratio = if (totalExpense > 0) (totalAmount / totalExpense).toFloat() else 0f
-    
-    Card(
-        shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(vertical = 4.dp)
-    ) {
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp),
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-        ) {
+    val categoryColor = category?.color?.let(::Color) ?: MaterialTheme.colorScheme.primary
+
+    ListItem(
+        leadingContent = {
             Box(
                 modifier = Modifier
                     .size(40.dp)
-                    .background(
-                        category?.color?.let { 
-                            try { Color(it) } catch (e: Exception) { MaterialTheme.colorScheme.primaryContainer }
-                        } ?: MaterialTheme.colorScheme.primaryContainer,
-                        shape = androidx.compose.foundation.shape.CircleShape
-                    ),
-                contentAlignment = androidx.compose.ui.Alignment.Center
+                    .background(categoryColor.copy(alpha = 0.16f), CircleShape),
+                contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = com.rton.expensebucket.ui.util.IconMapper.getIcon(category?.icon ?: "MoreHoriz"),
+                    imageVector = IconMapper.getIcon(category?.icon ?: "MoreHoriz"),
                     contentDescription = category?.name ?: "類別",
-                    tint = MaterialTheme.colorScheme.onPrimaryContainer,
+                    tint = categoryColor,
                     modifier = Modifier.size(20.dp)
                 )
             }
-            Spacer(modifier = Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = category?.name ?: "未知類別",
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
-                    )
-                    Text(
-                        text = CurrencyFormats.formatAmount(settlementCurrency, totalAmount),
-                        style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.SemiBold)
-                    )
-                }
-                Spacer(modifier = Modifier.height(4.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
-                ) {
-                    LinearProgressIndicator(
-                        progress = { ratio.coerceAtMost(1f) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .height(6.dp)
-                            .padding(end = 8.dp),
-                        color = category?.color?.let { 
-                            try { Color(it) } catch (e: Exception) { MaterialTheme.colorScheme.primary }
-                        } ?: MaterialTheme.colorScheme.primary,
-                        trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
-                        drawStopIndicator = {}
-                    )
-                    Text(
-                        text = "${(ratio * 100).toInt()}%",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
+        },
+        headlineContent = {
+            Text(
+                text = category?.name ?: "未知類別",
+                style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
+            )
+        },
+        supportingContent = {
+            Column(
+                modifier = Modifier.padding(top = 6.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                LinearProgressIndicator(
+                    progress = { ratio.coerceAtMost(1f) },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp),
+                    color = categoryColor,
+                    trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    drawStopIndicator = {}
+                )
+                Text(
+                    text = "${(ratio * 100).toInt()}%",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        trailingContent = {
+            Text(
+                text = CurrencyFormats.formatAmount(settlementCurrency, totalAmount),
+                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
+            )
+        },
+        colors = ListItemDefaults.colors(
+            containerColor = Color.Transparent
+        )
+    )
+}
+
+@Composable
+private fun ProjectDateDivider(label: String) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = MaterialTheme.colorScheme.primary
+        )
+        Spacer(modifier = Modifier.width(12.dp))
+        HorizontalDivider(
+            modifier = Modifier
+                .weight(1f)
+                .padding(top = 1.dp),
+            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)
+        )
+    }
+}
+
+private sealed interface ProjectTransactionEntry {
+    data class DateHeader(val label: String) : ProjectTransactionEntry
+    data class TransactionRow(val transaction: Transaction, val showDivider: Boolean) : ProjectTransactionEntry
+}
+
+private fun buildProjectTransactionEntries(
+    transactions: List<Transaction>
+): List<ProjectTransactionEntry> {
+    if (transactions.isEmpty()) return emptyList()
+
+    val grouped = transactions.groupBy { transaction ->
+        Calendar.getInstance().apply {
+            timeInMillis = transaction.date
+            set(Calendar.HOUR_OF_DAY, 0)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }.timeInMillis
+    }
+
+    val headerFormat = SimpleDateFormat("MM/dd EEE", Locale.getDefault())
+
+    return grouped
+        .toSortedMap(compareByDescending { it })
+        .flatMap { (dayStart, dayTransactions) ->
+            buildList {
+                add(ProjectTransactionEntry.DateHeader(headerFormat.format(Date(dayStart))))
+                dayTransactions.forEachIndexed { index, transaction ->
+                    add(
+                        ProjectTransactionEntry.TransactionRow(
+                            transaction = transaction,
+                            showDivider = index < dayTransactions.lastIndex
+                        )
                     )
                 }
             }
         }
-    }
 }

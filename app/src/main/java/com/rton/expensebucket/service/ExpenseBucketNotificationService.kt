@@ -6,6 +6,7 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Intent
 import android.os.Build
+import android.os.Bundle
 import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
@@ -90,14 +91,7 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
         val notification = sbn.notification ?: return
         val extras = notification.extras ?: return
 
-        val title = extras.getCharSequence(Notification.EXTRA_TITLE)?.toString() ?: ""
-        val text = extras.getCharSequence(Notification.EXTRA_TEXT)?.toString() ?: ""
-        val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)?.toString() ?: ""
-
-        // Combine all text for parsing
-        val combined = listOf(title, text, bigText)
-            .filter { it.isNotBlank() }
-            .joinToString(" ")
+        val combined = extractNotificationText(extras)
 
         if (combined.isBlank()) {
             Log.d(TAG, "[$pkg] Empty notification text, skipping")
@@ -125,7 +119,7 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
                         isExpense = parsed.isExpense,
                         source = "notification",
                         isDraft = true,
-                        date = System.currentTimeMillis(),
+                        date = parsed.date ?: System.currentTimeMillis(),
                         createdAt = System.currentTimeMillis()
                     )
                 )
@@ -219,11 +213,60 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
         }
     }
 
+    private fun extractNotificationText(extras: Bundle): String {
+        val textKeys = listOf(
+            Notification.EXTRA_TITLE,
+            Notification.EXTRA_TITLE_BIG,
+            Notification.EXTRA_TEXT,
+            Notification.EXTRA_BIG_TEXT,
+            Notification.EXTRA_SUB_TEXT,
+            Notification.EXTRA_SUMMARY_TEXT,
+            Notification.EXTRA_INFO_TEXT,
+            Notification.EXTRA_CONVERSATION_TITLE
+        )
+
+        val parts = linkedSetOf<String>()
+
+        textKeys.forEach { key ->
+            extras.getCharSequence(key)
+                ?.toString()
+                ?.trim()
+                ?.takeIf { it.isNotBlank() }
+                ?.let(parts::add)
+        }
+
+        extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
+            ?.mapNotNull { it?.toString()?.trim()?.takeIf(String::isNotBlank) }
+            ?.forEach(parts::add)
+
+        return parts.joinToString(" ")
+    }
+
     private fun isWatchedPackage(pkg: String): Boolean {
         val normalizedPkg = pkg.lowercase()
-        return WATCHED_PACKAGES.any { watched ->
+        if (WATCHED_PACKAGES.any { watched ->
             val normalizedWatched = watched.lowercase()
             normalizedPkg.startsWith(normalizedWatched) || normalizedPkg.contains(normalizedWatched)
+        }) {
+            return true
         }
+
+        val packageHints = listOf(
+            "fubon",
+            "taishin",
+            "richart",
+            "esun",
+            "cathay",
+            "ctbc",
+            "sinopac",
+            "mpost",
+            "jkos",
+            "linepay",
+            "easycard",
+            "pxpay",
+            "pchome.android.pi"
+        )
+
+        return packageHints.any(normalizedPkg::contains)
     }
 }

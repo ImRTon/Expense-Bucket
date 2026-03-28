@@ -52,13 +52,6 @@ class NotificationParser {
             merchantGroup = 1,
             paymentHint = "linepay"
         ),
-        // 信用卡通知：「消費通知 卡號末四碼1234 於 星巴克 消費 NT$165」
-        NotifPattern(
-            regex = Pattern.compile("""[於在]\s*(.{2,20}?)\s*消費\s*$twdCurrencyToken\s*([\d,]+(?:\.\d+)?)"""),
-            amountGroup = 2,
-            merchantGroup = 1,
-            paymentHint = "credit_card"
-        ),
         // 銀行簡訊格式：「台新銀行通知：刷卡消費NT$1,234 商店：7-ELEVEN」
         NotifPattern(
             regex = Pattern.compile("""刷卡消費\s*$twdCurrencyToken\s*([\d,]+(?:\.\d+)?)\s*.*?(?:商店|特約商店)[：:\s]*(.{2,20})"""),
@@ -119,6 +112,13 @@ class NotificationParser {
             merchantGroup = -1,
             paymentHint = "post",
             dateGroup = 1
+        ),
+        // 信用卡通知：「消費通知 卡號末四碼1234 於 星巴克 消費 NT$165」
+        NotifPattern(
+            regex = Pattern.compile("""[於在]\s*(.{2,20}?)\s*消費\s*$twdCurrencyToken\s*([\d,]+(?:\.\d+)?)"""),
+            amountGroup = 2,
+            merchantGroup = 1,
+            paymentHint = "credit_card"
         ),
         // 通用格式：「消費 NT$1,234」 or 「扣款 $567」
         NotifPattern(

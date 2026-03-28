@@ -132,4 +132,24 @@ class NotificationParserTest {
             assertEquals(8521.0, post!!.amount, 0.001)
         }
     }
+
+    @Test
+    fun parsesRealWorldFubonNotification() {
+        val parsed = parser.parse(
+            text = "【刷卡消費通知】您的信用卡末四碼6773於03/28 13:09:10好市多中和店消費臺幣1,257元",
+            packageName = "com.fubon.mobilebank"
+        )
+
+        assertNotNull(parsed)
+        parsed!!
+        assertEquals(1257.0, parsed.amount, 0.001)
+        assertEquals("好市多中和店", parsed.merchant)
+        assertEquals("credit_card", parsed.paymentMethodHint)
+
+        val calendar = Calendar.getInstance().apply { timeInMillis = parsed.date!! }
+        assertEquals(3, calendar.get(Calendar.MONTH) + 1)
+        assertEquals(28, calendar.get(Calendar.DAY_OF_MONTH))
+        assertEquals(13, calendar.get(Calendar.HOUR_OF_DAY))
+        assertEquals(9, calendar.get(Calendar.MINUTE))
+    }
 }
