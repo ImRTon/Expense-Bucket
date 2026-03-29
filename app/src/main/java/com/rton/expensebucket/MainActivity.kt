@@ -489,6 +489,8 @@ fun ExpensesApp(
                     transactions = projectTransactions,
                     categories = allCategories,
                     totalExpense = projectTotal ?: 0.0,
+                    appPalette = currentPalette,
+                    isDarkTheme = isDarkTheme,
                     onBack = { navController.popBackStack() },
                     onUpdateProject = { viewModel.updateProject(it) },
                     onDeleteProject = { viewModel.deleteProject(it) },

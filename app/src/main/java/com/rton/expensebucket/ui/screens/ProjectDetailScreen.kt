@@ -22,8 +22,6 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -48,6 +46,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.rton.expensebucket.data.AppPalette
 import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.Project
 import com.rton.expensebucket.data.model.Transaction
@@ -56,6 +55,9 @@ import com.rton.expensebucket.ui.components.ProjectFormDialog
 import com.rton.expensebucket.ui.components.QuickAddFab
 import com.rton.expensebucket.ui.components.TransactionListItem
 import com.rton.expensebucket.ui.components.TransactionListItemStyle
+import com.rton.expensebucket.ui.components.WaterLevelSurface
+import com.rton.expensebucket.ui.components.rememberWaterMotionState
+import com.rton.expensebucket.ui.components.waterLevelColor
 import com.rton.expensebucket.ui.util.CurrencyFormats
 import com.rton.expensebucket.ui.util.IconMapper
 import java.text.NumberFormat
@@ -72,6 +74,8 @@ fun ProjectDetailScreen(
     transactions: List<Transaction>,
     categories: List<Category>,
     totalExpense: Double,
+    appPalette: AppPalette = AppPalette.DEFAULT,
+    isDarkTheme: Boolean = false,
     onBack: () -> Unit,
     onUpdateProject: (Project) -> Unit,
     onDeleteProject: (Project) -> Unit,
@@ -84,6 +88,7 @@ fun ProjectDetailScreen(
     val settlementCurrency = project?.defaultCurrency ?: "TWD"
     val categoryMap = remember(categories) { categories.associateBy { it.id } }
     val sortedTransactions = remember(transactions) { transactions.sortedByDescending { it.date } }
+    val waterMotionState = rememberWaterMotionState()
     val categoryStats = remember(transactions) {
         transactions
             .filter { it.isExpense }
@@ -151,101 +156,143 @@ fun ProjectDetailScreen(
         ) {
             // ─── Total + Budget Card ────────────────────────────
             item {
-                Card(
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = MaterialTheme.colorScheme.primaryContainer
-                    )
+                val budget = project?.budget
+                val remaining = if (budget != null) budget - totalExpense else null
+                val remainingRatio = if (budget != null && budget > 0) {
+                    (remaining!! / budget).toFloat().coerceIn(0f, 1f)
+                } else {
+                    0.5f
+                }
+                val waterColor = waterLevelColor(
+                    level = remainingRatio.toDouble(),
+                    palette = appPalette,
+                    isDarkTheme = isDarkTheme
+                )
+                val usedRatio = if (budget != null && budget > 0) {
+                    (totalExpense / budget).toFloat().coerceAtLeast(0f)
+                } else {
+                    0f
+                }
+                val remainingAmount = if (budget != null && budget > 0) {
+                    budget - totalExpense
+                } else {
+                    null
+                }
+                val statusLabel = if (remainingAmount == null) {
+                    null
+                } else if (remainingAmount >= 0) {
+                    "剩餘"
+                } else {
+                    "超支"
+                }
+                val statusPercent = if (remainingAmount == null) {
+                    null
+                } else if (remainingAmount >= 0) {
+                    "${(remainingRatio * 100).toInt()}%"
+                } else {
+                    "${(((usedRatio - 1f).coerceAtLeast(0f)) * 100).toInt()}%"
+                }
+
+                WaterLevelSurface(
+                    level = remainingRatio,
+                    waterColor = waterColor,
+                    motionState = waterMotionState,
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp)
                 ) {
-                    Column(
+                    val primaryTextColor = MaterialTheme.colorScheme.onSurface
+                    val secondaryTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
+                    val tertiaryTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f)
+
+                    Box(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(24.dp)
                     ) {
-                        Text(
-                            "累計支出",
-                            style = MaterialTheme.typography.labelLarge,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                        )
-                        Spacer(modifier = Modifier.height(4.dp))
-                        Text(
-                            CurrencyFormats.formatAmount(settlementCurrency, totalExpense),
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Bold
-                            ),
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-
-                        // ─── Budget Progress ────────────────────
-                        val budget = project?.budget
-                        if (budget != null && budget > 0) {
-                            val ratio = (totalExpense / budget).toFloat().coerceIn(0f, 1.5f)
-                            val progressColor = when {
-                                ratio < 0.6f -> Color(0xFF4CAF50)   // green
-                                ratio < 0.85f -> Color(0xFFFFC107)  // yellow
-                                else -> Color(0xFFF44336)           // red
-                            }
-                            val remaining = budget - totalExpense
-                            val currency = project.defaultCurrency
-
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Row(
-                                modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Text(
-                                    "預算 $currency ${NumberFormat.getNumberInstance().apply { maximumFractionDigits = 0 }.format(budget)}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
-                                )
-                                Text(
-                                    "${(ratio * 100).toInt()}%",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = progressColor
-                                )
-                            }
-                            Spacer(modifier = Modifier.height(6.dp))
-                            LinearProgressIndicator(
-                                progress = { ratio.coerceAtMost(1f) },
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .height(8.dp),
-                                color = progressColor,
-                                trackColor = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.1f),
-                                drawStopIndicator = {}
-                            )
-                            Spacer(modifier = Modifier.height(6.dp))
+                        Column(
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
                             Text(
-                                if (remaining >= 0)
-                                    "剩餘 $currency ${NumberFormat.getNumberInstance().apply { maximumFractionDigits = 0 }.format(remaining)}"
-                                else
-                                    "超支 $currency ${NumberFormat.getNumberInstance().apply { maximumFractionDigits = 0 }.format(-remaining)}",
-                                style = MaterialTheme.typography.bodySmall.copy(
-                                    fontWeight = FontWeight.Medium
-                                ),
-                                color = if (remaining >= 0)
-                                    MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
-                                else
-                                    Color(0xFFF44336)
+                                "累計支出",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = secondaryTextColor
                             )
-                        }
-
-                        // ─── Date range info ────────────────────
-                        val dateFormat = remember { SimpleDateFormat("MM/dd", Locale.getDefault()) }
-                        if (project?.startDate != null && project.endDate != null) {
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                "${dateFormat.format(Date(project.startDate))} – ${dateFormat.format(Date(project.endDate))}",
+                                CurrencyFormats.formatAmount(settlementCurrency, totalExpense),
+                                style = MaterialTheme.typography.headlineMedium.copy(
+                                    fontWeight = FontWeight.Bold
+                                ),
+                                color = primaryTextColor
+                            )
+
+                            // ─── Budget Info ───────────────────────
+                            if (budget != null && budget > 0) {
+                                val currency = project.defaultCurrency
+                                val displayedRemainingAmount = remainingAmount ?: 0.0
+
+                                Spacer(modifier = Modifier.height(12.dp))
+                                Column(
+                                    modifier = Modifier.padding(end = 104.dp)
+                                ) {
+                                    Text(
+                                        "預算 $currency ${NumberFormat.getNumberInstance().apply { maximumFractionDigits = 0 }.format(budget)}",
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = tertiaryTextColor
+                                    )
+                                    Spacer(modifier = Modifier.height(6.dp))
+                                    Text(
+                                        if (displayedRemainingAmount >= 0)
+                                            "剩餘 $currency ${NumberFormat.getNumberInstance().apply { maximumFractionDigits = 0 }.format(displayedRemainingAmount)}"
+                                        else
+                                            "超支 $currency ${NumberFormat.getNumberInstance().apply { maximumFractionDigits = 0 }.format(-displayedRemainingAmount)}",
+                                        style = MaterialTheme.typography.bodySmall.copy(
+                                            fontWeight = FontWeight.Medium
+                                        ),
+                                        color = secondaryTextColor
+                                    )
+                                }
+                            }
+
+                            // ─── Date range info ────────────────────
+                            val dateFormat = remember { SimpleDateFormat("MM/dd", Locale.getDefault()) }
+                            if (project?.startDate != null && project.endDate != null) {
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    "${dateFormat.format(Date(project.startDate))} – ${dateFormat.format(Date(project.endDate))}",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = tertiaryTextColor
+                                )
+                            }
+
+                            Text(
+                                "${transactions.size} 筆交易",
                                 style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.5f)
+                                color = tertiaryTextColor
                             )
                         }
 
-                        Text(
-                            "${transactions.size} 筆交易",
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.6f)
-                        )
+                        if (statusLabel != null && statusPercent != null) {
+                            Column(
+                                modifier = Modifier
+                                    .align(Alignment.BottomEnd)
+                                    .padding(end = 2.dp, bottom = 2.dp),
+                                horizontalAlignment = Alignment.End
+                            ) {
+                                Text(
+                                    text = statusLabel,
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = secondaryTextColor
+                                )
+                                Text(
+                                    text = statusPercent,
+                                    style = MaterialTheme.typography.headlineMedium.copy(
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = primaryTextColor
+                                )
+                            }
+                        }
                     }
                 }
             }
@@ -273,12 +320,6 @@ fun ProjectDetailScreen(
                                         totalAmount = total,
                                         totalExpense = totalExpense
                                     )
-                                    if (index < categoryStats.lastIndex) {
-                                        HorizontalDivider(
-                                            modifier = Modifier.padding(start = 72.dp),
-                                            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.7f)
-                                        )
-                                    }
                                 }
                             }
                         }
@@ -319,8 +360,7 @@ fun ProjectDetailScreen(
                                                 settlementCurrency = settlementCurrency,
                                                 onDelete = { onDeleteTransaction(entry.transaction) },
                                                 onClick = { onTransactionClick(entry.transaction) },
-                                                style = TransactionListItemStyle.List,
-                                                showDivider = entry.showDivider
+                                                style = TransactionListItemStyle.List
                                             )
                                         }
                                     }
