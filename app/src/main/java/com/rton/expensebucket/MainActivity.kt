@@ -218,6 +218,7 @@ fun ExpensesApp(
     val periodLabel by viewModel.currentPeriodLabel.collectAsStateWithLifecycle()
     val allProjects by viewModel.allProjects.collectAsStateWithLifecycle()
     val activeProjects by viewModel.activeProjects.collectAsStateWithLifecycle()
+    val projectExpenseTotals by viewModel.projectExpenseTotals.collectAsStateWithLifecycle()
     val allPaymentMethods by viewModel.allPaymentMethods.collectAsStateWithLifecycle()
     val paymentMethodBillingSummaries by viewModel.paymentMethodBillingSummaries.collectAsStateWithLifecycle()
     val compareMode by viewModel.compareMode.collectAsStateWithLifecycle()
@@ -464,6 +465,7 @@ fun ExpensesApp(
             composable(Screen.Projects.route) {
                 ProjectsScreen(
                     projects = allProjects,
+                    expenseTotals = projectExpenseTotals,
                     onAddProject = { viewModel.addProject(it) },
                     onProjectClick = { projectId ->
                         navController.navigate(Screen.ProjectDetail.createRoute(projectId))

@@ -33,7 +33,8 @@ object DatabaseModule {
                 ExpenseBucketDatabase.MIGRATION_4_5,
                 ExpenseBucketDatabase.MIGRATION_5_6,
                 ExpenseBucketDatabase.MIGRATION_6_7,
-                ExpenseBucketDatabase.MIGRATION_7_8
+                ExpenseBucketDatabase.MIGRATION_7_8,
+                ExpenseBucketDatabase.MIGRATION_8_9
             )
             .build()
     }

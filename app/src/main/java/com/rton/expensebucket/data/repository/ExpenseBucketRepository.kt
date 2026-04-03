@@ -35,6 +35,8 @@ class ExpenseBucketRepository @Inject constructor(
         transactionDao.getTotalIncomeByDateRange(startDate, endDate)
     fun getTotalExpenseByProject(projectId: Long): Flow<Double?> =
         transactionDao.getTotalExpenseByProject(projectId)
+    fun getAllProjectExpenseTotals(): Flow<List<com.rton.expensebucket.data.model.ProjectExpenseTotal>> =
+        transactionDao.getAllProjectExpenseTotals()
     suspend fun getTransactionById(id: Long): Transaction? =
         transactionDao.getTransactionById(id)
     suspend fun insertTransaction(transaction: Transaction): Long =

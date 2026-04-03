@@ -255,6 +255,11 @@ class MainViewModel @Inject constructor(
         repository.getActiveProjects()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
+    val projectExpenseTotals: StateFlow<Map<Long, Double>> =
+        repository.getAllProjectExpenseTotals()
+            .map { list -> list.associate { it.projectId to it.totalExpense } }
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap<Long, Double>())
+
     val allProjects: StateFlow<List<Project>> =
         repository.getAllProjects()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())

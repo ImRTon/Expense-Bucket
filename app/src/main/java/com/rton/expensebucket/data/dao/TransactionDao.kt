@@ -34,6 +34,9 @@ interface TransactionDao {
     @Query("SELECT SUM(COALESCE(personalAmount, amount) * exchangeRate) FROM transactions WHERE projectId = :projectId AND isExpense = 1 AND isDraft = 0")
     fun getTotalExpenseByProject(projectId: Long): Flow<Double?>
 
+    @Query("SELECT projectId, SUM(COALESCE(personalAmount, amount) * exchangeRate) as totalExpense FROM transactions WHERE isExpense = 1 AND isDraft = 0 AND projectId IS NOT NULL GROUP BY projectId")
+    fun getAllProjectExpenseTotals(): Flow<List<com.rton.expensebucket.data.model.ProjectExpenseTotal>>
+
     @Query("SELECT * FROM transactions WHERE id = :id")
     suspend fun getTransactionById(id: Long): Transaction?
 

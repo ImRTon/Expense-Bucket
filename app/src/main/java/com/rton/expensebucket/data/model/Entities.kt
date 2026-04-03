@@ -70,6 +70,8 @@ data class Project(
     val startDate: Long? = null,       // epoch millis, null = 不限
     val endDate: Long? = null,         // epoch millis, null = 不限
     val budget: Double? = null,        // 預算金額, null = 不設預算
+    val icon: String = "✈️",
+    val color: Long = 0xFF2196F3,
     val isActive: Boolean = true,
     val createdAt: Long = System.currentTimeMillis(),
     val updatedAt: Long = System.currentTimeMillis()

@@ -19,15 +19,25 @@ import com.rton.expensebucket.ui.components.ProjectFormDialog
 import java.text.NumberFormat
 import java.text.SimpleDateFormat
 import java.util.*
+import androidx.compose.foundation.lazy.rememberLazyListState
+import kotlinx.coroutines.launch
+import com.rton.expensebucket.ui.components.ProjectTimelineChart
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProjectsScreen(
     projects: List<Project>,
+    expenseTotals: Map<Long, Double>,
     onAddProject: (Project) -> Unit,
     onProjectClick: (Long) -> Unit
 ) {
     var showAddDialog by remember { mutableStateOf(false) }
+
+    val sortedProjects = remember(projects) {
+        projects.sortedByDescending { it.startDate ?: it.createdAt }
+    }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -85,15 +95,36 @@ fun ProjectsScreen(
             }
         } else {
             LazyColumn(
+                state = listState,
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                items(projects, key = { it.id }) { project ->
+                item {
+                    ProjectTimelineChart(
+                        projects = sortedProjects,
+                        expenseTotals = expenseTotals,
+                        onProjectFocused = { focusedId ->
+                            if (focusedId != null) {
+                                val idx = sortedProjects.indexOfFirst { it.id == focusedId }
+                                if (idx >= 0) {
+                                    scope.launch {
+                                        // +1 because TimelineChart is item 0
+                                        listState.animateScrollToItem(idx + 1)
+                                    }
+                                }
+                            }
+                        },
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
+
+                items(sortedProjects, key = { it.id }) { project ->
                     ProjectCard(
                         project = project,
+                        expenseTotal = expenseTotals[project.id],
                         onClick = { onProjectClick(project.id) }
                     )
                 }
@@ -117,6 +148,7 @@ fun ProjectsScreen(
 @Composable
 private fun ProjectCard(
     project: Project,
+    expenseTotal: Double?,
     onClick: () -> Unit
 ) {
     val dateFormat = remember { SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()) }
@@ -169,6 +201,13 @@ private fun ProjectCard(
                     )
                 }
 
+                // Expense Total
+                val expenseText = expenseTotal?.let {
+                    val fmt = NumberFormat.getNumberInstance(Locale.getDefault())
+                    fmt.maximumFractionDigits = 0
+                    "總花費 ${project.defaultCurrency} ${fmt.format(it)}"
+                }
+
                 // Date range
                 val dateRangeText = if (project.startDate != null && project.endDate != null) {
                     "${shortDateFormat.format(Date(project.startDate))} – ${shortDateFormat.format(Date(project.endDate))}"
@@ -183,11 +222,17 @@ private fun ProjectCard(
 
                 Text(
                     buildString {
-                        append(project.defaultCurrency)
-                        if (dateRangeText != null) append(" · $dateRangeText")
-                        if (budgetText != null) append(" · $budgetText")
-                        if (dateRangeText == null && budgetText == null) {
-                            append(" · ${dateFormat.format(Date(project.createdAt))}")
+                        if (expenseText != null) {
+                            append(expenseText)
+                            if (dateRangeText != null) append(" · $dateRangeText")
+                            else if (budgetText != null) append(" · $budgetText")
+                        } else {
+                            append(project.defaultCurrency)
+                            if (dateRangeText != null) append(" · $dateRangeText")
+                            if (budgetText != null) append(" · $budgetText")
+                            if (dateRangeText == null && budgetText == null) {
+                                append(" · ${dateFormat.format(Date(project.createdAt))}")
+                            }
                         }
                     },
                     style = MaterialTheme.typography.labelSmall,

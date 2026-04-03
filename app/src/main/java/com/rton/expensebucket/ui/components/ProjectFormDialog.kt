@@ -30,6 +30,14 @@ fun ProjectFormDialog(
     } ?: ""
     var budgetText by remember { mutableStateOf(initialBudgetStr) }
     
+    var icon by remember { mutableStateOf(initialProject?.icon ?: "✈️") }
+    val defaultColors = listOf(
+        0xFF2196F3, 0xFF4CAF50, 0xFFFF9800, 0xFFF44336, 
+        0xFF9C27B0, 0xFF00BCD4, 0xFFFFC107, 0xFF795548
+    )
+    var color by remember { mutableStateOf(initialProject?.color ?: defaultColors.first()) }
+    var showEmojiPicker by remember { mutableStateOf(false) }
+    
     val currencies = CurrencyFormats.supportedCurrencies
 
     // Date states

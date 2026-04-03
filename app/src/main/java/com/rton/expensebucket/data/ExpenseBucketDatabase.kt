@@ -15,7 +15,7 @@ import com.rton.expensebucket.data.model.Transaction
 
 @Database(
     entities = [Transaction::class, Category::class, Project::class, PaymentMethod::class],
-    version = 8,
+    version = 9,
     exportSchema = true
 )
 abstract class ExpenseBucketDatabase : RoomDatabase() {
@@ -189,6 +189,28 @@ abstract class ExpenseBucketDatabase : RoomDatabase() {
                 database.execSQL(
                     "ALTER TABLE `transactions` ADD COLUMN `personalAmount` REAL DEFAULT NULL"
                 )
+                // Also add project custom icons and colors if they don't exist
+                // (Note: some previous versions might have had them in model but not in migration)
+                try {
+                    database.execSQL("ALTER TABLE `projects` ADD COLUMN `icon` TEXT NOT NULL DEFAULT '✈️'")
+                } catch (e: Exception) { /* already exists */ }
+                try {
+                    database.execSQL("ALTER TABLE `projects` ADD COLUMN `color` INTEGER NOT NULL DEFAULT -14575885")
+                } catch (e: Exception) { /* already exists */ }
+            }
+        }
+        /**
+         * Migration from v8 → v9: adds icon and color to projects.
+         */
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                // Ensure columns exist (fixes broken v8 schema where columns were in Entity but not in DB)
+                try {
+                    database.execSQL("ALTER TABLE `projects` ADD COLUMN `icon` TEXT NOT NULL DEFAULT '✈️'")
+                } catch (e: Exception) { /* ignore if already exists */ }
+                try {
+                    database.execSQL("ALTER TABLE `projects` ADD COLUMN `color` INTEGER NOT NULL DEFAULT -14575885")
+                } catch (e: Exception) { /* ignore if already exists */ }
             }
         }
     }
