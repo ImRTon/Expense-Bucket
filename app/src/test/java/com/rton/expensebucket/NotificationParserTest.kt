@@ -152,4 +152,26 @@ class NotificationParserTest {
         assertEquals(13, calendar.get(Calendar.HOUR_OF_DAY))
         assertEquals(9, calendar.get(Calendar.MINUTE))
     }
+
+    @Test
+    fun parsesTruncatedAndFullCombinedNotificationCorrectly() {
+        // Simulate a scenario where extraction combines a truncated EXTRA_TEXT and a full EXTRA_BIG_TEXT
+        // Truncated version matched generic credit card pattern #10, full version matched #8. 
+        // The parser should select the higher confidence one (the one with date and merchant)
+        val combinedText = "永豐大咖 末四碼1234感謝刷卡123元 永豐貴賓您好，末四碼1234感謝03/15 12:05刷卡台幣123元，商店名稱:STORE，實際商店名稱請以店家收據為準"
+        
+        val parsed = parser.parse(
+            text = combinedText,
+            packageName = "com.sinopac.DaCard"
+        )
+
+        assertNotNull("Should correctly parse combined notification text", parsed)
+        parsed!!
+        assertEquals(123.0, parsed.amount, 0.001)
+        assertEquals("STORE", parsed.merchant)
+        assertEquals("sinopac", parsed.paymentMethodHint)
+
+        // Verifying it successfully fell back to Pattern #8 and not general generic patterns
+        assertNotNull(parsed.date)
+    }
 }

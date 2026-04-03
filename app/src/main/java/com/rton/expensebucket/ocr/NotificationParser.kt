@@ -141,6 +141,8 @@ class NotificationParser {
      * @param packageName Source app package name (for payment method hinting)
      */
     fun parse(text: String, packageName: String? = null): ParsedTransaction? {
+        var bestMatch: ParsedTransaction? = null
+
         for (p in patterns) {
             val matcher = p.regex.matcher(text)
             if (matcher.find()) {
@@ -159,7 +161,7 @@ class NotificationParser {
                 val dateStr = if (p.dateGroup > 0) matcher.group(p.dateGroup) else null
                 val parsedDate = parseNotificationDate(dateStr)
 
-                return ParsedTransaction(
+                val candidate = ParsedTransaction(
                     amount = amount,
                     merchant = merchant,
                     note = text.take(100),
@@ -168,9 +170,13 @@ class NotificationParser {
                     paymentMethodHint = paymentMethodHint,
                     confidence = if (merchant.isNotBlank() || parsedDate != null) 0.9f else 0.6f
                 )
+                
+                if (bestMatch == null || candidate.confidence > bestMatch!!.confidence) {
+                    bestMatch = candidate
+                }
             }
         }
-        return null
+        return bestMatch
     }
 
     /**

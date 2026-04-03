@@ -63,7 +63,7 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
             "tw.gov.post.mpost",        // 郵局
 
             // Google Pay / Apple Pay (system-level)
-            "com.google.android.apps.nbu.paisa.user",  // Google Pay
+            "com.google.android.apps.walletnfcrel",  // Google Pay
         )
     }
 
@@ -73,6 +73,20 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val currencyFormat = NumberFormat.getCurrencyInstance(Locale("zh", "TW"))
     private var notificationIdCounter = 10000
+
+    // Cache for 1st layer dedup: identical SBN key (updates to the same notification)
+    private val processedSbnKeys = object : java.util.LinkedHashMap<String, Long>(50, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>?): Boolean {
+            return size > 50
+        }
+    }
+
+    // Cache to prevent processing the identical parsed notification multiple times
+    private val processedNotifications = object : java.util.LinkedHashMap<String, Long>(30, 0.75f, true) {
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>?): Boolean {
+            return size > 30
+        }
+    }
 
     override fun onCreate() {
         super.onCreate()
@@ -88,13 +102,21 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
         // Step 1: Filter by watched packages
         if (!isWatchedPackage(pkg)) return
 
+        // Layer 1: SBN key dedup — skip if this exact notification was already processed recently
+        val sbnKey = sbn.key
+        val now = System.currentTimeMillis()
+        val lastSbnTime = processedSbnKeys[sbnKey]
+        if (lastSbnTime != null && (now - lastSbnTime) < 10 * 1000) {
+            Log.d(TAG, "[$pkg] Same SBN key '$sbnKey' recently processed within 10s, skipping")
+            return
+        }
+
         val notification = sbn.notification ?: return
         val extras = notification.extras ?: return
 
         val combined = extractNotificationText(extras)
 
         if (combined.isBlank()) {
-            Log.d(TAG, "[$pkg] Empty notification text, skipping")
             return
         }
 
@@ -106,6 +128,19 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
             Log.d(TAG, "[$pkg] Parser returned null — no pattern matched")
             return
         }
+
+        // Deduplicate: Android apps often update notifications, causing repeated onNotificationPosted events.
+        // We use a 10-second window on the parsed transaction amount to prevent duplicate drafts.
+        val duplicateKey = "${pkg}_${parsed.amount}"
+        val lastProcessed = processedNotifications[duplicateKey]
+        if (lastProcessed != null && (now - lastProcessed) < 10 * 1000) {
+            Log.d(TAG, "[$pkg] Duplicate transaction content recently processed within 10s, skipping")
+            return
+        }
+        
+        // Mark both dedup keys as processed
+        processedSbnKeys[sbnKey] = now
+        processedNotifications[duplicateKey] = now
 
         Log.d(TAG, "[$pkg] Parsed: amount=${parsed.amount}, merchant='${parsed.merchant}', isExpense=${parsed.isExpense}")
 
@@ -214,29 +249,56 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
     }
 
     private fun extractNotificationText(extras: Bundle): String {
-        val textKeys = listOf(
-            Notification.EXTRA_TITLE,
+        // Prefer the longest, most complete text source
+        val bigText = extras.getCharSequence(Notification.EXTRA_BIG_TEXT)
+            ?.toString()?.trim()?.takeIf { it.isNotBlank() }
+        val text = extras.getCharSequence(Notification.EXTRA_TEXT)
+            ?.toString()?.trim()?.takeIf { it.isNotBlank() }
+        val title = extras.getCharSequence(Notification.EXTRA_TITLE)
+            ?.toString()?.trim()?.takeIf { it.isNotBlank() }
+
+        // Use the longest body text (bigText is usually the most complete)
+        val body = when {
+            bigText != null && text != null -> {
+                if (bigText.length >= text.length) bigText else text
+            }
+            bigText != null -> bigText
+            text != null -> text
+            else -> ""
+        }
+
+        // Add additional string fields if they exist and are not already part of the body
+        val parts = linkedSetOf<String>()
+        val additionalKeys = listOf(
             Notification.EXTRA_TITLE_BIG,
-            Notification.EXTRA_TEXT,
-            Notification.EXTRA_BIG_TEXT,
             Notification.EXTRA_SUB_TEXT,
             Notification.EXTRA_SUMMARY_TEXT,
             Notification.EXTRA_INFO_TEXT,
             Notification.EXTRA_CONVERSATION_TITLE
         )
-
-        val parts = linkedSetOf<String>()
-
-        textKeys.forEach { key ->
+        
+        // Add title if it's unique
+        if (title != null && !body.contains(title)) {
+            parts.add(title)
+        }
+        
+        // Add body
+        if (body.isNotBlank()) {
+            parts.add(body)
+        }
+        
+        // Add other elements if they provide more info
+        additionalKeys.forEach { key ->
             extras.getCharSequence(key)
                 ?.toString()
                 ?.trim()
-                ?.takeIf { it.isNotBlank() }
+                ?.takeIf { it.isNotBlank() && !body.contains(it) && title != it }
                 ?.let(parts::add)
         }
 
         extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
             ?.mapNotNull { it?.toString()?.trim()?.takeIf(String::isNotBlank) }
+            ?.filter { !body.contains(it) }
             ?.forEach(parts::add)
 
         return parts.joinToString(" ")

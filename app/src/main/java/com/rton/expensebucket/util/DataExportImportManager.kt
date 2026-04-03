@@ -140,7 +140,7 @@ class DataExportImportManager @Inject constructor(
                 compareBy<PaymentMethod> { it.sortOrder }.thenBy { it.id }
             )
             val projects = repository.getAllProjects().first().sortedBy { it.updatedAt }
-            val transactions = repository.getAllTransactions().first()
+            val transactions = repository.getAllConfirmedTransactions().first()
 
             val categoryById = categories.associateBy { it.id }
             val paymentMethodById = paymentMethods.associateBy { it.id }
