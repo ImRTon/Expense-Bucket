@@ -33,7 +33,6 @@ import com.rton.expensebucket.ocr.ReceiptOcrEngine
 import com.rton.expensebucket.ui.model.TransactionPrefill
 import com.rton.expensebucket.ui.screens.*
 import com.rton.expensebucket.ui.theme.ExpensesTheme
-import com.rton.expensebucket.ui.theme.LatteSurfaceRaisedLight
 import com.rton.expensebucket.ui.viewmodel.MainViewModel
 import com.rton.expensebucket.ui.viewmodel.CompareMode
 import dagger.hilt.android.AndroidEntryPoint
@@ -255,17 +254,17 @@ fun ExpensesApp(
         com.rton.expensebucket.data.AppTheme.LIGHT -> false
     }
     val bottomBarContainerColor = if (
-        currentPalette == com.rton.expensebucket.data.AppPalette.LATTE && !isDarkTheme
+        currentPalette != com.rton.expensebucket.data.AppPalette.DEFAULT && !isDarkTheme
     ) {
-        LatteSurfaceRaisedLight
+        MaterialTheme.colorScheme.surfaceContainerLow
     } else {
         MaterialTheme.colorScheme.surface
     }
     val bottomBarItemColors = if (
-        currentPalette == com.rton.expensebucket.data.AppPalette.LATTE && !isDarkTheme
+        currentPalette != com.rton.expensebucket.data.AppPalette.DEFAULT && !isDarkTheme
     ) {
         NavigationBarItemDefaults.colors(
-            indicatorColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+            indicatorColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.92f)
         )
     } else {
         NavigationBarItemDefaults.colors()

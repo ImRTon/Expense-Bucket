@@ -40,6 +40,14 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.rton.expensebucket.data.AppPalette
+import com.rton.expensebucket.ui.theme.BerryYogurtWaterBerryDark
+import com.rton.expensebucket.ui.theme.BerryYogurtWaterBerryLight
+import com.rton.expensebucket.ui.theme.BerryYogurtWaterCoralDark
+import com.rton.expensebucket.ui.theme.BerryYogurtWaterCoralLight
+import com.rton.expensebucket.ui.theme.BerryYogurtWaterGoldenDark
+import com.rton.expensebucket.ui.theme.BerryYogurtWaterGoldenLight
+import com.rton.expensebucket.ui.theme.BerryYogurtWaterMatchaDark
+import com.rton.expensebucket.ui.theme.BerryYogurtWaterMatchaLight
 import com.rton.expensebucket.ui.theme.LatteCaramelDark
 import com.rton.expensebucket.ui.theme.LatteCaramelLight
 import com.rton.expensebucket.ui.theme.LatteHojichaLight
@@ -48,6 +56,14 @@ import com.rton.expensebucket.ui.theme.LatteSageDark
 import com.rton.expensebucket.ui.theme.LatteSageLight
 import com.rton.expensebucket.ui.theme.LatteTerracottaDark
 import com.rton.expensebucket.ui.theme.LatteTerracottaLight
+import com.rton.expensebucket.ui.theme.StrawberryWaterBerryDark
+import com.rton.expensebucket.ui.theme.StrawberryWaterBerryLight
+import com.rton.expensebucket.ui.theme.StrawberryWaterApricotDark
+import com.rton.expensebucket.ui.theme.StrawberryWaterApricotLight
+import com.rton.expensebucket.ui.theme.StrawberryWaterHoneyDark
+import com.rton.expensebucket.ui.theme.StrawberryWaterHoneyLight
+import com.rton.expensebucket.ui.theme.StrawberryWaterMatchaDark
+import com.rton.expensebucket.ui.theme.StrawberryWaterMatchaLight
 import kotlinx.coroutines.isActive
 import kotlin.math.PI
 import kotlin.math.atan2
@@ -179,13 +195,55 @@ fun WaterLevelSurface(
 
 fun waterLevelColor(level: Double, palette: AppPalette, isDarkTheme: Boolean): Color {
     val normalizedLevel = level.toFloat().coerceIn(0f, 1f)
-    if (palette == AppPalette.LATTE) {
-        val (c1, c2, c3, c4) = if (isDarkTheme) {
-            listOf(LatteSageDark, LatteOatDark, LatteCaramelDark, LatteTerracottaDark)
-        } else {
-            listOf(LatteSageLight, LatteHojichaLight, LatteCaramelLight, LatteTerracottaLight)
+    when (palette) {
+        AppPalette.LATTE -> {
+            val (c1, c2, c3, c4) = if (isDarkTheme) {
+                listOf(LatteSageDark, LatteOatDark, LatteCaramelDark, LatteTerracottaDark)
+            } else {
+                listOf(LatteSageLight, LatteHojichaLight, LatteCaramelLight, LatteTerracottaLight)
+            }
+            return interpolateWaterColors(normalizedLevel, c1, c2, c3, c4)
         }
-        return interpolateWaterColors(normalizedLevel, c1, c2, c3, c4)
+
+        AppPalette.STRAWBERRY_MILK -> {
+            val (c1, c2, c3, c4) = if (isDarkTheme) {
+                listOf(
+                    StrawberryWaterMatchaDark,
+                    StrawberryWaterHoneyDark,
+                    StrawberryWaterApricotDark,
+                    StrawberryWaterBerryDark
+                )
+            } else {
+                listOf(
+                    StrawberryWaterMatchaLight,
+                    StrawberryWaterHoneyLight,
+                    StrawberryWaterApricotLight,
+                    StrawberryWaterBerryLight
+                )
+            }
+            return interpolateWaterColors(normalizedLevel, c1, c2, c3, c4)
+        }
+
+        AppPalette.BERRY_YOGURT -> {
+            val (c1, c2, c3, c4) = if (isDarkTheme) {
+                listOf(
+                    BerryYogurtWaterMatchaDark,
+                    BerryYogurtWaterGoldenDark,
+                    BerryYogurtWaterCoralDark,
+                    BerryYogurtWaterBerryDark
+                )
+            } else {
+                listOf(
+                    BerryYogurtWaterMatchaLight,
+                    BerryYogurtWaterGoldenLight,
+                    BerryYogurtWaterCoralLight,
+                    BerryYogurtWaterBerryLight
+                )
+            }
+            return interpolateWaterColors(normalizedLevel, c1, c2, c3, c4)
+        }
+
+        AppPalette.DEFAULT -> Unit
     }
 
     return interpolateWaterColors(

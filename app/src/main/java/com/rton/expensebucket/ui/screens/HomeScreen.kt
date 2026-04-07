@@ -90,6 +90,18 @@ fun HomeScreen(
                     )
                 },
                 actions = {
+                    if (draftCount > 0) {
+                        BadgedBox(
+                            badge = {
+                                Badge { Text("$draftCount") }
+                            }
+                        ) {
+                            IconButton(onClick = onNavigateToDrafts) {
+                                Icon(Icons.Filled.Notifications, contentDescription = "待確認")
+                            }
+                        }
+                    }
+
                     // Period navigation: ◀ label ▶
                     if (selectedPeriod != TimePeriod.ALL) {
                         IconButton(
@@ -136,18 +148,6 @@ fun HomeScreen(
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(end = 8.dp)
                         )
-                    }
-
-                    if (draftCount > 0) {
-                        BadgedBox(
-                            badge = {
-                                Badge { Text("$draftCount") }
-                            }
-                        ) {
-                            IconButton(onClick = onNavigateToDrafts) {
-                                Icon(Icons.Filled.Notifications, contentDescription = "待確認")
-                            }
-                        }
                     }
                 },
                 windowInsets = WindowInsets(0),

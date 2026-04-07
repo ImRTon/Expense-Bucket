@@ -21,7 +21,9 @@ enum class AppTheme(val displayName: String) {
 
 enum class AppPalette(val displayName: String) {
     DEFAULT("預設主題"),
-    LATTE("宇宙拿鐵")
+    LATTE("宇宙拿鐵"),
+    STRAWBERRY_MILK("草莓牛奶"),
+    BERRY_YOGURT("莓果優格")
 }
 
 private val Context.appSettingsDataStore: DataStore<Preferences> by preferencesDataStore(name = "app_settings")
@@ -54,10 +56,15 @@ class AppSettingsDataStore @Inject constructor(
 
     val palette: Flow<AppPalette> = context.appSettingsDataStore.data.map { prefs ->
         val paletteName = prefs[APP_PALETTE_KEY] ?: AppPalette.DEFAULT.name
-        try {
-            AppPalette.valueOf(paletteName)
-        } catch (e: IllegalArgumentException) {
-            AppPalette.DEFAULT
+        when (paletteName) {
+            "TROPICAL_CACTUS" -> AppPalette.BERRY_YOGURT
+            else -> {
+                try {
+                    AppPalette.valueOf(paletteName)
+                } catch (e: IllegalArgumentException) {
+                    AppPalette.DEFAULT
+                }
+            }
         }
     }
 

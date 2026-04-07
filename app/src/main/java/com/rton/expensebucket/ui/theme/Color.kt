@@ -35,23 +35,70 @@ val SurfaceDarkCard = Color(0xFF1A2740)
 
 // ─── Latte "宇宙拿鐵" palette ──────────────────────────────────
 val LatteSurfaceLight = Color(0xFFFFF8E7)
-val LatteSurfaceRaisedLight = Color(0xFFF8F0DE)
-val LatteSurfaceSoftLight = Color(0xFFF1E6D1)
-val LatteSurfaceDark = Color(0xFF1C1A16)
+val LatteSurfaceRaisedLight = Color(0xFFFBF2E0)
+val LatteSurfaceSoftLight = Color(0xFFEADFCC)
+val LatteSurfaceDark = Color(0xFF16120D)
+val LatteSurfaceRaisedDark = Color(0xFF211D17)
 
-val LatteSageLight = Color(0xFF6F9767)
-val LatteSageDark = Color(0xFFA2C5A2)
+val LatteSageLight = Color(0xFF5F7153)
+val LatteSageDark = Color(0xFFB7C9AA)
 
-val LatteHojichaLight = Color(0xFF8C7D40)
-val LatteOatDark = Color(0xFFD4C58D)
+val LatteHojichaLight = Color(0xFFA58A59)
+val LatteOatDark = Color(0xFFD7C39B)
 
-val LatteCaramelLight = Color(0xFFA96B36)
-val LatteCaramelDark = Color(0xFFEBB07D)
+val LatteCaramelLight = Color(0xFF7F5A3A)
+val LatteCaramelDark = Color(0xFFF0C08A)
 
-val LatteTerracottaLight = Color(0xFF9A463D)
-val LatteTerracottaDark = Color(0xFFFFB4AB)
+val LatteTerracottaLight = Color(0xFF8B5E52)
+val LatteTerracottaDark = Color(0xFFE6B9AD)
 
-val LatteContainerStroke = Color(0xFF3D523D)
+val LatteContainerStroke = Color(0xFF807667)
+
+// ─── Strawberry Milk "草莓牛奶" palette ────────────────────────
+val StrawberrySurfaceLight = Color(0xFFFFF8FB)
+val StrawberrySurfaceRaisedLight = Color(0xFFFFEFF5)
+val StrawberrySurfaceSoftLight = Color(0xFFF7DCE7)
+val StrawberrySurfaceDark = Color(0xFF201015)
+val StrawberrySurfaceRaisedDark = Color(0xFF302027)
+
+val StrawberryPrimaryLight = Color(0xFFB65486)
+val StrawberryPrimaryDark = Color(0xFFFFB5D1)
+val StrawberrySecondaryLight = Color(0xFFA06A83)
+val StrawberrySecondaryDark = Color(0xFFF2BFD0)
+val StrawberryTertiaryLight = Color(0xFFC47B94)
+val StrawberryTertiaryDark = Color(0xFFFFC0D4)
+
+val StrawberryWaterMatchaLight = Color(0xFF88B27D)
+val StrawberryWaterHoneyLight = Color(0xFFD9B15B)
+val StrawberryWaterApricotLight = Color(0xFFF0A06F)
+val StrawberryWaterBerryLight = Color(0xFFD56273)
+val StrawberryWaterMatchaDark = Color(0xFFB7D6A9)
+val StrawberryWaterHoneyDark = Color(0xFFF1CD83)
+val StrawberryWaterApricotDark = Color(0xFFFFB58E)
+val StrawberryWaterBerryDark = Color(0xFFFF96A2)
+
+// ─── Berry Yogurt "莓果優格" palette ──────────────────────────
+val CactusSurfaceLight = Color(0xFFFCF7FF)
+val CactusSurfaceRaisedLight = Color(0xFFF4EEFB)
+val CactusSurfaceSoftLight = Color(0xFFE7DDF4)
+val CactusSurfaceDark = Color(0xFF18111E)
+val CactusSurfaceRaisedDark = Color(0xFF261D2D)
+
+val CactusPrimaryLight = Color(0xFF7F52B3)
+val CactusPrimaryDark = Color(0xFFE0BCFF)
+val CactusSecondaryLight = Color(0xFF9658A7)
+val CactusSecondaryDark = Color(0xFFF1B8FF)
+val CactusTertiaryLight = Color(0xFFB24E94)
+val CactusTertiaryDark = Color(0xFFFFAFE5)
+
+val BerryYogurtWaterMatchaLight = Color(0xFF7EA97A)
+val BerryYogurtWaterGoldenLight = Color(0xFFD5AE63)
+val BerryYogurtWaterCoralLight = Color(0xFFE78F67)
+val BerryYogurtWaterBerryLight = Color(0xFFC85971)
+val BerryYogurtWaterMatchaDark = Color(0xFFAFD0A8)
+val BerryYogurtWaterGoldenDark = Color(0xFFECC97C)
+val BerryYogurtWaterCoralDark = Color(0xFFFFB288)
+val BerryYogurtWaterBerryDark = Color(0xFFFF90A1)
 
 // Category colors
 val CategoryFood = Color(0xFFF97316)

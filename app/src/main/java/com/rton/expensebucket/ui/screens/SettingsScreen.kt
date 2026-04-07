@@ -9,16 +9,19 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
@@ -27,6 +30,17 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import com.rton.expensebucket.service.ExpenseBucketNotificationService
+import com.rton.expensebucket.ui.theme.CactusPrimaryLight
+import com.rton.expensebucket.ui.theme.CactusSecondaryLight
+import com.rton.expensebucket.ui.theme.CactusTertiaryLight
+import com.rton.expensebucket.ui.theme.Emerald20
+import com.rton.expensebucket.ui.theme.LatteCaramelLight
+import com.rton.expensebucket.ui.theme.LatteSageLight
+import com.rton.expensebucket.ui.theme.LatteTerracottaLight
+import com.rton.expensebucket.ui.theme.StrawberryPrimaryLight
+import com.rton.expensebucket.ui.theme.StrawberrySecondaryLight
+import com.rton.expensebucket.ui.theme.StrawberryTertiaryLight
+import com.rton.expensebucket.ui.theme.Teal20
 import com.rton.expensebucket.data.AppTheme
 import com.rton.expensebucket.data.AppPalette
 import java.text.NumberFormat
@@ -136,10 +150,14 @@ fun SettingsScreen(
                                 }
                             )
                             Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = paletteOption.displayName,
-                                style = MaterialTheme.typography.bodyLarge
-                            )
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = paletteOption.displayName,
+                                    style = MaterialTheme.typography.bodyLarge
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                PalettePreview(palette = paletteOption)
+                            }
                         }
                     }
                 }
@@ -468,10 +486,34 @@ fun SettingsScreen(
             SettingsItem(
                 icon = Icons.Filled.Info,
                 title = "版本",
-                subtitle = "1.0.0"
+                subtitle = "1.1.0"
             )
         }
     }
+}
+
+@Composable
+private fun PalettePreview(palette: AppPalette) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        palettePreviewColors(palette).forEach { swatch ->
+            Box(
+                modifier = Modifier
+                    .size(14.dp)
+                    .background(color = swatch, shape = CircleShape)
+            )
+        }
+    }
+}
+
+private fun palettePreviewColors(palette: AppPalette): List<Color> = when (palette) {
+    AppPalette.DEFAULT -> listOf(Emerald20, Teal20, Color(0xFF236488))
+    AppPalette.LATTE -> listOf(LatteSageLight, LatteCaramelLight, LatteTerracottaLight)
+    AppPalette.STRAWBERRY_MILK -> listOf(
+        StrawberryPrimaryLight,
+        StrawberrySecondaryLight,
+        StrawberryTertiaryLight
+    )
+    AppPalette.BERRY_YOGURT -> listOf(CactusPrimaryLight, CactusSecondaryLight, CactusTertiaryLight)
 }
 
 @Composable
