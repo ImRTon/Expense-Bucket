@@ -67,6 +67,7 @@ dependencies {
     implementation(libs.androidx.compose.material.icons.extended)
     implementation(libs.androidx.compose.animation)
     implementation(libs.androidx.compose.foundation)
+    implementation("androidx.emoji2:emoji2-emojipicker:1.4.0")
 
     // Navigation
     implementation(libs.androidx.navigation.compose)
