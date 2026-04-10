@@ -99,6 +99,7 @@ dependencies {
     implementation(libs.mlkit.language.id)
     implementation(libs.mlkit.translate)
     implementation(libs.mlkit.barcode.scanning)
+    implementation(libs.mlkit.entity.extraction)
 
     // CameraX realtime scan
     implementation(libs.androidx.camera.core)
