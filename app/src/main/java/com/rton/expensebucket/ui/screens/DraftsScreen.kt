@@ -8,11 +8,15 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -20,6 +24,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.rton.expensebucket.data.model.Category
+import com.rton.expensebucket.data.model.NonPaymentNotification
 import com.rton.expensebucket.data.model.Transaction
 import com.rton.expensebucket.data.model.effectiveAmount
 import java.text.SimpleDateFormat
@@ -30,14 +35,17 @@ import com.rton.expensebucket.ui.util.CurrencyFormats
 @Composable
 fun DraftsScreen(
     drafts: List<Transaction>,
+    nonPaymentNotifications: List<NonPaymentNotification>,
     categories: List<Category>,
     onConfirm: (Long) -> Unit,
     onDelete: (Transaction) -> Unit,
     onEdit: (Transaction) -> Unit,
+    onClearNonPaymentNotifications: () -> Unit,
     onBack: () -> Unit
 ) {
     val dateFormat = remember { SimpleDateFormat("MM/dd HH:mm", Locale.getDefault()) }
     val categoryMap = remember(categories) { categories.associateBy { it.id } }
+    var showNonPaymentInbox by remember { mutableStateOf(false) }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -54,6 +62,19 @@ fun DraftsScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                    }
+                },
+                actions = {
+                    BadgedBox(
+                        badge = {
+                            if (nonPaymentNotifications.isNotEmpty()) {
+                                Badge { Text(nonPaymentNotifications.size.toString()) }
+                            }
+                        }
+                    ) {
+                        IconButton(onClick = { showNonPaymentInbox = true }) {
+                            Icon(Icons.Filled.Delete, contentDescription = "非支付通知")
+                        }
                     }
                 },
                 windowInsets = WindowInsets(0),
@@ -115,6 +136,95 @@ fun DraftsScreen(
                 }
             }
         }
+    }
+
+    if (showNonPaymentInbox) {
+        NonPaymentNotificationInboxDialog(
+            notifications = nonPaymentNotifications,
+            dateFormat = dateFormat,
+            onClear = onClearNonPaymentNotifications,
+            onDismiss = { showNonPaymentInbox = false }
+        )
+    }
+}
+
+@Composable
+private fun NonPaymentNotificationInboxDialog(
+    notifications: List<NonPaymentNotification>,
+    dateFormat: SimpleDateFormat,
+    onClear: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("非支付通知") },
+        text = {
+            if (notifications.isEmpty()) {
+                Text(
+                    "目前沒有紀錄",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 420.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    items(notifications, key = { it.id }) { notification ->
+                        NonPaymentNotificationItem(
+                            notification = notification,
+                            dateFormat = dateFormat
+                        )
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = notifications.isNotEmpty(),
+                onClick = {
+                    onClear()
+                    onDismiss()
+                }
+            ) {
+                Text("清空紀錄")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("關閉")
+            }
+        }
+    )
+}
+
+@Composable
+private fun NonPaymentNotificationItem(
+    notification: NonPaymentNotification,
+    dateFormat: SimpleDateFormat
+) {
+    Column(
+        modifier = Modifier.fillMaxWidth(),
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Text(
+            text = notification.packageName,
+            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
+            color = MaterialTheme.colorScheme.primary
+        )
+        Text(
+            text = notification.text,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Text(
+            text = dateFormat.format(Date(notification.capturedAt)),
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+        )
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
     }
 }
 

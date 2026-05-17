@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.room.Room
 import com.rton.expensebucket.data.ExpenseBucketDatabase
 import com.rton.expensebucket.data.dao.CategoryDao
+import com.rton.expensebucket.data.dao.NonPaymentNotificationDao
 import com.rton.expensebucket.data.dao.PaymentMethodDao
 import com.rton.expensebucket.data.dao.ProjectDao
 import com.rton.expensebucket.data.dao.TransactionDao
@@ -34,7 +35,8 @@ object DatabaseModule {
                 ExpenseBucketDatabase.MIGRATION_5_6,
                 ExpenseBucketDatabase.MIGRATION_6_7,
                 ExpenseBucketDatabase.MIGRATION_7_8,
-                ExpenseBucketDatabase.MIGRATION_8_9
+                ExpenseBucketDatabase.MIGRATION_8_9,
+                ExpenseBucketDatabase.MIGRATION_9_10
             )
             .build()
     }
@@ -54,4 +56,8 @@ object DatabaseModule {
     @Provides
     fun providePaymentMethodDao(database: ExpenseBucketDatabase): PaymentMethodDao =
         database.paymentMethodDao()
+
+    @Provides
+    fun provideNonPaymentNotificationDao(database: ExpenseBucketDatabase): NonPaymentNotificationDao =
+        database.nonPaymentNotificationDao()
 }

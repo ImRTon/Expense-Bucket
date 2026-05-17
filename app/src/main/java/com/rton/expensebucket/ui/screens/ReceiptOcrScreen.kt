@@ -1,8 +1,10 @@
 package com.rton.expensebucket.ui.screens
 
-import android.Manifest
+import android.app.Activity
+import android.content.IntentSender
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.Image
@@ -18,6 +20,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -61,12 +64,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.core.content.FileProvider
 import coil.compose.rememberAsyncImagePainter
+import com.google.mlkit.common.MlKitException
+import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
+import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import com.rton.expensebucket.ocr.ReceiptOcrEngine
 import com.rton.expensebucket.ocr.ReceiptOcrResult
 import com.rton.expensebucket.ui.model.TransactionPrefill
-import java.io.File
 import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -88,7 +93,6 @@ fun ReceiptOcrScreen(
     }
 
     var imageUri by remember { mutableStateOf<Uri?>(null) }
-    var captureUri by remember { mutableStateOf<Uri?>(null) }
     var rawReceiptResult by remember { mutableStateOf<ReceiptOcrResult?>(null) }
     var translatedReceiptResult by remember { mutableStateOf<ReceiptOcrResult?>(null) }
     var showTranslatedResult by remember { mutableStateOf(false) }
@@ -100,22 +104,27 @@ fun ReceiptOcrScreen(
     var autoOpenedCamera by remember { mutableStateOf(false) }
     var showRawText by remember { mutableStateOf(false) }
 
-    val takePictureLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.TakePicture()
-    ) { success ->
-        if (success) {
-            imageUri = captureUri
-            errorMessage = null
-        }
+    val scannerOptions = remember {
+        GmsDocumentScannerOptions.Builder()
+            .setGalleryImportAllowed(false)
+            .setPageLimit(1)
+            .setResultFormats(GmsDocumentScannerOptions.RESULT_FORMAT_JPEG)
+            .setScannerMode(GmsDocumentScannerOptions.SCANNER_MODE_FULL)
+            .build()
+    }
+    val documentScanner = remember(scannerOptions) {
+        GmsDocumentScanning.getClient(scannerOptions)
     }
 
-    val requestCameraPermission = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { granted ->
-        if (granted) {
-            val uri = createReceiptImageUri(context)
-            captureUri = uri
-            takePictureLauncher.launch(uri)
+    val documentScannerLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            val scanResult = GmsDocumentScanningResult.fromActivityResultIntent(result.data)
+            imageUri = scanResult?.pages?.firstOrNull()?.imageUri
+            errorMessage = if (imageUri == null) "掃描完成，但沒有取得收據圖片" else null
+        } else if (result.resultCode != Activity.RESULT_CANCELED) {
+            errorMessage = "收據掃描未完成"
         }
     }
 
@@ -129,7 +138,25 @@ fun ReceiptOcrScreen(
     }
 
     fun launchCamera() {
-        requestCameraPermission.launch(Manifest.permission.CAMERA)
+        val activity = context.findActivity()
+        if (activity == null) {
+            errorMessage = "目前無法啟動掃描器"
+            return
+        }
+
+        errorMessage = null
+        documentScanner.getStartScanIntent(activity)
+            .addOnSuccessListener { intentSender ->
+                documentScannerLauncher.launch(
+                    IntentSenderRequest.Builder(intentSender).build()
+                )
+            }
+            .addOnFailureListener { throwable ->
+                errorMessage = when ((throwable as? MlKitException)?.errorCode) {
+                    MlKitException.UNSUPPORTED -> "此裝置不支援文件掃描器"
+                    else -> throwable.localizedMessage ?: "無法啟動收據掃描"
+                }
+            }
     }
 
     fun applyAnalysis(result: ReceiptOcrResult) {
@@ -218,7 +245,7 @@ fun ReceiptOcrScreen(
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(Icons.Filled.CameraAlt, contentDescription = null)
-                    Text("拍攝收據", modifier = Modifier.padding(start = 8.dp))
+                    Text("掃描收據", modifier = Modifier.padding(start = 8.dp))
                 }
                 FilledTonalButton(
                     onClick = { pickImageLauncher.launch("image/*") },
@@ -451,6 +478,7 @@ fun ReceiptOcrScreen(
 
                 Button(
                     onClick = {
+                        val detectedCurrency = receiptResult?.detectedCurrency ?: "TWD"
                         onApplyPrefill(
                             TransactionPrefill(
                                 amount = parsedAmount,
@@ -458,8 +486,8 @@ fun ReceiptOcrScreen(
                                 isExpense = true,
                                 date = System.currentTimeMillis(),
                                 source = "ocr",
-                                currency = "TWD",
-                                exchangeRate = 1.0
+                                currency = detectedCurrency,
+                                exchangeRate = if (detectedCurrency == "TWD") 1.0 else 0.0
                             )
                         )
                     },
@@ -484,25 +512,30 @@ fun ReceiptOcrScreen(
                 }
 
                 AnimatedVisibility(visible = showRawText) {
-                    OutlinedCard(shape = RoundedCornerShape(14.dp)) {
-                        Column(
-                            modifier = Modifier.padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Text(
-                                "原始文字",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Text(result.rawText.ifBlank { "(空白)" })
-                            result.translatedText?.let { translated ->
-                                HorizontalDivider()
+                    OutlinedCard(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(14.dp)
+                    ) {
+                        SelectionContainer {
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                verticalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
                                 Text(
-                                    "翻譯後文字",
+                                    "原始文字",
                                     style = MaterialTheme.typography.labelLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                Text(translated)
+                                Text(result.rawText.ifBlank { "(空白)" })
+                                result.translatedText?.let { translated ->
+                                    HorizontalDivider()
+                                    Text(
+                                        "翻譯後文字",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(translated)
+                                }
                             }
                         }
                     }
@@ -523,20 +556,16 @@ private fun shouldOfferTranslation(
     return sourceBase != targetBase
 }
 
-private fun createReceiptImageUri(context: android.content.Context): Uri {
-    val imageDir = File(context.cacheDir, "receipt_images").apply { mkdirs() }
-    val imageFile = File(imageDir, "receipt_${System.currentTimeMillis()}.jpg")
-    return FileProvider.getUriForFile(
-        context,
-        "${context.packageName}.fileprovider",
-        imageFile
-    )
-}
-
 private fun formatEditableAmount(amount: Double): String {
     return if (amount == amount.toLong().toDouble()) {
         amount.toLong().toString()
     } else {
         "%.2f".format(amount)
     }
+}
+
+private fun android.content.Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is android.content.ContextWrapper -> baseContext.findActivity()
+    else -> null
 }

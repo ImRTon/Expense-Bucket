@@ -12,8 +12,12 @@ import java.util.regex.Pattern
  */
 class NotificationParser {
 
-    private val twdCurrencyToken = """(?:NT?\$?|(?:新)?[台臺]幣)"""
-    private val genericAmountCurrencyToken = """(?:$twdCurrencyToken|\$)"""
+    private val twdCurrencyToken = """(?:NTD|TWD|NT\$?|N\.?T\.?\$?|(?:新)?[台臺]幣)"""
+    private val genericAmountCurrencyToken = """(?:$twdCurrencyToken|\$|＄)"""
+    private val amountNumber = """[\d,]+(?:\.\d+)?"""
+    private val transactionKeywordRegex = Regex("""(刷卡|消費|付款|支付|扣款|交易|入帳|轉入|收到|退款|請款|授權)""")
+    private val incomeKeywordRegex = Regex("""(入帳|轉入|收到|退款)""")
+    private val balanceNoiseRegex = Regex("""(餘額|可用額度|帳單|最低應繳|紅利|點數|優惠|驗證碼)""")
 
     /**
      * Known notification patterns.
@@ -141,10 +145,11 @@ class NotificationParser {
      * @param packageName Source app package name (for payment method hinting)
      */
     fun parse(text: String, packageName: String? = null): ParsedTransaction? {
+        val normalizedText = normalizeText(text)
         var bestMatch: ParsedTransaction? = null
 
         for (p in patterns) {
-            val matcher = p.regex.matcher(text)
+            val matcher = p.regex.matcher(normalizedText)
             if (matcher.find()) {
                 val amountStr = matcher.group(p.amountGroup)?.replace(",", "") ?: continue
                 val amount = amountStr.toDoubleOrNull() ?: continue
@@ -164,7 +169,7 @@ class NotificationParser {
                 val candidate = ParsedTransaction(
                     amount = amount,
                     merchant = merchant,
-                    note = text.take(100),
+                    note = normalizedText.take(100),
                     isExpense = !p.isIncome,
                     date = parsedDate,
                     paymentMethodHint = paymentMethodHint,
@@ -176,8 +181,141 @@ class NotificationParser {
                 }
             }
         }
+
+        parseByFields(normalizedText, packageName)?.let { candidate ->
+            if (bestMatch == null || candidate.confidence > bestMatch!!.confidence) {
+                bestMatch = candidate
+            }
+        }
         return bestMatch
     }
+
+    /**
+     * A semantic fallback for notification copy drift.
+     *
+     * Bank/e-wallet apps regularly tweak sentences, but the useful fields stay stable:
+     * amount, date/time, merchant, and payment source. This parser extracts those fields
+     * independently instead of depending on one whole-sentence regex per vendor.
+     */
+    private fun parseByFields(text: String, packageName: String?): ParsedTransaction? {
+        if (!looksLikeTransactionNotification(text, packageName)) return null
+
+        val amount = extractBestAmount(text) ?: return null
+        if (amount < 1.0 || amount > 10_000_000) return null
+
+        val parsedDate = parseNotificationDate(extractDateText(text))
+        val merchant = extractMerchant(text)
+        val hint = detectPaymentHintFromPackage(packageName)
+        val isIncome = incomeKeywordRegex.containsMatchIn(text) && !Regex("""(刷卡|消費|付款|支付|扣款)""").containsMatchIn(text)
+
+        var confidence = 0.62f
+        if (merchant.isNotBlank()) confidence += 0.12f
+        if (parsedDate != null) confidence += 0.10f
+        if (hint != null) confidence += 0.04f
+        if (Regex("""($genericAmountCurrencyToken|元)""").containsMatchIn(text)) confidence += 0.04f
+
+        return ParsedTransaction(
+            amount = amount,
+            merchant = merchant,
+            note = text.take(100),
+            isExpense = !isIncome,
+            date = parsedDate,
+            paymentMethodHint = if (hint == "post") "credit_card" else hint,
+            confidence = confidence.coerceAtMost(0.86f)
+        )
+    }
+
+    private data class AmountCandidate(
+        val amount: Double,
+        val score: Int,
+        val index: Int
+    )
+
+    private fun extractBestAmount(text: String): Double? {
+        val candidates = mutableListOf<AmountCandidate>()
+
+        fun addMatches(regex: Regex, score: Int) {
+            regex.findAll(text).forEach { match ->
+                val amount = match.groupValues[1].replace(",", "").toDoubleOrNull() ?: return@forEach
+                val contextStart = (match.range.first - 16).coerceAtLeast(0)
+                val contextEnd = (match.range.last + 17).coerceAtMost(text.length)
+                val context = text.substring(contextStart, contextEnd)
+                val adjustedScore = score +
+                    (if (transactionKeywordRegex.containsMatchIn(context)) 12 else 0) -
+                    (if (balanceNoiseRegex.containsMatchIn(context)) 35 else 0)
+                candidates += AmountCandidate(amount, adjustedScore, match.range.first)
+            }
+        }
+
+        addMatches(Regex("""約當\s*$twdCurrencyToken\s*\$?\s*($amountNumber)\s*元?"""), 120)
+        addMatches(Regex("""(?:金額|消費金額|交易金額|請款金額|實付|刷卡|消費|扣款|支付|付款)\s*(?:約)?\s*(?:$genericAmountCurrencyToken\s*)?($amountNumber)\s*元?"""), 95)
+        addMatches(Regex("""$genericAmountCurrencyToken\s*($amountNumber)\s*元?"""), 85)
+        addMatches(Regex("""($amountNumber)\s*元"""), 65)
+
+        return candidates
+            .filter { it.amount in 1.0..10_000_000.0 }
+            .maxWithOrNull(compareBy<AmountCandidate> { it.score }.thenByDescending { -it.index })
+            ?.amount
+    }
+
+    private fun extractDateText(text: String): String? {
+        val datePatterns = listOf(
+            Regex("""\d{3,4}\d{2}\d{2}_\d{1,2}:\d{1,2}"""),
+            Regex("""(?:\d{3,4}[/-])?\d{1,2}[/-]\d{1,2}[\s-]\d{1,2}:\d{1,2}(?::\d{1,2})?""")
+        )
+        return datePatterns.firstNotNullOfOrNull { it.find(text)?.value }
+    }
+
+    private fun extractMerchant(text: String): String {
+        val dateThenMerchant =
+            """(?:\d{1,4}[/-])?\d{1,2}[/-]\d{1,2}[\s-]\d{1,2}:\d{1,2}(?::\d{1,2})?"""
+        val merchantPatterns = listOf(
+            Regex("""(?:商店名稱|特約商店|商店|店家)[：:\s]*([^,。；;\n]{2,40})"""),
+            Regex("""(?:實際消費|實際商店名稱)[：:\s]*([^,。；;\n]{2,40})"""),
+            Regex("""[於在]\s*([^,。；;\n]{2,40}?)\s*(?:付款|支付|消費|刷卡)"""),
+            Regex("""$dateThenMerchant\s*([^,。；;\n]{2,40}?)\s*(?:消費|刷卡|$genericAmountCurrencyToken|$amountNumber\s*元)""")
+        )
+
+        return merchantPatterns
+            .asSequence()
+            .mapNotNull { it.find(text)?.groupValues?.getOrNull(1) }
+            .map(::cleanMerchant)
+            .firstOrNull { it.isNotBlank() }
+            .orEmpty()
+    }
+
+    private fun cleanMerchant(raw: String): String {
+        val cleaned = raw
+            .trim()
+            .trim(',', '，', '.', '。', ':', '：', ' ')
+            .replace(Regex("""^(商店名稱|特約商店|商店|店家|名稱)[：:\s]*"""), "")
+            .replace(Regex("""(刷卡|消費|付款|支付|扣款|立即.*|如有.*|請以.*)$"""), "")
+            .trim()
+
+        if (cleaned.length < 2) return ""
+        if (Regex("""^\d{1,4}[/-]\d{1,2}.*""").matches(cleaned)) return ""
+        if (Regex("""^(末四碼|卡號|金額|台幣|臺幣|新台幣|新臺幣|NT|TWD)""").containsMatchIn(cleaned)) return ""
+        return cleaned.take(40)
+    }
+
+    private fun looksLikeTransactionNotification(text: String, packageName: String?): Boolean {
+        val hasTransactionKeyword = transactionKeywordRegex.containsMatchIn(text)
+        val hasAmountSignal = Regex("""($genericAmountCurrencyToken|元)""").containsMatchIn(text)
+        val hasKnownPackage = detectPaymentHintFromPackage(packageName) != null
+        val hasStrongNoise = balanceNoiseRegex.containsMatchIn(text) && !hasTransactionKeyword
+
+        return !hasStrongNoise && hasTransactionKeyword && (hasAmountSignal || hasKnownPackage)
+    }
+
+    private fun normalizeText(text: String): String =
+        text
+            .replace('\u00A0', ' ')
+            .replace('　', ' ')
+            .replace('＄', '$')
+            .replace('：', ':')
+            .replace('，', ',')
+            .replace(Regex("""\s+"""), " ")
+            .trim()
 
     /**
      * Map known package names to payment method icon keys.

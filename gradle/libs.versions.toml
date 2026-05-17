@@ -34,6 +34,7 @@ mlkitLanguageId = "17.0.6"
 mlkitTranslate = "17.0.3"
 mlkitBarcodeScanning = "17.3.0"
 mlkitEntityExtraction = "16.0.0-beta3"
+playServicesMlkitDocumentScanner = "16.0.0"
 # CameraX
 cameraX = "1.4.1"
 # Coil (image loading for Compose)
@@ -87,6 +88,7 @@ mlkit-language-id = { group = "com.google.mlkit", name = "language-id", version.
 mlkit-translate = { group = "com.google.mlkit", name = "translate", version.ref = "mlkitTranslate" }
 mlkit-barcode-scanning = { group = "com.google.mlkit", name = "barcode-scanning", version.ref = "mlkitBarcodeScanning" }
 mlkit-entity-extraction = { group = "com.google.mlkit", name = "entity-extraction", version.ref = "mlkitEntityExtraction" }
+play-services-mlkit-document-scanner = { group = "com.google.android.gms", name = "play-services-mlkit-document-scanner", version.ref = "playServicesMlkitDocumentScanner" }
 # CameraX
 androidx-camera-core = { group = "androidx.camera", name = "camera-core", version.ref = "cameraX" }
 androidx-camera-camera2 = { group = "androidx.camera", name = "camera-camera2", version.ref = "cameraX" }

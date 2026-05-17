@@ -50,12 +50,10 @@ class OcrEngine @Inject constructor() {
         TextRecognizerOptions.DEFAULT_OPTIONS
     )
     private val languageIdentifier = LanguageIdentification.getClient()
-    private val entityExtractor: EntityExtractor = EntityExtraction.getClient(
-        EntityExtractorOptions.Builder(EntityExtractorOptions.ENGLISH).build()
-    )
-    private val entityModelMutex = Mutex()
-    @Volatile
-    private var entityModelReady = false
+    private val entityExtractorMutex = Mutex()
+    private val entityExtractors = mutableMapOf<String, EntityExtractor>()
+    private val entityModelReady = mutableMapOf<String, Boolean>()
+    private var entityExtractionDisabled = false
 
     /** Parser chain — ordered by priority. First non-null result wins. */
     private val parsers: List<TransactionParser> = listOf(
@@ -98,11 +96,12 @@ class OcrEngine @Inject constructor() {
     fun getAvailableParsers(): List<TransactionParser> = parsers.filter { it.isAvailable }
 
     private suspend fun recognizeDocument(image: InputImage): OcrTextDocument = coroutineScope {
-        val chineseDeferred = async { recognizeText(chineseRecognizer, image, ScreenshotRecognizerHint.CHINESE) }
-        val latinDeferred = async { recognizeText(latinRecognizer, image, ScreenshotRecognizerHint.LATIN) }
-        val japaneseDeferred = async { recognizeText(japaneseRecognizer, image, ScreenshotRecognizerHint.JAPANESE) }
+        // Run OCR recognizers sequentially to avoid massive memory spikes (OOM crashes) from simultaneous native image decoding
+        val chineseResult = recognizeText(chineseRecognizer, image, ScreenshotRecognizerHint.CHINESE)
+        val latinResult = recognizeText(latinRecognizer, image, ScreenshotRecognizerHint.LATIN)
+        val japaneseResult = recognizeText(japaneseRecognizer, image, ScreenshotRecognizerHint.JAPANESE)
 
-        val recognized = listOf(chineseDeferred, latinDeferred, japaneseDeferred).awaitAll()
+        val recognized = listOf(chineseResult, latinResult, japaneseResult)
         val mergedBlocks = mergeBlocks(recognized.flatMap { result ->
             result.textBlocks.map { block -> block.toCandidate(result.hint) }
         })
@@ -112,7 +111,7 @@ class OcrEngine @Inject constructor() {
             .map { block ->
                 async {
                     block.copy(
-                        languageTag = identifyLanguage(block.text)
+                        languageTag = block.languageTag ?: identifyLanguage(block.text)
                     )
                 }
             }
@@ -138,31 +137,39 @@ class OcrEngine @Inject constructor() {
         image: InputImage,
         hint: ScreenshotRecognizerHint
     ): RecognizedDocument = suspendCancellableCoroutine { continuation ->
-        recognizer.process(image)
-            .addOnSuccessListener { visionText ->
-                continuation.resume(
-                    RecognizedDocument(
-                        hint = hint,
-                        fullText = visionText.text,
-                        textBlocks = visionText.textBlocks
+        try {
+            recognizer.process(image)
+                .addOnSuccessListener { visionText ->
+                    continuation.resume(
+                        RecognizedDocument(
+                            hint = hint,
+                            fullText = visionText.text,
+                            textBlocks = visionText.textBlocks
+                        )
                     )
-                )
-            }
-            .addOnFailureListener { exception ->
-                continuation.resumeWithException(exception)
-            }
+                }
+                .addOnFailureListener { exception ->
+                    continuation.resumeWithException(exception)
+                }
+        } catch (e: Throwable) {
+            continuation.resumeWithException(e)
+        }
     }
 
     private suspend fun identifyLanguage(text: String): String? {
         if (text.isBlank()) return null
         return suspendCancellableCoroutine { continuation ->
-            languageIdentifier.identifyLanguage(text)
-                .addOnSuccessListener { languageCode ->
-                    continuation.resume(languageCode.takeUnless { it == "und" })
-                }
-                .addOnFailureListener {
-                    continuation.resume(null)
-                }
+            try {
+                languageIdentifier.identifyLanguage(text)
+                    .addOnSuccessListener { languageCode ->
+                        continuation.resume(languageCode.takeUnless { it == "und" })
+                    }
+                    .addOnFailureListener {
+                        continuation.resume(null)
+                    }
+            } catch (e: Throwable) {
+                continuation.resume(null)
+            }
         }
     }
 
@@ -188,7 +195,7 @@ class OcrEngine @Inject constructor() {
                 lines = best.lines,
                 boundingBox = best.boundingBox,
                 recognizerHint = best.recognizerHint,
-                languageTag = null
+                languageTag = best.languageTag
             )
         }
     }
@@ -210,22 +217,40 @@ class OcrEngine @Inject constructor() {
     }
 
     private suspend fun extractAmountCandidates(document: OcrTextDocument): List<OcrAmountCandidate> = coroutineScope {
-        val entitySupported = ensureEntityModelReady()
         val units = buildList {
             document.blocks.forEachIndexed { blockIndex, block ->
-                add(TextUnit(block.text, blockIndex, null, block.boundingBox, block.recognizerHint))
+                add(
+                    TextUnit(
+                        text = block.text,
+                        blockIndex = blockIndex,
+                        lineIndex = null,
+                        boundingBox = block.boundingBox,
+                        recognizerHint = block.recognizerHint,
+                        languageTag = block.languageTag
+                    )
+                )
                 block.lines.forEachIndexed { lineIndex, line ->
-                    add(TextUnit(line.text, blockIndex, lineIndex, line.boundingBox, block.recognizerHint))
+                    add(
+                        TextUnit(
+                            text = line.text,
+                            blockIndex = blockIndex,
+                            lineIndex = lineIndex,
+                            boundingBox = line.boundingBox,
+                            recognizerHint = block.recognizerHint,
+                            languageTag = line.languageTag ?: block.languageTag
+                        )
+                    )
                 }
             }
         }
 
-        val entityCandidates = if (entitySupported) {
-            units.map { unit ->
-                async { extractEntityCandidates(unit, document.blocks.size) }
-            }.awaitAll().flatten()
-        } else {
-            emptyList()
+        // Run sequentially to prevent overwhelming ML Kit's native thread pool and causing memory issues
+        val entityCandidates = units.flatMap { unit ->
+            try {
+                extractEntityCandidates(unit, document.blocks.size)
+            } catch (e: Throwable) {
+                emptyList()
+            }
         }
 
         val regexCandidates = units.flatMap { unit ->
@@ -234,24 +259,10 @@ class OcrEngine @Inject constructor() {
 
         (entityCandidates + regexCandidates)
             .groupBy { AmountCandidateKey(it.amount, it.blockIndex, it.lineIndex) }
-            .map { (_, grouped) ->
-                grouped.maxByOrNull { it.score }!!
+            .mapNotNull { (_, grouped) ->
+                grouped.maxByOrNull { it.score }
             }
             .sortedByDescending { it.score }
-    }
-
-    private suspend fun ensureEntityModelReady(): Boolean {
-        if (entityModelReady) return true
-        return entityModelMutex.withLock {
-            if (entityModelReady) return@withLock true
-            val downloaded = suspendCancellableCoroutine<Boolean> { continuation ->
-                entityExtractor.downloadModelIfNeeded(DownloadConditions.Builder().build())
-                    .addOnSuccessListener { continuation.resume(true) }
-                    .addOnFailureListener { continuation.resume(false) }
-            }
-            entityModelReady = downloaded
-            downloaded
-        }
     }
 
     private suspend fun extractEntityCandidates(
@@ -259,11 +270,19 @@ class OcrEngine @Inject constructor() {
         blockCount: Int
     ): List<OcrAmountCandidate> {
         if (!looksLikeMoneyText(unit.text)) return emptyList()
+        val modelIdentifier = resolveEntityModelIdentifier(unit.languageTag) ?: return emptyList()
+        val entityExtractor = getOrCreateEntityExtractor(modelIdentifier) ?: return emptyList()
+        val modelReady = ensureEntityModelReady(modelIdentifier, entityExtractor)
+        if (!modelReady) return emptyList()
 
         val annotations = suspendCancellableCoroutine<List<EntityAnnotation>> { continuation ->
-            entityExtractor.annotate(unit.text)
-                .addOnSuccessListener { continuation.resume(it) }
-                .addOnFailureListener { continuation.resume(emptyList()) }
+            try {
+                entityExtractor.annotate(unit.text)
+                    .addOnSuccessListener { continuation.resume(it) }
+                    .addOnFailureListener { continuation.resume(emptyList()) }
+            } catch (e: Throwable) {
+                continuation.resume(emptyList())
+            }
         }
 
         return annotations.flatMap { annotation ->
@@ -377,6 +396,10 @@ class OcrEngine @Inject constructor() {
             .replace("NT$", "", ignoreCase = true)
             .replace("TWD", "", ignoreCase = true)
             .replace("NTD", "", ignoreCase = true)
+            .replace("JPY", "", ignoreCase = true)
+            .replace("¥", "")
+            .replace("￥", "")
+            .replace("円", "")
             .replace("$", "")
             .replace(",", "")
             .trim()
@@ -391,7 +414,10 @@ class OcrEngine @Inject constructor() {
                 amountKeywords.any { keyword -> keyword in text.lowercase() } ||
                 totalKeywords.any { keyword -> keyword in text.lowercase() } ||
                 text.contains('$') ||
-                text.contains('元'))
+                text.contains('¥') ||
+                text.contains('￥') ||
+                text.contains('元') ||
+                text.contains('円'))
     }
 
     private fun looksLikeDateOrPhoneContext(text: String, candidateText: String): Boolean {
@@ -399,6 +425,52 @@ class OcrEngine @Inject constructor() {
         if (phoneRegex.containsMatchIn(text)) return true
         if (text.contains(':') && candidateText.length <= 4) return true
         return false
+    }
+
+    private fun resolveEntityModelIdentifier(languageTag: String?): String? {
+        if (languageTag.isNullOrBlank()) return null
+        val normalized = languageTag.substringBefore('-').lowercase()
+        return try {
+            EntityExtractorOptions.fromLanguageTag(normalized)
+        } catch (_: IllegalArgumentException) {
+            null
+        }
+    }
+
+    private suspend fun getOrCreateEntityExtractor(modelIdentifier: String): EntityExtractor? {
+        if (entityExtractionDisabled) return null
+        entityExtractors[modelIdentifier]?.let { return it }
+        return try {
+            entityExtractorMutex.withLock {
+                entityExtractors[modelIdentifier] ?: run {
+                    val created = EntityExtraction.getClient(
+                        EntityExtractorOptions.Builder(modelIdentifier).build()
+                    )
+                    entityExtractors[modelIdentifier] = created
+                    created
+                }
+            }
+        } catch (e: Throwable) {
+            entityExtractionDisabled = true
+            null
+        }
+    }
+
+    private suspend fun ensureEntityModelReady(
+        modelIdentifier: String,
+        extractor: EntityExtractor
+    ): Boolean {
+        entityModelReady[modelIdentifier]?.let { if (it) return true }
+        return entityExtractorMutex.withLock {
+            entityModelReady[modelIdentifier]?.let { if (it) return@withLock true }
+            val downloaded = suspendCancellableCoroutine<Boolean> { continuation ->
+                extractor.downloadModelIfNeeded(DownloadConditions.Builder().build())
+                    .addOnSuccessListener { continuation.resume(true) }
+                    .addOnFailureListener { continuation.resume(false) }
+            }
+            entityModelReady[modelIdentifier] = downloaded
+            downloaded
+        }
     }
 }
 
@@ -428,7 +500,8 @@ data class OcrTextBlock(
 
 data class OcrTextLine(
     val text: String,
-    val boundingBox: Rect?
+    val boundingBox: Rect?,
+    val languageTag: String? = null
 )
 
 data class OcrAmountCandidate(
@@ -451,6 +524,7 @@ private data class BlockCandidate(
     val lines: List<OcrTextLine>,
     val boundingBox: Rect?,
     val recognizerHint: ScreenshotRecognizerHint,
+    val languageTag: String?,
     val score: Int
 )
 
@@ -459,7 +533,8 @@ private data class TextUnit(
     val blockIndex: Int,
     val lineIndex: Int?,
     val boundingBox: Rect?,
-    val recognizerHint: ScreenshotRecognizerHint
+    val recognizerHint: ScreenshotRecognizerHint,
+    val languageTag: String?
 )
 
 private data class AmountCandidateKey(
@@ -474,6 +549,12 @@ enum class ScreenshotRecognizerHint {
     LATIN
 }
 
+private fun ScreenshotRecognizerHint.defaultLanguageTag(): String = when (this) {
+    ScreenshotRecognizerHint.CHINESE -> "zh"
+    ScreenshotRecognizerHint.JAPANESE -> "ja"
+    ScreenshotRecognizerHint.LATIN -> "en"
+}
+
 private fun Text.TextBlock.toCandidate(hint: ScreenshotRecognizerHint): BlockCandidate {
     val text = text.replace("\\s+".toRegex(), " ").trim()
     val lines = lines
@@ -482,7 +563,8 @@ private fun Text.TextBlock.toCandidate(hint: ScreenshotRecognizerHint): BlockCan
             normalized.takeIf { it.isNotBlank() }?.let {
                 OcrTextLine(
                     text = it,
-                    boundingBox = line.boundingBox
+                    boundingBox = line.boundingBox,
+                    languageTag = null
                 )
             }
         }
@@ -491,6 +573,7 @@ private fun Text.TextBlock.toCandidate(hint: ScreenshotRecognizerHint): BlockCan
         lines = lines,
         boundingBox = boundingBox,
         recognizerHint = hint,
+        languageTag = hint.defaultLanguageTag(),
         score = scoreRecognizerText(text, hint)
     )
 }
@@ -513,10 +596,10 @@ private fun scoreRecognizerText(text: String, hint: ScreenshotRecognizerHint): I
     return visibleChars + (digits / 2) + recognizerBonus
 }
 
-private val amountRegex = Regex("""(?:NT\$|NTD|TWD|\$)?\s*\d[\d,]*(?:\.\d{1,2})?""", RegexOption.IGNORE_CASE)
-private val totalKeywords = listOf("總計", "合計", "總額", "應付", "實付", "total", "grand total", "amount due")
-private val amountKeywords = listOf("金額", "付款", "支付", "刷卡", "消費", "paid", "charge", "debit")
-private val currencyKeywords = listOf("nt$", "twd", "ntd", "jpy", "usd", "$", "元", "圓")
+private val amountRegex = Regex("""(?:NT\$|NTD|TWD|JPY|USD|¥|￥|\$)?\s*\d[\d,]*(?:\.\d{1,2})?(?:\s*(?:円|元))?""", RegexOption.IGNORE_CASE)
+private val totalKeywords = listOf("總計", "合計", "總額", "應付", "實付", "お会計", "ご請求額", "合計金額", "税込", "total", "grand total", "amount due")
+private val amountKeywords = listOf("金額", "付款", "支付", "刷卡", "消費", "支払", "お支払い", "請求", "paid", "charge", "debit")
+private val currencyKeywords = listOf("nt$", "twd", "ntd", "jpy", "usd", "$", "¥", "￥", "元", "圓", "円")
 private val negativeKeywords = listOf("折扣", "找零", "change", "discount", "tax", "服務費")
 private val metadataNoiseKeywords = listOf("電話", "統編", "地址", "卡號", "invoice", "tel", "receipt")
 private val dateSlashRegex = Regex("""\d{1,4}[/-]\d{1,2}[/-]\d{1,4}""")

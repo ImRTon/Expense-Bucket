@@ -97,7 +97,7 @@ fun OcrPreviewScreen(
                     }
                 }
             }
-        } catch (e: Exception) {
+        } catch (e: Throwable) {
             errorMessage = "OCR 辨識失敗: ${e.localizedMessage}"
         }
         isProcessing = false

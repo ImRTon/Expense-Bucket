@@ -125,3 +125,20 @@ data class Transaction(
     val isDraft: Boolean = false, // true for auto-captured pending confirmation
     val createdAt: Long = System.currentTimeMillis()
 )
+
+/**
+ * Captures watched notifications that were intercepted but did not parse as payments.
+ */
+@Entity(
+    tableName = "non_payment_notifications",
+    indices = [
+        Index(value = ["capturedAt"]),
+        Index(value = ["packageName"])
+    ]
+)
+data class NonPaymentNotification(
+    @PrimaryKey(autoGenerate = true) val id: Long = 0,
+    val packageName: String,
+    val text: String,
+    val capturedAt: Long = System.currentTimeMillis()
+)

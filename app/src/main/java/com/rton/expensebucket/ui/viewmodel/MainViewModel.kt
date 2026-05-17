@@ -12,6 +12,7 @@ import com.rton.expensebucket.data.DefaultCategories
 import com.rton.expensebucket.data.DefaultPaymentMethods
 import com.rton.expensebucket.data.model.BillingCycleType
 import com.rton.expensebucket.data.model.Category
+import com.rton.expensebucket.data.model.NonPaymentNotification
 import com.rton.expensebucket.data.model.PaymentMethod
 import com.rton.expensebucket.data.model.Project
 import com.rton.expensebucket.data.model.Transaction
@@ -75,6 +76,10 @@ class MainViewModel @Inject constructor(
 
     val draftTransactions: StateFlow<List<Transaction>> =
         repository.getDraftTransactions()
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    val nonPaymentNotifications: StateFlow<List<NonPaymentNotification>> =
+        repository.getNonPaymentNotifications()
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // ─── Selected Period (shared by WaterLevelCard & transaction list) ──
@@ -392,6 +397,10 @@ class MainViewModel @Inject constructor(
 
     fun confirmDraft(id: Long) {
         viewModelScope.launch { repository.confirmDraft(id) }
+    }
+
+    fun clearNonPaymentNotifications() {
+        viewModelScope.launch { repository.clearNonPaymentNotifications() }
     }
 
     suspend fun getTransactionById(id: Long): Transaction? =

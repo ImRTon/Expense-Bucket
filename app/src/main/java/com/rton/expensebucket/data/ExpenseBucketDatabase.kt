@@ -5,17 +5,19 @@ import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.rton.expensebucket.data.dao.CategoryDao
+import com.rton.expensebucket.data.dao.NonPaymentNotificationDao
 import com.rton.expensebucket.data.dao.PaymentMethodDao
 import com.rton.expensebucket.data.dao.ProjectDao
 import com.rton.expensebucket.data.dao.TransactionDao
 import com.rton.expensebucket.data.model.Category
+import com.rton.expensebucket.data.model.NonPaymentNotification
 import com.rton.expensebucket.data.model.PaymentMethod
 import com.rton.expensebucket.data.model.Project
 import com.rton.expensebucket.data.model.Transaction
 
 @Database(
-    entities = [Transaction::class, Category::class, Project::class, PaymentMethod::class],
-    version = 9,
+    entities = [Transaction::class, Category::class, Project::class, PaymentMethod::class, NonPaymentNotification::class],
+    version = 10,
     exportSchema = true
 )
 abstract class ExpenseBucketDatabase : RoomDatabase() {
@@ -23,6 +25,7 @@ abstract class ExpenseBucketDatabase : RoomDatabase() {
     abstract fun categoryDao(): CategoryDao
     abstract fun projectDao(): ProjectDao
     abstract fun paymentMethodDao(): PaymentMethodDao
+    abstract fun nonPaymentNotificationDao(): NonPaymentNotificationDao
 
     companion object {
         /**
@@ -211,6 +214,29 @@ abstract class ExpenseBucketDatabase : RoomDatabase() {
                 try {
                     database.execSQL("ALTER TABLE `projects` ADD COLUMN `color` INTEGER NOT NULL DEFAULT -14575885")
                 } catch (e: Exception) { /* ignore if already exists */ }
+            }
+        }
+        /**
+         * Migration from v9 → v10: stores intercepted notifications that are not payments.
+         */
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `non_payment_notifications` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `packageName` TEXT NOT NULL,
+                        `text` TEXT NOT NULL,
+                        `capturedAt` INTEGER NOT NULL
+                    )
+                    """.trimIndent()
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_non_payment_notifications_capturedAt` ON `non_payment_notifications` (`capturedAt`)"
+                )
+                database.execSQL(
+                    "CREATE INDEX IF NOT EXISTS `index_non_payment_notifications_packageName` ON `non_payment_notifications` (`packageName`)"
+                )
             }
         }
     }

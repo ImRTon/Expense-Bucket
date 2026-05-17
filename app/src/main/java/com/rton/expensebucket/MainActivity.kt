@@ -202,11 +202,13 @@ fun ExpensesApp(
     val viewModel: MainViewModel = hiltViewModel()
     var transactionPrefill by remember { mutableStateOf<TransactionPrefill?>(null) }
     var addTransactionProjectId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var navGraphReady by remember { mutableStateOf(false) }
 
     // Collect states
     val transactions by viewModel.allTransactions.collectAsStateWithLifecycle()
     val filteredTransactions by viewModel.filteredTransactions.collectAsStateWithLifecycle()
     val draftTransactions by viewModel.draftTransactions.collectAsStateWithLifecycle()
+    val nonPaymentNotifications by viewModel.nonPaymentNotifications.collectAsStateWithLifecycle()
     val expenseCategories by viewModel.expenseCategories.collectAsStateWithLifecycle()
     val incomeCategories by viewModel.incomeCategories.collectAsStateWithLifecycle()
     val periodData by viewModel.periodData.collectAsStateWithLifecycle()
@@ -226,18 +228,18 @@ fun ExpensesApp(
         expenseCategories + incomeCategories
     }
 
-    // Navigate to OCR preview if image was shared
-    LaunchedEffect(sharedImageUri) {
-        if (sharedImageUri != null) {
+    // Navigate to OCR preview if image was shared (only after navGraph is ready)
+    LaunchedEffect(sharedImageUri, navGraphReady) {
+        if (sharedImageUri != null && navGraphReady) {
             navController.navigate(Screen.OcrPreview.route) {
                 launchSingleTop = true
             }
         }
     }
 
-    // Navigate to DraftsScreen if opened from notification
-    LaunchedEffect(navigateTo) {
-        if (navigateTo == "drafts") {
+    // Navigate to DraftsScreen if opened from notification (only after navGraph is ready)
+    LaunchedEffect(navigateTo, navGraphReady) {
+        if (navigateTo == "drafts" && navGraphReady) {
             navController.navigate(Screen.Drafts.route) {
                 launchSingleTop = true
             }
@@ -609,15 +611,21 @@ fun ExpensesApp(
             composable(Screen.Drafts.route) {
                 DraftsScreen(
                     drafts = draftTransactions,
+                    nonPaymentNotifications = nonPaymentNotifications,
                     categories = allCategories,
                     onConfirm = { viewModel.confirmDraft(it) },
                     onDelete = { viewModel.deleteTransaction(it) },
                     onEdit = { transaction ->
                         navController.navigate(Screen.EditTransaction.createRoute(transaction.id))
                     },
+                    onClearNonPaymentNotifications = { viewModel.clearNonPaymentNotifications() },
                     onBack = { navController.popBackStack() }
                 )
             }
+        }
+
+        LaunchedEffect(Unit) {
+            navGraphReady = true
         }
     }
 }

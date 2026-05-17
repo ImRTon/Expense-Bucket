@@ -154,6 +154,39 @@ class NotificationParserTest {
     }
 
     @Test
+    fun parsesCreditCardNotificationWhenBankCopyChangesOrder() {
+        val parsed = parser.parse(
+            text = "刷卡通知：卡號末四碼6773 03/28 13:09:10 好市多中和店 臺幣1,257 已授權",
+            packageName = "com.fubon.mobilebank"
+        )
+
+        assertNotNull(parsed)
+        parsed!!
+        assertEquals(1257.0, parsed.amount, 0.001)
+        assertEquals("好市多中和店", parsed.merchant)
+        assertEquals("credit_card", parsed.paymentMethodHint)
+
+        val calendar = Calendar.getInstance().apply { timeInMillis = parsed.date!! }
+        assertEquals(3, calendar.get(Calendar.MONTH) + 1)
+        assertEquals(28, calendar.get(Calendar.DAY_OF_MONTH))
+        assertEquals(13, calendar.get(Calendar.HOUR_OF_DAY))
+        assertEquals(9, calendar.get(Calendar.MINUTE))
+    }
+
+    @Test
+    fun parsesWalletNotificationByFieldsInsteadOfFullSentenceTemplate() {
+        val parsed = parser.parse(
+            text = "全支付交易通知：付款成功 金額$356 商店 全聯福利中心",
+            packageName = "com.pxpayplus.app"
+        )
+
+        assertNotNull(parsed)
+        parsed!!
+        assertEquals(356.0, parsed.amount, 0.001)
+        assertEquals("全聯福利中心", parsed.merchant)
+    }
+
+    @Test
     fun parsesTruncatedAndFullCombinedNotificationCorrectly() {
         // Simulate a scenario where extraction combines a truncated EXTRA_TEXT and a full EXTRA_BIG_TEXT
         // Truncated version matched generic credit card pattern #10, full version matched #8. 

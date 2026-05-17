@@ -1,10 +1,12 @@
 package com.rton.expensebucket.data.repository
 
 import com.rton.expensebucket.data.dao.CategoryDao
+import com.rton.expensebucket.data.dao.NonPaymentNotificationDao
 import com.rton.expensebucket.data.dao.PaymentMethodDao
 import com.rton.expensebucket.data.dao.ProjectDao
 import com.rton.expensebucket.data.dao.TransactionDao
 import com.rton.expensebucket.data.model.Category
+import com.rton.expensebucket.data.model.NonPaymentNotification
 import com.rton.expensebucket.data.model.PaymentMethod
 import com.rton.expensebucket.data.model.Project
 import com.rton.expensebucket.data.model.Transaction
@@ -17,7 +19,8 @@ class ExpenseBucketRepository @Inject constructor(
     private val transactionDao: TransactionDao,
     private val categoryDao: CategoryDao,
     private val projectDao: ProjectDao,
-    private val paymentMethodDao: PaymentMethodDao
+    private val paymentMethodDao: PaymentMethodDao,
+    private val nonPaymentNotificationDao: NonPaymentNotificationDao
 ) {
     // ─── Transactions ───────────────────────────────────────────────
     fun getAllConfirmedTransactions(): Flow<List<Transaction>> = transactionDao.getAllConfirmedTransactions()
@@ -49,6 +52,16 @@ class ExpenseBucketRepository @Inject constructor(
         transactionDao.deleteTransactionById(id)
     suspend fun confirmDraft(id: Long) =
         transactionDao.confirmDraft(id)
+
+    // ─── Non-payment notification inbox ─────────────────────────────
+    fun getNonPaymentNotifications(): Flow<List<NonPaymentNotification>> =
+        nonPaymentNotificationDao.getAll()
+
+    suspend fun insertNonPaymentNotification(notification: NonPaymentNotification): Long =
+        nonPaymentNotificationDao.insert(notification)
+
+    suspend fun clearNonPaymentNotifications() =
+        nonPaymentNotificationDao.clearAll()
 
     // ─── Categories ─────────────────────────────────────────────────
     fun getAllCategories(): Flow<List<Category>> = categoryDao.getAllCategories()
