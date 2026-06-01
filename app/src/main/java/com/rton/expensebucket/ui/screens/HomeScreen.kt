@@ -16,7 +16,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rton.expensebucket.data.model.Category
-import com.rton.expensebucket.data.model.Transaction
+import com.rton.expensebucket.data.model.BudgetTransaction
 import com.rton.expensebucket.ui.components.WaterLevelCard
 import com.rton.expensebucket.ui.components.TransactionListItem
 import com.rton.expensebucket.ui.components.QuickAddFab
@@ -32,7 +32,7 @@ import java.util.*
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
-    transactions: List<Transaction>,
+    transactions: List<BudgetTransaction>,
     categories: List<Category>,
     periodData: Map<TimePeriod, PeriodSummary>,
     monthlyBudget: Double,
@@ -48,8 +48,8 @@ fun HomeScreen(
     onAddClick: () -> Unit,
     onReceiptOcrClick: () -> Unit,
     onInvoiceOcrClick: () -> Unit,
-    onTransactionClick: (Transaction) -> Unit,
-    onDeleteTransaction: (Transaction) -> Unit,
+    onTransactionClick: (com.rton.expensebucket.data.model.Transaction) -> Unit,
+    onDeleteTransaction: (com.rton.expensebucket.data.model.Transaction) -> Unit,
     onNavigateToDrafts: () -> Unit,
     onSetPeriodDate: (Long) -> Unit,
     modifier: Modifier = Modifier
@@ -60,7 +60,7 @@ fun HomeScreen(
     // Group transactions by date
     val groupedTransactions = remember(transactions) {
         transactions.groupBy { tx ->
-            val cal = Calendar.getInstance().apply { timeInMillis = tx.date }
+            val cal = Calendar.getInstance().apply { timeInMillis = tx.displayDate }
             cal.set(Calendar.HOUR_OF_DAY, 0)
             cal.set(Calendar.MINUTE, 0)
             cal.set(Calendar.SECOND, 0)
@@ -235,11 +235,13 @@ fun HomeScreen(
                 // Transaction items
                 items(
                     items = txList,
-                    key = { it.id }
-                ) { transaction ->
+                    key = { "${it.sourceTransactionId}_${it.displayYearMonth}_${it.amortizationIndex ?: 0}" }
+                ) { budgetTransaction ->
+                    val transaction = budgetTransaction.transaction
                     TransactionListItem(
                         transaction = transaction,
                         category = categoryMap[transaction.categoryId],
+                        budgetTransaction = budgetTransaction,
                         onDelete = { onDeleteTransaction(transaction) },
                         onClick = { onTransactionClick(transaction) }
                     )

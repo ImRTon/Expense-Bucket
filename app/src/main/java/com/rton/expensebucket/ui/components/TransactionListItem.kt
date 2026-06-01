@@ -23,6 +23,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rton.expensebucket.data.model.Category
+import com.rton.expensebucket.data.model.BudgetTransaction
 import com.rton.expensebucket.data.model.Transaction
 import com.rton.expensebucket.data.model.effectiveAmount
 import com.rton.expensebucket.data.model.effectiveConvertedAmount
@@ -44,6 +45,7 @@ enum class TransactionListItemStyle {
 fun TransactionListItem(
     transaction: Transaction,
     category: Category?,
+    budgetTransaction: BudgetTransaction? = null,
     settlementCurrency: String = "TWD",
     onDelete: () -> Unit,
     onClick: () -> Unit = {},
@@ -73,14 +75,14 @@ fun TransactionListItem(
     )
     stateHolder.value = dismissState
 
-    val displayAmount = remember(transaction.amount, transaction.personalAmount) {
-        transaction.effectiveAmount()
+    val displayAmount = remember(transaction.amount, transaction.personalAmount, budgetTransaction?.displayAmount) {
+        budgetTransaction?.displayAmount ?: transaction.effectiveAmount()
     }
     val originalAmountText = remember(displayAmount, transaction.currency) {
         CurrencyFormats.formatAmount(transaction.currency, displayAmount)
     }
-    val convertedAmountText = remember(transaction.amount, transaction.personalAmount, transaction.exchangeRate, settlementCurrency) {
-        CurrencyFormats.formatAmount(settlementCurrency, transaction.effectiveConvertedAmount())
+    val convertedAmountText = remember(transaction.amount, transaction.personalAmount, transaction.exchangeRate, settlementCurrency, budgetTransaction?.displayConvertedAmount) {
+        CurrencyFormats.formatAmount(settlementCurrency, budgetTransaction?.displayConvertedAmount ?: transaction.effectiveConvertedAmount())
     }
 
     SwipeToDismissBox(
@@ -142,6 +144,7 @@ fun TransactionListItem(
                 TransactionListRowContent(
                     transaction = transaction,
                     category = category,
+                    budgetTransaction = budgetTransaction,
                     settlementCurrency = settlementCurrency,
                     modifier = Modifier
                         .padding(16.dp),
@@ -164,6 +167,7 @@ fun TransactionListItem(
                     TransactionListRowContent(
                         transaction = transaction,
                         category = category,
+                        budgetTransaction = budgetTransaction,
                         settlementCurrency = settlementCurrency,
                         modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
                         timeFormat = timeFormat,
@@ -186,6 +190,7 @@ fun TransactionListItem(
 private fun TransactionListRowContent(
     transaction: Transaction,
     category: Category?,
+    budgetTransaction: BudgetTransaction?,
     settlementCurrency: String,
     modifier: Modifier,
     timeFormat: SimpleDateFormat,
@@ -193,6 +198,7 @@ private fun TransactionListRowContent(
     convertedAmountText: String
 ) {
     val categoryColor = Color(category?.color ?: 0xFF6B7280)
+    val paymentMonthFormat = remember { SimpleDateFormat("yyyy/MM", Locale.TAIWAN) }
 
     Row(
         modifier = modifier.fillMaxWidth(),
@@ -234,10 +240,25 @@ private fun TransactionListRowContent(
                 )
             }
             Text(
-                text = timeFormat.format(Date(transaction.date)),
+                text = if (budgetTransaction?.isAmortizedProjection == true) {
+                    "付款 ${paymentMonthFormat.format(Date(transaction.date))}"
+                } else {
+                    timeFormat.format(Date(transaction.date))
+                },
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
             )
+            if (budgetTransaction?.isAmortizedProjection == true) {
+                Text(
+                    text = "攤提 ${budgetTransaction.amortizationIndex}/${budgetTransaction.amortizationTotalMonths} · 原始 ${
+                        CurrencyFormats.formatAmount(transaction.currency, transaction.effectiveAmount())
+                    }",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary.copy(alpha = 0.82f),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
             if (transaction.personalAmount != null && transaction.personalAmount != transaction.amount) {
                 Text(
                     text = "支出總額 ${CurrencyFormats.formatAmount(transaction.currency, transaction.amount)}",

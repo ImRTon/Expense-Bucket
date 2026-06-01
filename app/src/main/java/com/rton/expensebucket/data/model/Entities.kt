@@ -123,6 +123,9 @@ data class Transaction(
     val isExpense: Boolean = true,
     val source: String = "manual", // "manual", "ocr", "notification"
     val isDraft: Boolean = false, // true for auto-captured pending confirmation
+    val amortizationEnabled: Boolean = false,
+    val amortizationStartYearMonth: Int? = null, // YYYYMM
+    val amortizationMonthCount: Int? = null,
     val createdAt: Long = System.currentTimeMillis()
 )
 

@@ -8,6 +8,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -20,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
@@ -27,14 +29,22 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import com.rton.expensebucket.data.HistoricalCashRateProvider
 import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.PaymentMethod
 import com.rton.expensebucket.data.model.Project
 import com.rton.expensebucket.data.model.Transaction
+import com.rton.expensebucket.data.model.amortizationEndYearMonth
+import com.rton.expensebucket.data.model.amortizedShare
+import com.rton.expensebucket.data.model.millisForYearMonth
+import com.rton.expensebucket.data.model.yearMonthFromMillis
 import com.rton.expensebucket.ui.components.ExpenseNumpad
+import com.rton.expensebucket.ui.components.YearMonthPickerDialog
 import com.rton.expensebucket.ui.model.TransactionPrefill
 import com.rton.expensebucket.ui.util.CurrencyFormats
 import com.rton.expensebucket.ui.util.ExpressionEvaluator
@@ -72,6 +82,19 @@ fun AddTransactionScreen(
         mutableStateOf(initialPersonalAmount?.let { formatEditableTransactionAmount(it) } ?: "")
     }
     var showPersonalAmountDialog by remember { mutableStateOf(false) }
+    var showAmortizationDialog by remember { mutableStateOf(false) }
+    var amortizationEnabled by remember {
+        mutableStateOf(existingTransaction?.amortizationEnabled == true)
+    }
+    var amortizationStartYearMonth by remember {
+        mutableStateOf(
+            existingTransaction?.amortizationStartYearMonth
+                ?: yearMonthFromMillis(existingTransaction?.date ?: prefill?.date ?: System.currentTimeMillis())
+        )
+    }
+    var amortizationMonthCount by remember {
+        mutableStateOf(existingTransaction?.amortizationMonthCount?.takeIf { it >= 2 } ?: 6)
+    }
     var selectedCategory by remember { mutableStateOf<Category?>(
         existingTransaction?.categoryId?.let { catId -> categories.find { it.id == catId } }
     ) }
@@ -187,6 +210,14 @@ fun AddTransactionScreen(
         if (!isExpense) {
             personalAmountText = ""
             showPersonalAmountDialog = false
+            showAmortizationDialog = false
+            amortizationEnabled = false
+        }
+    }
+
+    LaunchedEffect(selectedDateTime, amortizationEnabled) {
+        if (!amortizationEnabled) {
+            amortizationStartYearMonth = yearMonthFromMillis(selectedDateTime)
         }
     }
 
@@ -278,6 +309,26 @@ fun AddTransactionScreen(
     } else {
         null
     }
+    val budgetBaseAmount = if (isExpense) parsedPersonalAmount ?: resolvedAmount else null
+    val amortizationSummary = remember(
+        isExpense,
+        amortizationEnabled,
+        amortizationStartYearMonth,
+        amortizationMonthCount,
+        budgetBaseAmount,
+        selectedCurrency
+    ) {
+        if (isExpense && amortizationEnabled && amortizationMonthCount >= 2) {
+            formatAmortizationSummary(
+                currency = selectedCurrency,
+                amount = budgetBaseAmount,
+                startYearMonth = amortizationStartYearMonth,
+                monthCount = amortizationMonthCount
+            )
+        } else {
+            null
+        }
+    }
     val personalAmountError = when {
         parsedPersonalAmount == null && personalAmountText.isNotBlank() -> "請輸入正確金額"
         parsedPersonalAmount != null && parsedPersonalAmount <= 0 -> "我的花費需大於 0"
@@ -315,6 +366,17 @@ fun AddTransactionScreen(
             currency = selectedCurrency,
             exchangeRate = exchangeRate,
             isDraft = false,
+            amortizationEnabled = isExpense && amortizationEnabled && amortizationMonthCount >= 2,
+            amortizationStartYearMonth = if (isExpense && amortizationEnabled && amortizationMonthCount >= 2) {
+                amortizationStartYearMonth
+            } else {
+                null
+            },
+            amortizationMonthCount = if (isExpense && amortizationEnabled && amortizationMonthCount >= 2) {
+                amortizationMonthCount
+            } else {
+                null
+            },
             createdAt = existingTransaction?.createdAt ?: System.currentTimeMillis()
         )
         onSave(transaction)
@@ -610,6 +672,71 @@ fun AddTransactionScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(tFormat.format(cal.time), style = MaterialTheme.typography.bodyMedium)
+                        }
+                    }
+                }
+
+                if (isExpense) {
+                    OutlinedCard(
+                        onClick = {
+                            focusManager.clearFocus()
+                            showNumpad = false
+                            showAmortizationDialog = true
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = CardDefaults.outlinedCardColors(
+                            containerColor = if (amortizationEnabled) {
+                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f)
+                            } else {
+                                MaterialTheme.colorScheme.surface
+                            }
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                Icons.Filled.CalendarMonth,
+                                contentDescription = null,
+                                tint = if (amortizationEnabled) {
+                                    MaterialTheme.colorScheme.primary
+                                } else {
+                                    MaterialTheme.colorScheme.onSurfaceVariant
+                                },
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    "攤提",
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        fontWeight = FontWeight.SemiBold
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Text(
+                                    amortizationSummary ?: "將一筆支出平均分配到多個月份的預算",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (amortizationEnabled) {
+                                        MaterialTheme.colorScheme.primary
+                                    } else {
+                                        MaterialTheme.colorScheme.onSurfaceVariant
+                                    },
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                            Icon(
+                                Icons.Filled.ChevronRight,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
                         }
                     }
                 }
@@ -1208,6 +1335,185 @@ fun AddTransactionScreen(
             }
         )
     }
+
+    if (showAmortizationDialog && isExpense) {
+        AmortizationDialog(
+            currency = selectedCurrency,
+            budgetAmount = budgetBaseAmount,
+            initialStartYearMonth = amortizationStartYearMonth,
+            initialMonthCount = amortizationMonthCount,
+            canRemove = amortizationEnabled,
+            onDismiss = { showAmortizationDialog = false },
+            onApply = { startYearMonth, monthCount ->
+                amortizationStartYearMonth = startYearMonth
+                amortizationMonthCount = monthCount
+                amortizationEnabled = true
+                showAmortizationDialog = false
+            },
+            onRemove = {
+                amortizationEnabled = false
+                amortizationStartYearMonth = yearMonthFromMillis(selectedDateTime)
+                amortizationMonthCount = 6
+                showAmortizationDialog = false
+            }
+        )
+    }
+}
+
+@Composable
+private fun AmortizationDialog(
+    currency: String,
+    budgetAmount: Double?,
+    initialStartYearMonth: Int,
+    initialMonthCount: Int,
+    canRemove: Boolean,
+    onDismiss: () -> Unit,
+    onApply: (startYearMonth: Int, monthCount: Int) -> Unit,
+    onRemove: () -> Unit
+) {
+    var startYearMonth by remember(initialStartYearMonth) { mutableIntStateOf(initialStartYearMonth) }
+    var monthCountText by remember(initialMonthCount) { mutableStateOf(initialMonthCount.toString()) }
+    var showMonthPicker by remember { mutableStateOf(false) }
+    val monthCount = monthCountText.toIntOrNull()
+    val isValid = monthCount != null && monthCount >= 2
+    val summary = if (isValid) {
+        formatAmortizationSummary(
+            currency = currency,
+            amount = budgetAmount,
+            startYearMonth = startYearMonth,
+            monthCount = monthCount
+        )
+    } else {
+        "攤提月數需至少 2 個月"
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("設定攤提") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Text(
+                    "攤提只影響預算與月份列表；支付工具額度仍使用付款日期與支出總額。",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                OutlinedCard(
+                    onClick = { showMonthPicker = true },
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            Icons.Filled.DateRange,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                "起始月份",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Text(
+                                formatYearMonth(startYearMonth),
+                                style = MaterialTheme.typography.titleMedium
+                            )
+                        }
+                        Icon(
+                            Icons.Filled.ChevronRight,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+
+                OutlinedTextField(
+                    value = monthCountText,
+                    onValueChange = { value ->
+                        if (value.length <= 3 && value.all { it.isDigit() }) {
+                            monthCountText = value
+                        }
+                    },
+                    label = { Text("攤提月數") },
+                    singleLine = true,
+                    isError = monthCountText.isNotBlank() && !isValid,
+                    supportingText = { Text("總共 N 個月，包含起始月份") },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp)
+                )
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.horizontalScroll(rememberScrollState())
+                ) {
+                    listOf(3, 6, 12, 24).forEach { quickMonthCount ->
+                        FilterChip(
+                            selected = monthCount == quickMonthCount,
+                            onClick = { monthCountText = quickMonthCount.toString() },
+                            label = { Text("${quickMonthCount}月") }
+                        )
+                    }
+                }
+
+                Surface(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f)
+                ) {
+                    Text(
+                        summary,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = if (isValid) {
+                            MaterialTheme.colorScheme.onSurface
+                        } else {
+                            MaterialTheme.colorScheme.error
+                        },
+                        modifier = Modifier.padding(14.dp)
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { monthCount?.let { onApply(startYearMonth, it) } },
+                enabled = isValid
+            ) {
+                Text("套用")
+            }
+        },
+        dismissButton = {
+            Row {
+                if (canRemove) {
+                    TextButton(onClick = onRemove) {
+                        Text("移除攤提")
+                    }
+                }
+                TextButton(onClick = onDismiss) {
+                    Text("取消")
+                }
+            }
+        }
+    )
+
+    if (showMonthPicker) {
+        YearMonthPickerDialog(
+            initialTimeMillis = millisForYearMonth(startYearMonth),
+            onDateSelected = { dateMillis ->
+                startYearMonth = yearMonthFromMillis(dateMillis)
+                showMonthPicker = false
+            },
+            onDismiss = { showMonthPicker = false }
+        )
+    }
 }
 
 @Composable
@@ -1269,7 +1575,7 @@ private fun PersonalAmountDialog(
     onConfirm: (String) -> Unit
 ) {
     var tempValue by remember(initialValue) { mutableStateOf(initialValue) }
-    val parsedValue = tempValue.toDoubleOrNull()
+    val parsedValue = evaluatePersonalAmountInput(tempValue)
     val errorText = when {
         tempValue.isBlank() -> null
         parsedValue == null -> "請輸入正確金額"
@@ -1277,73 +1583,228 @@ private fun PersonalAmountDialog(
         totalAmount != null && parsedValue > totalAmount -> "我的花費不能大於支出總額"
         else -> null
     }
+    val density = LocalDensity.current
+    val keyboardLift = 28.dp
+    val cardKeyboardGap = 12.dp
+    var keyboardHeightPx by remember { mutableStateOf(0) }
+    var cardHeightPx by remember { mutableStateOf(0) }
 
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("設定我的花費") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    "支出總額會用於支付工具額度統計；這裡填的金額則會用於預算與一般統計。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                totalAmount?.let {
+        properties = DialogProperties(usePlatformDefaultWidth = false)
+    ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val topSafePadding = with(density) {
+                WindowInsets.safeDrawing.getTop(this).toDp()
+            } + 12.dp
+            val navigationBarPadding = with(density) {
+                WindowInsets.navigationBars.getBottom(this).toDp()
+            }
+            val keyboardHeight = if (keyboardHeightPx > 0) {
+                with(density) { keyboardHeightPx.toDp() }
+            } else {
+                352.dp + navigationBarPadding
+            }
+            val cardHeight = if (cardHeightPx > 0) {
+                with(density) { cardHeightPx.toDp() }
+            } else {
+                260.dp
+            }
+            val desiredCardBottomPadding = keyboardHeight + keyboardLift + cardKeyboardGap
+            val maxCardBottomPadding = (maxHeight - topSafePadding - cardHeight).coerceAtLeast(0.dp)
+            val cardBottomPadding = minOf(desiredCardBottomPadding, maxCardBottomPadding)
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 560.dp)
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = cardBottomPadding)
+                    .onSizeChanged { cardHeightPx = it.height },
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     Text(
-                        "支出總額 ${CurrencyFormats.formatAmount(currency, it)}",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary
+                        "設定我的花費",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
+                    Text(
+                        "支出總額會用於支付工具額度統計；這裡填的金額則會用於預算與一般統計。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    totalAmount?.let {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "支出總額 ${CurrencyFormats.formatAmount(currency, it)}",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            TextButton(
+                                onClick = { tempValue = formatEditableTransactionAmount(it) }
+                            ) {
+                                Text("導入總額")
+                            }
+                        }
+                    }
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "我的花費",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                if (tempValue.isBlank()) "留空代表全額都算在自己" else tempValue,
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = if (tempValue.isBlank()) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = TextAlign.End,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                    Text(
+                        errorText ?: "例如聚餐刷卡 1200，可先導入總額再按 ÷ 人數",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (errorText != null) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { onConfirm("") }) {
+                            Text("清除")
+                        }
+                        TextButton(onClick = onDismiss) {
+                            Text("取消")
+                        }
+                        TextButton(
+                            onClick = { onConfirm(formatPersonalAmountInputForSave(tempValue)) },
+                            enabled = errorText == null
+                        ) {
+                            Text("確定")
+                        }
+                    }
                 }
-                OutlinedTextField(
-                    value = tempValue,
-                    onValueChange = { newValue ->
-                        tempValue = sanitizePersonalAmountInput(newValue)
+            }
+            AnimatedVisibility(
+                visible = true,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .padding(bottom = keyboardLift),
+                enter = slideInVertically(initialOffsetY = { it }) + fadeIn()
+            ) {
+                ExpenseNumpad(
+                    displayAmount = tempValue,
+                    modifier = Modifier.onSizeChanged { keyboardHeightPx = it.height },
+                    onDigitClick = { key ->
+                        tempValue = appendPersonalAmountKey(tempValue, key)
                     },
-                    label = { Text("我的花費") },
-                    placeholder = { Text("留空代表全額都算在自己") },
-                    singleLine = true,
-                    isError = errorText != null,
-                    keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                        keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                    supportingText = {
-                        Text(errorText ?: "例如聚餐刷卡 1200，你只要記 300")
+                    onDotClick = {
+                        tempValue = appendPersonalAmountDot(tempValue)
+                    },
+                    onBackspaceClick = {
+                        if (tempValue.isNotEmpty()) {
+                            tempValue = tempValue.dropLast(1)
+                        }
+                    },
+                    onConfirm = {
+                        if (errorText == null) {
+                            onConfirm(formatPersonalAmountInputForSave(tempValue))
+                        }
                     }
                 )
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirm(tempValue) },
-                enabled = errorText == null
-            ) {
-                Text("確定")
-            }
-        },
-        dismissButton = {
-            Row {
-                TextButton(onClick = { onConfirm("") }) {
-                    Text("清除")
-                }
-                TextButton(onClick = onDismiss) {
-                    Text("取消")
-                }
-            }
         }
-    )
-}
-
-private fun sanitizePersonalAmountInput(input: String): String {
-    val filtered = input.filter { it.isDigit() || it == '.' }
-    val parts = filtered.split('.')
-    return when {
-        parts.isEmpty() -> ""
-        parts.size == 1 -> parts[0]
-        else -> parts.first() + "." + parts.drop(1).joinToString("").take(2)
     }
 }
+
+private fun appendPersonalAmountKey(current: String, key: String): String {
+    val operators = "+−×÷"
+    return when {
+        key in operators -> {
+            if (current.isBlank()) {
+                current
+            } else if (current.last() in operators) {
+                current.dropLast(1) + key
+            } else {
+                current + key
+            }
+        }
+        current.length >= 20 -> current
+        else -> current + key
+    }
+}
+
+private fun appendPersonalAmountDot(current: String): String {
+    val lastSegment = current.takeLastWhile { it !in "+−×÷" }
+    return when {
+        lastSegment.contains('.') -> current
+        current.isEmpty() || current.last() in "+−×÷" -> current + "0."
+        else -> "$current."
+    }
+}
+
+private fun evaluatePersonalAmountInput(input: String): Double? {
+    val trimmed = input.trim()
+    if (trimmed.isBlank()) return null
+    return if (trimmed.any { it in "+−×÷" }) {
+        ExpressionEvaluator.evaluate(trimmed)
+    } else {
+        trimmed.toDoubleOrNull()
+    }
+}
+
+private fun formatPersonalAmountInputForSave(input: String): String {
+    if (input.isBlank()) return ""
+    return evaluatePersonalAmountInput(input)?.let { ExpressionEvaluator.formatResult(it) } ?: input
+}
+
+private fun formatAmortizationSummary(
+    currency: String,
+    amount: Double?,
+    startYearMonth: Int,
+    monthCount: Int
+): String {
+    val endYearMonth = amortizationEndYearMonth(startYearMonth, monthCount)
+    val periodText = "${formatYearMonth(startYearMonth)} - ${formatYearMonth(endYearMonth)}"
+    val amountText = amount?.let {
+        "，每月 ${CurrencyFormats.formatAmount(currency, amortizedShare(it, monthCount, 0))}"
+    } ?: "，輸入金額後計算每月金額"
+    return "攤提：$periodText，共 ${monthCount} 個月$amountText"
+}
+
+private fun formatYearMonth(yearMonth: Int): String =
+    "%04d/%02d".format(Locale.TAIWAN, yearMonth / 100, yearMonth % 100)
 
 private fun formatEditableTransactionAmount(amount: Double): String =
     if (amount == amount.toLong().toDouble()) amount.toLong().toString() else amount.toString()

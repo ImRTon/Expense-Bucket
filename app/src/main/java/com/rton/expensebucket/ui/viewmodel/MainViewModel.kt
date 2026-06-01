@@ -11,11 +11,15 @@ import com.rton.expensebucket.data.AppSettingsDataStore
 import com.rton.expensebucket.data.DefaultCategories
 import com.rton.expensebucket.data.DefaultPaymentMethods
 import com.rton.expensebucket.data.model.BillingCycleType
+import com.rton.expensebucket.data.model.BudgetTransaction
 import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.NonPaymentNotification
 import com.rton.expensebucket.data.model.PaymentMethod
 import com.rton.expensebucket.data.model.Project
 import com.rton.expensebucket.data.model.Transaction
+import com.rton.expensebucket.data.model.budgetExpenseForRange
+import com.rton.expensebucket.data.model.effectiveConvertedAmount
+import com.rton.expensebucket.data.model.toBudgetTransactionsForRange
 import com.rton.expensebucket.data.repository.ExpenseBucketRepository
 import com.rton.expensebucket.util.PaymentMethodBillingCalculator
 import com.rton.expensebucket.util.PaymentMethodBillingSummary
@@ -45,7 +49,8 @@ enum class CompareMode(val label: String) {
 
 data class PeriodSummary(
     val expense: Double = 0.0,
-    val income: Double = 0.0
+    val income: Double = 0.0,
+    val budgetExpense: Double = expense
 )
 
 @HiltViewModel
@@ -174,39 +179,40 @@ class MainViewModel @Inject constructor(
         formatPeriodLabel(period, offset, firstDay)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
 
-    /** Transactions filtered by selected period + offset */
-    val filteredTransactions: StateFlow<List<Transaction>> = combine(
-        _selectedPeriod, _periodOffset, firstDayOfWeek
-    ) { period, offset, firstDay ->
-        getDateRangeForPeriod(period, offset, firstDay)
-    }.flatMapLatest { (start, end) ->
-        repository.getTransactionsByDateRange(start, end)
+    /** Transactions filtered by selected period + offset, projected for budget amortization. */
+    val filteredTransactions: StateFlow<List<BudgetTransaction>> = combine(
+        _selectedPeriod, _periodOffset, firstDayOfWeek, allTransactions
+    ) { period, offset, firstDay, transactions ->
+        val (start, end) = getDateRangeForPeriod(period, offset, firstDay)
+        transactions
+            .flatMap { it.toBudgetTransactionsForRange(start, end) }
+            .sortedByDescending { it.displayDate }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     // ─── Multi-period totals for WaterLevelCard ─────────────────────
     // Reactive: selected period uses periodOffset, others use offset 0.
     /** Combined map of all period summaries for the WaterLevelCard. */
     val periodData: StateFlow<Map<TimePeriod, PeriodSummary>> = combine(
-        _selectedPeriod, _periodOffset, firstDayOfWeek
-    ) { selectedPeriod, offset, firstDay ->
+        _selectedPeriod, _periodOffset, firstDayOfWeek, allTransactions
+    ) { selectedPeriod, offset, firstDay, transactions ->
         // Compute date ranges: the selected period uses the current offset,
         // all other periods use offset=0 (current).
-        TimePeriod.entries.map { tp ->
+        TimePeriod.entries.associateWith { tp ->
             val tpOffset = if (tp == selectedPeriod) offset else 0
-            tp to getDateRangeForPeriod(tp, tpOffset, firstDay)
+            val (start, end) = getDateRangeForPeriod(tp, tpOffset, firstDay)
+            val expense = transactions
+                .filter { it.isExpense && it.date in start..end }
+                .sumOf { it.effectiveConvertedAmount() }
+            val income = transactions
+                .filter { !it.isExpense && it.date in start..end }
+                .sumOf { it.effectiveConvertedAmount() }
+            val budgetExpense = transactions.sumOf { it.budgetExpenseForRange(start, end) }
+            PeriodSummary(
+                expense = expense,
+                income = income,
+                budgetExpense = budgetExpense
+            )
         }
-    }.flatMapLatest { rangesWithPeriod ->
-        val flows = rangesWithPeriod.map { (tp, range) ->
-            combine(
-                repository.getTotalExpenseByDateRange(range.first, range.second)
-                    .map { it ?: 0.0 },
-                repository.getTotalIncomeByDateRange(range.first, range.second)
-                    .map { it ?: 0.0 }
-            ) { expense, income ->
-                tp to PeriodSummary(expense, income)
-            }
-        }
-        combine(flows) { pairs -> pairs.toMap() }
     }.stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),

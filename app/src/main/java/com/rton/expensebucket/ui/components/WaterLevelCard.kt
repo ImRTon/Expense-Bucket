@@ -109,7 +109,7 @@ fun WaterLevelCard(
             CompareMode.EXPENSE_INCOME -> pageSummary.income - pageSummary.expense
             CompareMode.EXPENSE_BUDGET -> {
                 val periodBudget = pageDisplay.secondaryValue
-                if (periodBudget > 0) periodBudget - pageSummary.expense else 0.0
+                if (periodBudget > 0) periodBudget - pageDisplay.primaryValue else 0.0
             }
         }
 
@@ -266,6 +266,7 @@ private fun computeDisplayData(
             )
         }
         CompareMode.EXPENSE_BUDGET -> {
+            val expense = summary.budgetExpense
             val periodBudget = when (period) {
                 TimePeriod.TODAY -> budget / 30.0
                 TimePeriod.WEEK -> budget * 7.0 / 30.0
@@ -274,13 +275,13 @@ private fun computeDisplayData(
                 TimePeriod.ALL -> budget
             }
             val level = if (periodBudget > 0) {
-                ((periodBudget - summary.expense) / periodBudget).coerceIn(0.0, 1.0)
+                ((periodBudget - expense) / periodBudget).coerceIn(0.0, 1.0)
             } else {
                 0.5
             }
             DisplayData(
                 level = level,
-                primaryValue = summary.expense,
+                primaryValue = expense,
                 secondaryValue = periodBudget,
                 primaryLabel = "支出",
                 secondaryLabel = "預算"

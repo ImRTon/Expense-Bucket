@@ -109,6 +109,9 @@ class DataExportImportManager @Inject constructor(
         val isExpense: Boolean,
         val source: String,
         val isDraft: Boolean,
+        val amortizationEnabled: Boolean,
+        val amortizationStartYearMonth: Int?,
+        val amortizationMonthCount: Int?,
         val createdAt: Long
     )
 
@@ -214,7 +217,7 @@ class DataExportImportManager @Inject constructor(
                     writer.write("\n")
 
                     writer.write("#SECTION:TRANSACTIONS\n")
-                    writer.write("amount,personalAmount,note,categoryPath,projectName,projectCurrency,projectStartDate,projectEndDate,paymentMethodPath,date,currency,exchangeRate,isExpense,source,isDraft,createdAt\n")
+                    writer.write("amount,personalAmount,note,categoryPath,projectName,projectCurrency,projectStartDate,projectEndDate,paymentMethodPath,date,currency,exchangeRate,isExpense,source,isDraft,amortizationEnabled,amortizationStartYearMonth,amortizationMonthCount,createdAt\n")
                     transactions.forEach { transaction ->
                         val categoryPath = transaction.categoryId
                             ?.let { categoryById[it] }
@@ -244,6 +247,9 @@ class DataExportImportManager @Inject constructor(
                                     transaction.isExpense.toString(),
                                     transaction.source,
                                     transaction.isDraft.toString(),
+                                    transaction.amortizationEnabled.toString(),
+                                    transaction.amortizationStartYearMonth?.toString().orEmpty(),
+                                    transaction.amortizationMonthCount?.toString().orEmpty(),
                                     transaction.createdAt.toString()
                                 )
                             ) + "\n"
@@ -355,6 +361,9 @@ class DataExportImportManager @Inject constructor(
                             isExpense = valueAt(values, currentHeader, "isExpense").toBooleanStrictOrNull() ?: true,
                             source = valueAt(values, currentHeader, "source").ifBlank { "import" },
                             isDraft = valueAt(values, currentHeader, "isDraft").toBooleanStrictOrNull() ?: false,
+                            amortizationEnabled = valueAt(values, currentHeader, "amortizationEnabled").toBooleanStrictOrNull() ?: false,
+                            amortizationStartYearMonth = valueAt(values, currentHeader, "amortizationStartYearMonth").toIntOrNull(),
+                            amortizationMonthCount = valueAt(values, currentHeader, "amortizationMonthCount").toIntOrNull(),
                             createdAt = parseDateValue(valueAt(values, currentHeader, "createdAt")) ?: System.currentTimeMillis()
                         )
                     }
@@ -406,6 +415,9 @@ class DataExportImportManager @Inject constructor(
                     isExpense = valueAt(values, header, "isExpense").toBooleanStrictOrNull() ?: true,
                     source = valueAt(values, header, "source").ifBlank { "import" },
                     isDraft = valueAt(values, header, "isDraft").toBooleanStrictOrNull() ?: false,
+                    amortizationEnabled = false,
+                    amortizationStartYearMonth = null,
+                    amortizationMonthCount = null,
                     createdAt = parseDateValue(valueAt(values, header, "createdAt")) ?: System.currentTimeMillis()
                 )
             }
@@ -665,6 +677,16 @@ class DataExportImportManager @Inject constructor(
                     isExpense = record.isExpense,
                     source = record.source,
                     isDraft = record.isDraft,
+                    amortizationEnabled = record.isExpense &&
+                        record.amortizationEnabled &&
+                        record.amortizationStartYearMonth != null &&
+                        (record.amortizationMonthCount ?: 0) >= 2,
+                    amortizationStartYearMonth = record.amortizationStartYearMonth?.takeIf {
+                        record.isExpense && record.amortizationEnabled && (record.amortizationMonthCount ?: 0) >= 2
+                    },
+                    amortizationMonthCount = record.amortizationMonthCount?.takeIf {
+                        record.isExpense && record.amortizationEnabled && it >= 2 && record.amortizationStartYearMonth != null
+                    },
                     createdAt = record.createdAt
                 )
             )

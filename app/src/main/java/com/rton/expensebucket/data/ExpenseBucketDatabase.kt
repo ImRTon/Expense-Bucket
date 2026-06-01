@@ -17,7 +17,7 @@ import com.rton.expensebucket.data.model.Transaction
 
 @Database(
     entities = [Transaction::class, Category::class, Project::class, PaymentMethod::class, NonPaymentNotification::class],
-    version = 10,
+    version = 11,
     exportSchema = true
 )
 abstract class ExpenseBucketDatabase : RoomDatabase() {
@@ -236,6 +236,23 @@ abstract class ExpenseBucketDatabase : RoomDatabase() {
                 )
                 database.execSQL(
                     "CREATE INDEX IF NOT EXISTS `index_non_payment_notifications_packageName` ON `non_payment_notifications` (`packageName`)"
+                )
+            }
+        }
+
+        /**
+         * Migration from v10 -> v11: adds amortization settings to transactions.
+         */
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL(
+                    "ALTER TABLE `transactions` ADD COLUMN `amortizationEnabled` INTEGER NOT NULL DEFAULT 0"
+                )
+                database.execSQL(
+                    "ALTER TABLE `transactions` ADD COLUMN `amortizationStartYearMonth` INTEGER DEFAULT NULL"
+                )
+                database.execSQL(
+                    "ALTER TABLE `transactions` ADD COLUMN `amortizationMonthCount` INTEGER DEFAULT NULL"
                 )
             }
         }
