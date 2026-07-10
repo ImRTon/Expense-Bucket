@@ -312,7 +312,9 @@ fun ExpensesApp(
         NavHost(
             navController = navController,
             startDestination = Screen.Home.route,
-            modifier = Modifier.padding(innerPadding),
+            modifier = Modifier
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding),
             enterTransition = {
                 val fromIndex = tabIndexMap[initialState.destination.route]
                 val toIndex = tabIndexMap[targetState.destination.route]

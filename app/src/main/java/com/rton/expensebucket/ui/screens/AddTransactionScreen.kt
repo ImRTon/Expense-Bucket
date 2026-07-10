@@ -1,6 +1,5 @@
 package com.rton.expensebucket.ui.screens
 
-import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -142,16 +141,9 @@ fun AddTransactionScreen(
     var expandedPaymentParentId by remember { mutableStateOf<Long?>(null) }
 
     // ─── Numpad visibility state ─────────────────────────────
-    var showNumpad by remember { mutableStateOf(true) }
+    var showNumpad by remember { mutableStateOf(!isEditMode) }
 
     // ─── Back handler: close numpad first, then exit ─────────
-    BackHandler {
-        if (showNumpad) {
-            showNumpad = false
-        } else {
-            onBack()
-        }
-    }
 
     var selectedDateTime by remember {
         mutableStateOf(existingTransaction?.date ?: prefill?.date ?: System.currentTimeMillis())
@@ -407,7 +399,6 @@ fun AddTransactionScreen(
     }
 
     Scaffold(
-        contentWindowInsets = WindowInsets(0),
         topBar = {
             TopAppBar(
                 title = {
@@ -417,15 +408,11 @@ fun AddTransactionScreen(
                             isExpense -> "新增支出"
                             else -> "新增收入"
                         },
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        style = MaterialTheme.typography.titleLarge
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = {
-                        if (showNumpad) showNumpad = false else onBack()
-                    }) {
+                    IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 },
@@ -442,9 +429,8 @@ fun AddTransactionScreen(
                         )
                     }
                 },
-                windowInsets = WindowInsets(0),
                 colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
+                    containerColor = MaterialTheme.colorScheme.surface
                 )
             )
         }
@@ -476,9 +462,9 @@ fun AddTransactionScreen(
                             showNumpad = true
                         },
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(20.dp),
+                        shape = MaterialTheme.shapes.extraLarge,
                         colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f)
+                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
                         )
                     ) {
                         Column(
@@ -590,7 +576,7 @@ fun AddTransactionScreen(
                     horizontalArrangement = Arrangement.Center
                 ) {
                     SingleChoiceSegmentedButtonRow(
-                        modifier = Modifier.fillMaxWidth(0.7f)
+                        modifier = Modifier.fillMaxWidth()
                     ) {
                         SegmentedButton(
                             selected = isExpense,
@@ -618,24 +604,27 @@ fun AddTransactionScreen(
                 }
 
                 // ─── Date display ────────────────────────────────
-                Row(
+                OutlinedCard(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(horizontal = 16.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    shape = MaterialTheme.shapes.large
                 ) {
                     val cal = Calendar.getInstance().apply { timeInMillis = selectedDateTime }
                     val dFormat = remember { SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()) }
                     val tFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
                     
-                    OutlinedCard(
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(0.dp)
+                    ) {
+                    TextButton(
                         onClick = { 
                             showDatePicker = true
                             focusManager.clearFocus()
                             showNumpad = false
                         },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f).heightIn(min = 56.dp)
                     ) {
                         Row(
                             modifier = Modifier.padding(12.dp),
@@ -651,14 +640,17 @@ fun AddTransactionScreen(
                             Text(dFormat.format(cal.time), style = MaterialTheme.typography.bodyMedium)
                         }
                     }
-                    OutlinedCard(
+                    VerticalDivider(
+                        modifier = Modifier.height(24.dp).align(Alignment.CenterVertically),
+                        color = MaterialTheme.colorScheme.outlineVariant
+                    )
+                    TextButton(
                         onClick = { 
                             showTimePicker = true
                             focusManager.clearFocus()
                             showNumpad = false
                         },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.weight(1f)
+                        modifier = Modifier.weight(1f).heightIn(min = 56.dp)
                     ) {
                         Row(
                             modifier = Modifier.padding(12.dp),
@@ -676,6 +668,7 @@ fun AddTransactionScreen(
                     }
                 }
 
+                }
                 if (isExpense) {
                     OutlinedCard(
                         onClick = {
@@ -686,12 +679,12 @@ fun AddTransactionScreen(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(horizontal = 16.dp, vertical = 4.dp),
-                        shape = RoundedCornerShape(14.dp),
+                        shape = MaterialTheme.shapes.large,
                         colors = CardDefaults.outlinedCardColors(
                             containerColor = if (amortizationEnabled) {
-                                MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.22f)
+                                MaterialTheme.colorScheme.secondaryContainer
                             } else {
-                                MaterialTheme.colorScheme.surface
+                                MaterialTheme.colorScheme.surfaceContainerLow
                             }
                         )
                     ) {
@@ -745,7 +738,7 @@ fun AddTransactionScreen(
                 if (parentCategories.isNotEmpty()) {
                     Text(
                         "分類",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 20.dp, top = 8.dp, bottom = 6.dp)
                     )
@@ -799,8 +792,15 @@ fun AddTransactionScreen(
                                 modifier = Modifier
                                     .horizontalScroll(rememberScrollState())
                                     .padding(start = 32.dp, end = 16.dp, top = 6.dp),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Icon(
+                                    imageVector = Icons.Filled.SubdirectoryArrowRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
                                 children.forEach { child ->
                                     val chipColor = Color(child.color)
                                     val isSelected = selectedCategory?.id == child.id
@@ -811,15 +811,23 @@ fun AddTransactionScreen(
                                             showNumpad = false
                                         },
                                         label = { Text(child.name, style = MaterialTheme.typography.labelSmall) },
+                                        leadingIcon = {
+                                            Icon(
+                                                Icons.Filled.Circle,
+                                                contentDescription = null,
+                                                modifier = Modifier.size(8.dp),
+                                                tint = chipColor
+                                            )
+                                        },
                                         colors = AssistChipDefaults.assistChipColors(
-                                            containerColor = if (isSelected) chipColor.copy(alpha = 0.2f)
-                                                else MaterialTheme.colorScheme.surface,
-                                            labelColor = if (isSelected) chipColor
-                                                else MaterialTheme.colorScheme.onSurface
+                                            containerColor = if (isSelected) MaterialTheme.colorScheme.secondaryContainer
+                                                else MaterialTheme.colorScheme.surfaceContainerLow,
+                                            labelColor = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer
+                                                else MaterialTheme.colorScheme.onSurfaceVariant
                                         ),
                                         border = AssistChipDefaults.assistChipBorder(
-                                            borderColor = if (isSelected) chipColor
-                                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                            borderColor = if (isSelected) MaterialTheme.colorScheme.secondary
+                                                else MaterialTheme.colorScheme.outlineVariant,
                                             enabled = true
                                         )
                                     )
@@ -847,7 +855,7 @@ fun AddTransactionScreen(
                 if (parentPaymentMethods.isNotEmpty()) {
                     Text(
                         "支付工具",
-                        style = MaterialTheme.typography.labelMedium,
+                        style = MaterialTheme.typography.titleSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(start = 20.dp, top = 12.dp, bottom = 6.dp)
                     )
@@ -910,8 +918,15 @@ fun AddTransactionScreen(
                                 modifier = Modifier
                                     .horizontalScroll(rememberScrollState())
                                     .padding(start = 32.dp, end = 16.dp, top = 6.dp),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
+                                Icon(
+                                    imageVector = Icons.Filled.SubdirectoryArrowRight,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    modifier = Modifier.size(18.dp)
+                                )
                                 children.forEach { child ->
                                     val chipColor = Color(child.color)
                                     val isSelected = selectedPaymentMethodId == child.id
@@ -922,15 +937,23 @@ fun AddTransactionScreen(
                                             showNumpad = false
                                         },
                                         label = { Text(child.name, style = MaterialTheme.typography.labelSmall) },
+                                        leadingIcon = {
+                                            Icon(
+                                                PaymentIconMapper.getIcon(child.icon),
+                                                contentDescription = null,
+                                                modifier = Modifier.size(14.dp),
+                                                tint = chipColor
+                                            )
+                                        },
                                         colors = AssistChipDefaults.assistChipColors(
-                                            containerColor = if (isSelected) chipColor.copy(alpha = 0.2f)
-                                                else MaterialTheme.colorScheme.surface,
-                                            labelColor = if (isSelected) chipColor
-                                                else MaterialTheme.colorScheme.onSurface
+                                            containerColor = if (isSelected) MaterialTheme.colorScheme.secondaryContainer
+                                                else MaterialTheme.colorScheme.surfaceContainerLow,
+                                            labelColor = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer
+                                                else MaterialTheme.colorScheme.onSurfaceVariant
                                         ),
                                         border = AssistChipDefaults.assistChipBorder(
-                                            borderColor = if (isSelected) chipColor
-                                                else MaterialTheme.colorScheme.outline.copy(alpha = 0.3f),
+                                            borderColor = if (isSelected) MaterialTheme.colorScheme.secondary
+                                                else MaterialTheme.colorScheme.outlineVariant,
                                             enabled = true
                                         )
                                     )
@@ -1008,7 +1031,6 @@ fun AddTransactionScreen(
                                                 exchangeRateText = "1"
                                             }
                                         },
-                                        modifier = Modifier.size(20.dp)
                                     ) {
                                         Icon(
                                             Icons.Filled.Close,
@@ -1217,7 +1239,7 @@ fun AddTransactionScreen(
                         .fillMaxWidth()
                         .height(52.dp)
                         .padding(horizontal = 16.dp),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = MaterialTheme.shapes.large,
                     enabled = canSave
                 ) {
                     Icon(Icons.Filled.Check, contentDescription = null)
@@ -1244,6 +1266,7 @@ fun AddTransactionScreen(
             ) {
                 ExpenseNumpad(
                     displayAmount = amountText,
+                    includeNavigationBarInset = false,
                     onDigitClick = { key -> handleInput(key) },
                     onDotClick = {
                         // Find last number segment (after last operator)
@@ -1564,6 +1587,14 @@ private fun PersonalAmountHandle(
             textDecoration = if (isActive) null else TextDecoration.Underline
         )
     }
+        if (!isActive) {
+            Icon(
+                imageVector = Icons.Filled.SwipeRightAlt,
+                contentDescription = null,
+                tint = contentColor,
+                modifier = Modifier.size(16.dp)
+            )
+        }
 }
 
 @Composable

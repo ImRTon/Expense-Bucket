@@ -88,7 +88,7 @@ fun ExpenseNumpad(
         ) {
             Surface(
                 modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                color = MaterialTheme.colorScheme.surfaceContainerHigh,
                 shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
             ) {
             Column(
@@ -181,7 +181,7 @@ fun ExpenseNumpad(
                         .fillMaxWidth()
                         .height(50.dp)
                         .padding(horizontal = 4.dp),
-                    shape = RoundedCornerShape(14.dp),
+                    shape = MaterialTheme.shapes.large,
                     colors = ButtonDefaults.buttonColors(
                         containerColor = MaterialTheme.colorScheme.primary
                     )
@@ -233,13 +233,13 @@ private fun NumpadKey(
     )
 
     val bgColor = when {
-        isBackspace -> MaterialTheme.colorScheme.errorContainer.copy(alpha = 0.6f)
-        isOperator -> MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.6f)
-        else -> MaterialTheme.colorScheme.surface
+        isBackspace -> MaterialTheme.colorScheme.errorContainer
+        isOperator -> MaterialTheme.colorScheme.secondaryContainer
+        else -> MaterialTheme.colorScheme.surfaceContainerHighest
     }
     val textColor = when {
-        isBackspace -> MaterialTheme.colorScheme.error
-        isOperator -> MaterialTheme.colorScheme.primary
+        isBackspace -> MaterialTheme.colorScheme.onErrorContainer
+        isOperator -> MaterialTheme.colorScheme.onSecondaryContainer
         else -> MaterialTheme.colorScheme.onSurface
     }
 
