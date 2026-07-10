@@ -22,6 +22,7 @@ import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rton.expensebucket.ui.util.ExpressionEvaluator
@@ -45,6 +46,8 @@ fun ExpenseNumpad(
     onDotClick: () -> Unit,
     onBackspaceClick: () -> Unit,
     onConfirm: () -> Unit,
+    includeNavigationBarInset: Boolean = true,
+    bottomContentPadding: Dp = 0.dp,
     modifier: Modifier = Modifier
 ) {
     val view = LocalView.current
@@ -201,9 +204,14 @@ fun ExpenseNumpad(
             }
             }
         }
-            Spacer(
-                modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars)
-            )
+            if (includeNavigationBarInset) {
+                Spacer(
+                    modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars)
+                )
+            }
+            if (bottomContentPadding > 0.dp) {
+                Spacer(modifier = Modifier.height(bottomContentPadding))
+            }
         }
     }
 }

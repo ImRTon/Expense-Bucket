@@ -22,12 +22,17 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.window.Dialog
+import androidx.compose.ui.window.DialogProperties
 import coil.compose.rememberAsyncImagePainter
 import com.rton.expensebucket.data.HistoricalCashRateProvider
 import com.rton.expensebucket.data.model.Category
@@ -35,7 +40,9 @@ import com.rton.expensebucket.data.model.PaymentMethod
 import com.rton.expensebucket.data.model.Transaction
 import com.rton.expensebucket.ocr.OcrEngine
 import com.rton.expensebucket.ocr.OcrResult
+import com.rton.expensebucket.ui.components.ExpenseNumpad
 import com.rton.expensebucket.ui.util.CurrencyFormats
+import com.rton.expensebucket.ui.util.ExpressionEvaluator
 import com.rton.expensebucket.ui.util.PaymentIconMapper
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -860,7 +867,7 @@ private fun PersonalAmountDialog(
     onConfirm: (String) -> Unit
 ) {
     var tempValue by remember(initialValue) { mutableStateOf(initialValue) }
-    val parsedValue = tempValue.toDoubleOrNull()
+    val parsedValue = evaluatePersonalAmountInput(tempValue)
     val errorText = when {
         tempValue.isBlank() -> null
         parsedValue == null -> "請輸入正確金額"
@@ -868,70 +875,218 @@ private fun PersonalAmountDialog(
         totalAmount != null && parsedValue > totalAmount -> "我的花費不能大於支出總額"
         else -> null
     }
+    val density = LocalDensity.current
+    val keyboardLift = 28.dp
+    val cardKeyboardGap = 12.dp
+    var keyboardHeightPx by remember { mutableStateOf(0) }
+    var cardHeightPx by remember { mutableStateOf(0) }
 
-    AlertDialog(
+    Dialog(
         onDismissRequest = onDismiss,
-        title = { Text("設定我的花費") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                Text(
-                    "支出總額會用於支付工具額度統計；這裡填的金額則會用於預算與一般統計。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                totalAmount?.let {
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
+    ) {
+        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+            val topSafePadding = with(density) {
+                WindowInsets.safeDrawing.getTop(this).toDp()
+            } + 12.dp
+            val keyboardBottomPadding = with(density) {
+                maxOf(
+                    WindowInsets.navigationBars.getBottom(this),
+                    WindowInsets.mandatorySystemGestures.getBottom(this),
+                    WindowInsets.safeDrawing.getBottom(this)
+                ).toDp()
+            } + keyboardLift
+            val keyboardHeight = if (keyboardHeightPx > 0) {
+                with(density) { keyboardHeightPx.toDp() }
+            } else {
+                352.dp + keyboardBottomPadding
+            }
+            val cardHeight = if (cardHeightPx > 0) {
+                with(density) { cardHeightPx.toDp() }
+            } else {
+                260.dp
+            }
+            val desiredCardBottomPadding = keyboardHeight + cardKeyboardGap
+            val maxCardBottomPadding = (maxHeight - topSafePadding - cardHeight).coerceAtLeast(0.dp)
+            val cardBottomPadding = minOf(desiredCardBottomPadding, maxCardBottomPadding)
+
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .widthIn(max = 560.dp)
+                    .align(Alignment.BottomCenter)
+                    .padding(horizontal = 24.dp)
+                    .padding(bottom = cardBottomPadding)
+                    .onSizeChanged { cardHeightPx = it.height },
+                shape = RoundedCornerShape(28.dp),
+                color = MaterialTheme.colorScheme.surface,
+                tonalElevation = 6.dp
+            ) {
+                Column(
+                    modifier = Modifier.padding(24.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
                     Text(
-                        "支出總額 ${CurrencyFormats.formatAmount(currency, it)}",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary
+                        "設定我的花費",
+                        style = MaterialTheme.typography.headlineSmall,
+                        color = MaterialTheme.colorScheme.onSurface
                     )
+                    Text(
+                        "支出總額會用於支付工具額度統計；這裡填的金額則會用於預算與一般統計。",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    totalAmount?.let {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "支出總額 ${CurrencyFormats.formatAmount(currency, it)}",
+                                style = MaterialTheme.typography.labelLarge,
+                                color = MaterialTheme.colorScheme.primary
+                            )
+                            TextButton(
+                                onClick = { tempValue = formatEditableOcrAmount(it) }
+                            ) {
+                                Text("導入總額")
+                            }
+                        }
+                    }
+                    Surface(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(12.dp),
+                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Text(
+                                "我的花費",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.width(12.dp))
+                            Text(
+                                if (tempValue.isBlank()) "留空代表全額都算在自己" else tempValue,
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = if (tempValue.isBlank()) {
+                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+                                } else {
+                                    MaterialTheme.colorScheme.onSurface
+                                },
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = TextAlign.End,
+                                modifier = Modifier.weight(1f)
+                            )
+                        }
+                    }
+                    Text(
+                        errorText ?: "例如聚餐刷卡 1200，可先導入總額再按 ÷ 人數",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = if (errorText != null) {
+                            MaterialTheme.colorScheme.error
+                        } else {
+                            MaterialTheme.colorScheme.onSurfaceVariant
+                        }
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.End
+                    ) {
+                        TextButton(onClick = { onConfirm("") }) {
+                            Text("清除")
+                        }
+                        TextButton(onClick = onDismiss) {
+                            Text("取消")
+                        }
+                        TextButton(
+                            onClick = { onConfirm(formatPersonalAmountInputForSave(tempValue)) },
+                            enabled = errorText == null
+                        ) {
+                            Text("確定")
+                        }
+                    }
                 }
-                OutlinedTextField(
-                    value = tempValue,
-                    onValueChange = { newValue ->
-                        tempValue = sanitizePersonalAmountInput(newValue)
+            }
+            AnimatedVisibility(
+                visible = true,
+                modifier = Modifier.align(Alignment.BottomCenter),
+                enter = slideInVertically(initialOffsetY = { it }) + fadeIn()
+            ) {
+                ExpenseNumpad(
+                    displayAmount = tempValue,
+                    includeNavigationBarInset = false,
+                    bottomContentPadding = keyboardBottomPadding,
+                    modifier = Modifier.onSizeChanged { keyboardHeightPx = it.height },
+                    onDigitClick = { key ->
+                        tempValue = appendPersonalAmountKey(tempValue, key)
                     },
-                    label = { Text("我的花費") },
-                    placeholder = { Text("留空代表全額都算在自己") },
-                    singleLine = true,
-                    isError = errorText != null,
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Decimal
-                    ),
-                    modifier = Modifier.fillMaxWidth(),
-                    supportingText = {
-                        Text(errorText ?: "例如聚餐刷卡 1200，你只要記 300")
+                    onDotClick = {
+                        tempValue = appendPersonalAmountDot(tempValue)
+                    },
+                    onBackspaceClick = {
+                        if (tempValue.isNotEmpty()) {
+                            tempValue = tempValue.dropLast(1)
+                        }
+                    },
+                    onConfirm = {
+                        if (errorText == null) {
+                            onConfirm(formatPersonalAmountInputForSave(tempValue))
+                        }
                     }
                 )
             }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = { onConfirm(tempValue) },
-                enabled = errorText == null
-            ) {
-                Text("確定")
-            }
-        },
-        dismissButton = {
-            Row {
-                TextButton(onClick = { onConfirm("") }) {
-                    Text("清除")
-                }
-                TextButton(onClick = onDismiss) {
-                    Text("取消")
-                }
-            }
         }
-    )
-}
-
-private fun sanitizePersonalAmountInput(input: String): String {
-    val filtered = input.filter { it.isDigit() || it == '.' }
-    val parts = filtered.split('.')
-    return when {
-        parts.isEmpty() -> ""
-        parts.size == 1 -> parts[0]
-        else -> parts.first() + "." + parts.drop(1).joinToString("").take(2)
     }
 }
+
+private fun appendPersonalAmountKey(current: String, key: String): String {
+    val operators = "+−×÷"
+    return when {
+        key in operators -> {
+            if (current.isBlank()) {
+                current
+            } else if (current.last() in operators) {
+                current.dropLast(1) + key
+            } else {
+                current + key
+            }
+        }
+        current.length >= 20 -> current
+        else -> current + key
+    }
+}
+
+private fun appendPersonalAmountDot(current: String): String {
+    val lastSegment = current.takeLastWhile { it !in "+−×÷" }
+    return when {
+        lastSegment.contains('.') -> current
+        current.isEmpty() || current.last() in "+−×÷" -> current + "0."
+        else -> "$current."
+    }
+}
+
+private fun evaluatePersonalAmountInput(input: String): Double? {
+    val trimmed = input.trim()
+    if (trimmed.isBlank()) return null
+    return if (trimmed.any { it in "+−×÷" }) {
+        ExpressionEvaluator.evaluate(trimmed)
+    } else {
+        trimmed.toDoubleOrNull()
+    }
+}
+
+private fun formatPersonalAmountInputForSave(input: String): String {
+    if (input.isBlank()) return ""
+    return evaluatePersonalAmountInput(input)?.let { ExpressionEvaluator.formatResult(it) } ?: input
+}
+
+private fun formatEditableOcrAmount(amount: Double): String =
+    if (amount == amount.toLong().toDouble()) amount.toLong().toString() else amount.toString()

@@ -1591,26 +1591,33 @@ private fun PersonalAmountDialog(
 
     Dialog(
         onDismissRequest = onDismiss,
-        properties = DialogProperties(usePlatformDefaultWidth = false)
+        properties = DialogProperties(
+            usePlatformDefaultWidth = false,
+            decorFitsSystemWindows = false
+        )
     ) {
         BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
             val topSafePadding = with(density) {
                 WindowInsets.safeDrawing.getTop(this).toDp()
             } + 12.dp
-            val navigationBarPadding = with(density) {
-                WindowInsets.navigationBars.getBottom(this).toDp()
-            }
+            val keyboardBottomPadding = with(density) {
+                maxOf(
+                    WindowInsets.navigationBars.getBottom(this),
+                    WindowInsets.mandatorySystemGestures.getBottom(this),
+                    WindowInsets.safeDrawing.getBottom(this)
+                ).toDp()
+            } + keyboardLift
             val keyboardHeight = if (keyboardHeightPx > 0) {
                 with(density) { keyboardHeightPx.toDp() }
             } else {
-                352.dp + navigationBarPadding
+                352.dp + keyboardBottomPadding
             }
             val cardHeight = if (cardHeightPx > 0) {
                 with(density) { cardHeightPx.toDp() }
             } else {
                 260.dp
             }
-            val desiredCardBottomPadding = keyboardHeight + keyboardLift + cardKeyboardGap
+            val desiredCardBottomPadding = keyboardHeight + cardKeyboardGap
             val maxCardBottomPadding = (maxHeight - topSafePadding - cardHeight).coerceAtLeast(0.dp)
             val cardBottomPadding = minOf(desiredCardBottomPadding, maxCardBottomPadding)
 
@@ -1718,13 +1725,13 @@ private fun PersonalAmountDialog(
             }
             AnimatedVisibility(
                 visible = true,
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = keyboardLift),
+                modifier = Modifier.align(Alignment.BottomCenter),
                 enter = slideInVertically(initialOffsetY = { it }) + fadeIn()
             ) {
                 ExpenseNumpad(
                     displayAmount = tempValue,
+                    includeNavigationBarInset = false,
+                    bottomContentPadding = keyboardBottomPadding,
                     modifier = Modifier.onSizeChanged { keyboardHeightPx = it.height },
                     onDigitClick = { key ->
                         tempValue = appendPersonalAmountKey(tempValue, key)
