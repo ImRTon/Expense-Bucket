@@ -1,5 +1,6 @@
 package com.rton.expensebucket.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -144,6 +145,11 @@ fun AddTransactionScreen(
     var showNumpad by remember { mutableStateOf(!isEditMode) }
 
     // ─── Back handler: close numpad first, then exit ─────────
+
+    BackHandler(enabled = showNumpad) {
+        showNumpad = false
+    }
+
 
     var selectedDateTime by remember {
         mutableStateOf(existingTransaction?.date ?: prefill?.date ?: System.currentTimeMillis())
