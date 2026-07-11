@@ -1,16 +1,15 @@
 package com.rton.expensebucket.data
 
-import androidx.core.text.HtmlCompat
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
+import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 import java.time.Instant
 import java.time.LocalDate
-import java.time.LocalDateTime
-import java.time.LocalTime
 import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 
@@ -26,23 +25,14 @@ object HistoricalCashRateProvider {
         cause: Throwable? = null
     ) : IllegalStateException(message, cause)
 
-    private data class QuotedRate(
-        val dateTime: LocalDateTime,
+    private data class CachedRate(
+        val quotedDate: LocalDate,
         val cashSell: Double
     )
 
-    private val cache = mutableMapOf<String, List<QuotedRate>>()
-    private val recentCache = mutableMapOf<String, List<QuotedRate>>()
+    private val cache = mutableMapOf<String, CachedRate>()
     private val cacheMutex = Mutex()
-    private val datePathFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd")
-    private val dateTokenFormatter = DateTimeFormatter.ofPattern("yyyy/MM/dd")
-    private val timeTokenFormatter = DateTimeFormatter.ofPattern("HH:mm:ss")
-    private val dateTimeTokenFormatter = DateTimeFormatter.ofPattern("yyyy/MM/dd HH:mm:ss")
-    private val tableRowRegex = Regex("""<tr[^>]*>(.*?)</tr>""", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
-    private val tableCellRegex = Regex("""<td[^>]*>(.*?)</td>""", setOf(RegexOption.IGNORE_CASE, RegexOption.DOT_MATCHES_ALL))
-    private val rowRegex = Regex(
-        """(\d{4}/\d{2}/\d{2})\s+(\d{2}:\d{2}:\d{2}).*?\(([A-Z]{3})\)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)\s+(\d+(?:\.\d+)?)"""
-    )
+    private val dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE
 
     suspend fun getExchangeRate(
         fromCurrency: String,
@@ -60,39 +50,28 @@ object HistoricalCashRateProvider {
         dateMillis: Long
     ): Result<ExchangeRateLookup> {
         val debugLines = mutableListOf<String>()
+        val normalizedFrom = fromCurrency.trim().uppercase()
+        val normalizedTo = toCurrency.trim().uppercase()
         return try {
-            if (fromCurrency == toCurrency) {
-                debugLines += "same currency: $fromCurrency -> 1.0"
+            if (normalizedFrom == normalizedTo) {
+                debugLines += "same currency: $normalizedFrom -> 1.0"
                 return Result.success(ExchangeRateLookup(1.0, debugLines))
             }
 
-            val targetDateTime = Instant.ofEpochMilli(dateMillis)
+            val targetDate = Instant.ofEpochMilli(dateMillis)
                 .atZone(ZoneId.systemDefault())
-                .toLocalDateTime()
-            debugLines += "target: $targetDateTime"
-            debugLines += "pair: $fromCurrency -> $toCurrency"
+                .toLocalDate()
+            debugLines += "target date: $targetDate"
+            debugLines += "pair: $normalizedFrom -> $normalizedTo"
 
-            val fromRateInTwd = if (fromCurrency == "TWD") {
-                debugLines += "from currency is TWD -> 1.0"
-                1.0
-            } else {
-                getCashSellRateInTwd(fromCurrency, targetDateTime, debugLines)
-            }
-            val toRateInTwd = if (toCurrency == "TWD") {
-                debugLines += "to currency is TWD -> 1.0"
-                1.0
-            } else {
-                getCashSellRateInTwd(toCurrency, targetDateTime, debugLines)
-            }
-
-            if (toRateInTwd <= 0.0) {
-                error("找不到 $toCurrency 的歷史現鈔匯率")
-            }
+            val fromRateInTwd = getRateInTwd(normalizedFrom, targetDate, debugLines)
+            val toRateInTwd = getRateInTwd(normalizedTo, targetDate, debugLines)
+            require(toRateInTwd > 0.0) { "找不到 $normalizedTo 的歷史現鈔匯率" }
 
             val rate = fromRateInTwd / toRateInTwd
             debugLines += "from in TWD: $fromRateInTwd"
             debugLines += "to in TWD: $toRateInTwd"
-            debugLines += "result: $fromCurrency/$toCurrency = $rate"
+            debugLines += "result: $normalizedFrom/$normalizedTo = $rate"
             Result.success(ExchangeRateLookup(rate, debugLines))
         } catch (throwable: Throwable) {
             debugLines += "error: ${throwable.message ?: throwable::class.java.simpleName}"
@@ -106,233 +85,91 @@ object HistoricalCashRateProvider {
         }
     }
 
-    fun extractDebugLines(throwable: Throwable): List<String> {
-        return (throwable as? ExchangeRateLookupException)?.debugLines
+    fun extractDebugLines(throwable: Throwable): List<String> =
+        (throwable as? ExchangeRateLookupException)?.debugLines
             ?: listOf("error: ${throwable.message ?: throwable::class.java.simpleName}")
-    }
 
-    private suspend fun getCashSellRateInTwd(
+    private suspend fun getRateInTwd(
         currency: String,
-        targetDateTime: LocalDateTime,
+        targetDate: LocalDate,
         debugLines: MutableList<String>
     ): Double {
-        repeat(14) { dayOffset ->
-            val candidateDate = targetDateTime.toLocalDate().minusDays(dayOffset.toLong())
-            val rates = getDailyRates(currency, candidateDate, debugLines)
-            debugLines += "daily lookup $currency $candidateDate -> ${rates.size} parsed rows"
-            if (rates.isEmpty()) return@repeat
-
-            val matched = if (candidateDate == targetDateTime.toLocalDate()) {
-                rates.filter { !it.dateTime.toLocalTime().isAfter(targetDateTime.toLocalTime()) }
-                    .maxByOrNull { it.dateTime }
-                    ?: rates.maxByOrNull { it.dateTime }
-            } else {
-                rates.maxByOrNull { it.dateTime }
-            }
-
-            if (matched != null && matched.cashSell > 0.0) {
-                debugLines += "matched daily $currency at ${matched.dateTime} cashSell=${matched.cashSell}"
-                return matched.cashSell
-            }
+        if (currency == "TWD") {
+            debugLines += "$currency is TWD -> 1.0"
+            return 1.0
         }
 
-        val recentRates = getRecentRates(currency, debugLines)
-        debugLines += "recent lookup $currency -> ${recentRates.size} parsed rows"
-        val fallback = recentRates
-            .filter { !it.dateTime.isAfter(targetDateTime) && it.cashSell > 0.0 }
-            .maxByOrNull { it.dateTime }
-            ?: recentRates
-                .filter { it.cashSell > 0.0 }
-                .maxByOrNull { it.dateTime }
-
-        if (fallback != null) {
-            debugLines += "matched recent $currency at ${fallback.dateTime} cashSell=${fallback.cashSell}"
-            return fallback.cashSell
-        }
-
-        debugLines += "no rate found for $currency near ${targetDateTime.toLocalDate()}"
-        error("找不到 $currency 在 ${targetDateTime.toLocalDate()} 附近的歷史現鈔匯率")
-    }
-
-    private suspend fun getDailyRates(
-        currency: String,
-        date: LocalDate,
-        debugLines: MutableList<String>
-    ): List<QuotedRate> {
-        val cacheKey = "$currency:$date"
+        val cacheKey = "$currency:$targetDate"
         cacheMutex.withLock {
             cache[cacheKey]?.let {
-                debugLines += "cache hit daily $cacheKey -> ${it.size} rows"
-                return it
+                debugLines += "cache hit $cacheKey -> ${it.cashSell} (${it.quotedDate})"
+                return it.cashSell
             }
         }
 
-        val fetched = fetchDailyRates(currency, date, debugLines)
-        cacheMutex.withLock {
-            cache[cacheKey] = fetched
-        }
-        return fetched
+        val fetched = fetchFinMindCashSellRate(currency, targetDate, debugLines)
+            ?: error("找不到 $currency 在 $targetDate 附近的歷史現鈔匯率")
+        cacheMutex.withLock { cache[cacheKey] = fetched }
+        return fetched.cashSell
     }
 
-    private suspend fun getRecentRates(
+    private suspend fun fetchFinMindCashSellRate(
         currency: String,
+        targetDate: LocalDate,
         debugLines: MutableList<String>
-    ): List<QuotedRate> {
-        cacheMutex.withLock {
-            recentCache[currency]?.let {
-                debugLines += "cache hit recent $currency -> ${it.size} rows"
-                return it
-            }
-        }
-
-        val fetched = fetchRecentRates(currency, debugLines)
-        cacheMutex.withLock {
-            recentCache[currency] = fetched
-        }
-        return fetched
-    }
-
-    private suspend fun fetchDailyRates(
-        currency: String,
-        date: LocalDate,
-        debugLines: MutableList<String>
-    ): List<QuotedRate> =
-        withContext(Dispatchers.IO) {
-            val primary = fetchRatesFromUrl(
-                "https://rate.bot.com.tw/xrt/quote/${date.format(datePathFormatter)}/$currency/cash",
-                date,
-                debugLines
-            )
-            if (primary.isNotEmpty()) {
-                return@withContext primary
-            }
-
-            fetchRatesFromUrl(
-                "https://rate.bot.com.tw/xrt/quote/${date.format(datePathFormatter)}/$currency/",
-                date,
-                debugLines
-            )
-        }
-
-    private suspend fun fetchRecentRates(
-        currency: String,
-        debugLines: MutableList<String>
-    ): List<QuotedRate> =
-        withContext(Dispatchers.IO) {
-            val urlString = "https://rate.bot.com.tw/xrt/quote/ltm/$currency/cash"
-            debugLines += "request recent: $urlString"
-            val connection = (URL(urlString).openConnection() as HttpURLConnection).apply {
-                requestMethod = "GET"
-                connectTimeout = 10_000
-                readTimeout = 10_000
-                setRequestProperty("User-Agent", "ExpenseBucket/1.0")
-            }
-
-            try {
-                val responseCode = connection.responseCode
-                debugLines += "response recent: $responseCode"
-                if (responseCode !in 200..299) {
-                    return@withContext emptyList()
-                }
-                val body = connection.inputStream.bufferedReader().use { it.readText() }
-                val parsed = parseRatesFromHtml(body)
-                debugLines += "parsed recent rows: ${parsed.size}"
-                parsed
-            } finally {
-                connection.disconnect()
-            }
-        }
-
-    private fun fetchRatesFromUrl(
-        urlString: String,
-        date: LocalDate,
-        debugLines: MutableList<String>
-    ): List<QuotedRate> {
-        debugLines += "request daily: $urlString"
+    ): CachedRate? = withContext(Dispatchers.IO) {
+        val startDate = targetDate.minusDays(14)
+        val urlString = "https://api.finmindtrade.com/api/v4/data" +
+            "?dataset=TaiwanExchangeRate" +
+            "&data_id=${URLEncoder.encode(currency, Charsets.UTF_8.name())}" +
+            "&start_date=${startDate.format(dateFormatter)}" +
+            "&end_date=${targetDate.plusDays(1).format(dateFormatter)}"
+        debugLines += "request FinMind: $currency $startDate..$targetDate"
         val connection = (URL(urlString).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 10_000
             readTimeout = 10_000
+            setRequestProperty("Accept", "application/json")
             setRequestProperty("User-Agent", "ExpenseBucket/1.0")
         }
 
-        return try {
+        try {
             val responseCode = connection.responseCode
-            debugLines += "response daily: $responseCode"
-            if (responseCode !in 200..299) {
-                emptyList()
-            } else {
-                val body = connection.inputStream.bufferedReader().use { it.readText() }
-                val parsed = parseDailyRates(body, date)
-                debugLines += "parsed daily rows: ${parsed.size}"
-                parsed
+            debugLines += "response FinMind: $responseCode"
+            if (responseCode !in 200..299) return@withContext null
+
+            val body = connection.inputStream.bufferedReader().use { it.readText() }
+            val root = JSONObject(body)
+            if (root.optInt("status") != 200) {
+                debugLines += "FinMind error: ${root.optString("msg", "unknown error")}"
+                return@withContext null
             }
+
+            val data = root.optJSONArray("data") ?: return@withContext null
+            var matched: CachedRate? = null
+            for (index in 0 until data.length()) {
+                val row = data.optJSONObject(index) ?: continue
+                val rowDate = runCatching {
+                    LocalDate.parse(row.optString("date"), dateFormatter)
+                }.getOrNull() ?: continue
+                val cashSell = row.optDouble("cash_sell", Double.NaN)
+                if (!rowDate.isAfter(targetDate) && cashSell.isFinite() && cashSell > 0.0 &&
+                    (matched == null || rowDate.isAfter(matched.quotedDate))
+                ) {
+                    matched = CachedRate(rowDate, cashSell)
+                }
+            }
+            matched?.also {
+                debugLines += "matched FinMind $currency at ${it.quotedDate} cashSell=${it.cashSell}"
+            } ?: run {
+                debugLines += "no FinMind rate for $currency near $targetDate"
+            }
+            matched
+        } catch (throwable: Exception) {
+            debugLines += "FinMind error: ${throwable.message ?: throwable::class.java.simpleName}"
+            null
         } finally {
             connection.disconnect()
         }
-    }
-
-    private fun parseDailyRates(html: String, expectedDate: LocalDate): List<QuotedRate> {
-        val expectedDateToken = expectedDate.format(dateTokenFormatter)
-        return parseRatesFromHtml(html)
-            .filter { it.dateTime.toLocalDate().format(dateTokenFormatter) == expectedDateToken }
-    }
-
-    private fun parseRatesFromHtml(html: String): List<QuotedRate> {
-        val parsedFromTable = tableRowRegex.findAll(html)
-            .mapNotNull { rowMatch ->
-                val cells = tableCellRegex.findAll(rowMatch.groupValues[1])
-                    .map { sanitizeHtmlCell(it.groupValues[1]) }
-                    .toList()
-
-                if (cells.size < 4) return@mapNotNull null
-
-                val dateTime = runCatching {
-                    LocalDateTime.parse(cells[0], dateTimeTokenFormatter)
-                }.getOrNull() ?: return@mapNotNull null
-
-                val cashSell = cells[3].toDoubleOrNull() ?: return@mapNotNull null
-
-                QuotedRate(
-                    dateTime = dateTime,
-                    cashSell = cashSell
-                )
-            }
-            .toList()
-
-        if (parsedFromTable.isNotEmpty()) {
-            return parsedFromTable
-        }
-
-        val plainText = HtmlCompat.fromHtml(
-            html,
-            HtmlCompat.FROM_HTML_MODE_LEGACY
-        ).toString()
-
-        return rowRegex.findAll(plainText)
-            .mapNotNull { match ->
-                val rowDate = runCatching {
-                    LocalDate.parse(match.groupValues[1], dateTokenFormatter)
-                }.getOrNull() ?: return@mapNotNull null
-
-                val parsedTime = runCatching {
-                    LocalTime.parse(match.groupValues[2], timeTokenFormatter)
-                }.getOrNull() ?: return@mapNotNull null
-
-                val cashSell = match.groupValues[5].toDoubleOrNull() ?: return@mapNotNull null
-
-                QuotedRate(
-                    dateTime = LocalDateTime.of(rowDate, parsedTime),
-                    cashSell = cashSell
-                )
-            }
-            .toList()
-    }
-
-    private fun sanitizeHtmlCell(cellHtml: String): String {
-        return HtmlCompat.fromHtml(cellHtml, HtmlCompat.FROM_HTML_MODE_LEGACY)
-            .toString()
-            .replace('\u00A0', ' ')
-            .trim()
     }
 }
