@@ -146,6 +146,7 @@ class NotificationParser {
      */
     fun parse(text: String, packageName: String? = null): ParsedTransaction? {
         val normalizedText = normalizeText(text)
+        if (NotificationCapturePolicy.isLikelyPromotion(normalizedText)) return null
         var bestMatch: ParsedTransaction? = null
 
         for (p in patterns) {

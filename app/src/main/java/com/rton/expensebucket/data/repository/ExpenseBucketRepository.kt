@@ -44,6 +44,11 @@ class ExpenseBucketRepository @Inject constructor(
         transactionDao.getTransactionById(id)
     suspend fun insertTransaction(transaction: Transaction): Long =
         transactionDao.insertTransaction(transaction)
+    suspend fun insertNotificationDraftIfAbsent(
+        transaction: Transaction,
+        hasTransactionDate: Boolean,
+        recentSince: Long
+    ): Long? = transactionDao.insertNotificationDraftIfAbsent(transaction, hasTransactionDate, recentSince)
     suspend fun updateTransaction(transaction: Transaction) =
         transactionDao.updateTransaction(transaction)
     suspend fun deleteTransaction(transaction: Transaction) =

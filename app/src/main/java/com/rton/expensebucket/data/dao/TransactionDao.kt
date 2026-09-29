@@ -43,6 +43,36 @@ interface TransactionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: Transaction): Long
 
+    @Query("""SELECT EXISTS(SELECT 1 FROM transactions
+        WHERE source = 'notification' AND amount = :amount AND note = :note
+          AND isExpense = :isExpense AND createdAt >= :recentSince
+          AND (:hasTransactionDate = 0 OR date = :transactionDate))""")
+    suspend fun hasMatchingNotificationTransaction(
+        amount: Double,
+        note: String,
+        isExpense: Boolean,
+        hasTransactionDate: Boolean,
+        transactionDate: Long,
+        recentSince: Long
+    ): Boolean
+
+    @Transaction
+    suspend fun insertNotificationDraftIfAbsent(
+        transaction: Transaction,
+        hasTransactionDate: Boolean,
+        recentSince: Long
+    ): Long? {
+        if (hasMatchingNotificationTransaction(
+                transaction.amount,
+                transaction.note,
+                transaction.isExpense,
+                hasTransactionDate,
+                transaction.date,
+                recentSince
+            )) return null
+        return insertTransaction(transaction)
+    }
+
     @Update
     suspend fun updateTransaction(transaction: Transaction)
 

@@ -1,14 +1,49 @@
 package com.rton.expensebucket
 
 import com.rton.expensebucket.ocr.NotificationParser
+import com.rton.expensebucket.ocr.NotificationCapturePolicy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.util.Calendar
 
 class NotificationParserTest {
 
     private val parser = NotificationParser()
+
+    @Test
+    fun rejectsPromotionalAmountWithoutCompletedTransaction() {
+        assertNull(parser.parse(
+            "限時優惠！信用卡消費滿 NT$1,000 最高回饋 100 元，立即參加活動",
+            "com.esunbank"
+        ))
+        assertFalse(NotificationCapturePolicy.shouldKeepUnparsed(
+            "刷卡滿 1,000 元享優惠，立即參加活動"
+        ))
+    }
+
+    @Test
+    fun keepsCompletedCardNotificationWithPointsOffer() {
+        assertNotNull(parser.parse(
+            "【刷卡通知】金額NT$1340元卡號末四碼1234於2026/03/08 20:52在商店名稱AAAA刷卡。立即以點數折抵",
+            "com.cathaybk.mymobibank"
+        ))
+    }
+
+    @Test
+    fun lineNotificationsRequireLinePayMarker() {
+        assertFalse(NotificationCapturePolicy.shouldInspect("jp.naver.line.android", "朋友：明天消費 500 元"))
+        assertTrue(NotificationCapturePolicy.shouldInspect("jp.naver.line.android", "LINE Pay消費通知 在 全聯 支付 $356"))
+    }
+
+    @Test
+    fun unparsedInboxKeepsOnlyPlausiblePayments() {
+        assertTrue(NotificationCapturePolicy.shouldKeepUnparsed("您的信用卡於 09/29 授權 NT$560"))
+        assertFalse(NotificationCapturePolicy.shouldKeepUnparsed("本月帳單繳款截止日提醒"))
+    }
 
     @Test
     fun parsesSinopacLegacyNotification() {

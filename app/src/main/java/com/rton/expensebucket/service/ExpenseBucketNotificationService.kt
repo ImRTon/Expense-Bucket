@@ -16,6 +16,7 @@ import com.rton.expensebucket.R
 import com.rton.expensebucket.data.model.NonPaymentNotification
 import com.rton.expensebucket.data.model.Transaction
 import com.rton.expensebucket.data.repository.ExpenseBucketRepository
+import com.rton.expensebucket.ocr.NotificationCapturePolicy
 import com.rton.expensebucket.ocr.NotificationParser
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
@@ -75,20 +76,6 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
     private val currencyFormat = NumberFormat.getCurrencyInstance(Locale("zh", "TW"))
     private var notificationIdCounter = 10000
 
-    // Cache for 1st layer dedup: identical SBN key (updates to the same notification)
-    private val processedSbnKeys = object : java.util.LinkedHashMap<String, Long>(50, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>?): Boolean {
-            return size > 50
-        }
-    }
-
-    // Cache to prevent processing the identical parsed notification multiple times
-    private val processedNotifications = object : java.util.LinkedHashMap<String, Long>(30, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>?): Boolean {
-            return size > 30
-        }
-    }
-
     private val processedNonPaymentNotifications = object : java.util.LinkedHashMap<String, Long>(50, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>?): Boolean {
             return size > 50
@@ -109,14 +96,7 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
         // Step 1: Filter by watched packages
         if (!isWatchedPackage(pkg)) return
 
-        // Layer 1: SBN key dedup — skip if this exact notification was already processed recently
-        val sbnKey = sbn.key
         val now = System.currentTimeMillis()
-        val lastSbnTime = processedSbnKeys[sbnKey]
-        if (lastSbnTime != null && (now - lastSbnTime) < 10 * 1000) {
-            Log.d(TAG, "[$pkg] Same SBN key '$sbnKey' recently processed within 10s, skipping")
-            return
-        }
 
         val notification = sbn.notification ?: return
         if ((notification.flags and Notification.FLAG_GROUP_SUMMARY) != 0) {
@@ -132,36 +112,28 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
             return
         }
 
-        Log.d(TAG, "[$pkg] Intercepted: $combined")
+        val primaryText = listOf(Notification.EXTRA_TITLE, Notification.EXTRA_TEXT)
+            .joinToString(" ") { extras.getCharSequence(it)?.toString().orEmpty() }
+        if (!NotificationCapturePolicy.shouldInspect(pkg, primaryText)) return
+
+        Log.d(TAG, "[$pkg] Intercepted notification")
 
         // Step 2: Parse with NotificationParser
         val parsed = parser.parse(combined, pkg)
         if (parsed == null) {
             Log.d(TAG, "[$pkg] Parser returned null — no pattern matched")
-            recordNonPaymentNotification(pkg, combined, now)
-            processedSbnKeys[sbnKey] = now
+            if (NotificationCapturePolicy.shouldKeepUnparsed(combined)) {
+                recordNonPaymentNotification(pkg, combined, now)
+            }
             return
         }
 
-        // Deduplicate: Android apps often update notifications, causing repeated onNotificationPosted events.
-        // Include merchant/date/note context so two same-amount purchases are not collapsed.
-        val duplicateKey = buildDuplicateKey(pkg, parsed)
-        val lastProcessed = processedNotifications[duplicateKey]
-        if (lastProcessed != null && (now - lastProcessed) < 10 * 1000) {
-            Log.d(TAG, "[$pkg] Duplicate transaction content recently processed within 10s, skipping")
-            return
-        }
-        
-        // Mark both dedup keys as processed
-        processedSbnKeys[sbnKey] = now
-        processedNotifications[duplicateKey] = now
-
-        Log.d(TAG, "[$pkg] Parsed: amount=${parsed.amount}, merchant='${parsed.merchant}', isExpense=${parsed.isExpense}")
+        Log.d(TAG, "[$pkg] Payment notification parsed")
 
         // Step 3: Insert as draft and show heads-up notification
         serviceScope.launch {
             try {
-                val transactionId = repository.insertTransaction(
+                val transactionId = repository.insertNotificationDraftIfAbsent(
                     Transaction(
                         amount = parsed.amount,
                         note = parsed.merchant.ifBlank { parsed.note },
@@ -170,9 +142,15 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
                         isDraft = true,
                         date = parsed.date ?: System.currentTimeMillis(),
                         createdAt = System.currentTimeMillis()
-                    )
+                    ),
+                    hasTransactionDate = parsed.date != null,
+                    recentSince = now - 2 * 60 * 1000L
                 )
-                Log.d(TAG, "Draft created: id=$transactionId, amount=${parsed.amount}")
+                if (transactionId == null) {
+                    Log.d(TAG, "[$pkg] Duplicate notification transaction, skipping")
+                    return@launch
+                }
+                Log.d(TAG, "Draft created: id=$transactionId")
 
                 // Show heads-up notification to the user
                 showConfirmationNotification(transactionId, parsed)
@@ -319,31 +297,7 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
         extras.getCharSequenceArray(Notification.EXTRA_TEXT_LINES)
             ?.forEach { addText(it?.toString()) }
 
-        extras.keySet().sorted().forEach { key ->
-            collectTextFromExtra(extras.get(key), ::addText)
-        }
-
         return parts.joinToString(" ")
-    }
-
-    private fun collectTextFromExtra(value: Any?, addText: (String?) -> Unit) {
-        when (value) {
-            is CharSequence -> addText(value.toString())
-            is Bundle -> value.keySet().forEach { key -> collectTextFromExtra(value.get(key), addText) }
-            is Array<*> -> value.forEach { collectTextFromExtra(it, addText) }
-            is Iterable<*> -> value.forEach { collectTextFromExtra(it, addText) }
-        }
-    }
-
-    private fun buildDuplicateKey(
-        pkg: String,
-        parsed: com.rton.expensebucket.ocr.ParsedTransaction
-    ): String {
-        val dateBucket = parsed.date?.let { it / 60_000L } ?: -1L
-        val identity = parsed.merchant.ifBlank { parsed.note.take(60) }
-            .lowercase()
-            .replace(Regex("""\s+"""), " ")
-        return "$pkg|${parsed.amount}|$dateBucket|$identity"
     }
 
     private fun isWatchedPackage(pkg: String): Boolean {
