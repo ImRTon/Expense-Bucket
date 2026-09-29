@@ -1,6 +1,7 @@
 package com.rton.expensebucket.data.dao
 
 import androidx.room.*
+import androidx.room.Transaction as RoomTransaction
 import com.rton.expensebucket.data.model.Transaction
 import kotlinx.coroutines.flow.Flow
 
@@ -56,7 +57,7 @@ interface TransactionDao {
         recentSince: Long
     ): Boolean
 
-    @Transaction
+    @RoomTransaction
     suspend fun insertNotificationDraftIfAbsent(
         transaction: Transaction,
         hasTransactionDate: Boolean,
