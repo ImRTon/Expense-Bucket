@@ -11,6 +11,8 @@
   ![Status](https://img.shields.io/badge/status-experimental-orange)
 </div>
 
+https://github.com/user-attachments/assets/eeec5fbf-2e52-4aa2-bb4a-2e41f6709d32
+
 ## Overview
 
 Expense Bucket reduces manual data entry while keeping every transaction under user control. It can detect expenses from Android notifications, scan Taiwan e-invoice QR codes, track card benefit limits, convert foreign-currency transactions, and separate travel spending into projects.
