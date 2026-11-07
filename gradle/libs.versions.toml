@@ -33,7 +33,7 @@ mlkitTextRecognitionJapanese = "16.0.1"
 mlkitLanguageId = "17.0.6"
 mlkitTranslate = "17.0.3"
 mlkitBarcodeScanning = "17.3.0"
-mlkitEntityExtraction = "16.0.0-beta3"
+mlkitEntityExtraction = "16.0.0-beta6"
 playServicesMlkitDocumentScanner = "16.0.0"
 # CameraX
 cameraX = "1.4.1"

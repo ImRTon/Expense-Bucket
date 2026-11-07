@@ -211,6 +211,7 @@ class ReceiptOcrEngine @Inject constructor() {
                     async {
                         try {
                             val modelId = EntityExtractorOptions.fromLanguageTag(langTag)
+                                ?: return@async emptyList()
                             val extractor = getOrCreateEntityExtractor(modelId) ?: return@async emptyList()
                             val ready = ensureEntityModelReady(modelId, extractor)
                             if (!ready) return@async emptyList()
