@@ -1,6 +1,7 @@
 package com.rton.expensebucket
 
 import android.content.Intent
+import android.app.NotificationManager
 import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
@@ -30,6 +31,7 @@ import androidx.navigation.navArgument
 import com.rton.expensebucket.navigation.Screen
 import com.rton.expensebucket.ocr.OcrEngine
 import com.rton.expensebucket.ocr.ReceiptOcrEngine
+import com.rton.expensebucket.service.CaptureNotificationContract
 import com.rton.expensebucket.ui.model.TransactionPrefill
 import com.rton.expensebucket.ui.screens.*
 import com.rton.expensebucket.ui.theme.ExpensesTheme
@@ -43,6 +45,8 @@ import android.os.Build
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
 
 @AndroidEntryPoint
@@ -99,7 +103,17 @@ class MainActivity : ComponentActivity() {
                     sharedImageUri = sharedImageUri,
                     navigateTo = navigateTo,
                     onSharedImageConsumed = { _sharedImageUri.value = null },
-                    onNavigateToConsumed = { _pendingNavigateTo.value = null }
+                    onNavigateToConsumed = {
+                        _pendingNavigateTo.value = null
+                        val notificationId = intent?.getIntExtra(
+                            CaptureNotificationContract.EXTRA_NOTIFICATION_ID, -1
+                        ) ?: -1
+                        if (notificationId != -1) {
+                            getSystemService(NotificationManager::class.java).cancel(notificationId)
+                        }
+                        intent?.removeExtra("navigate_to")
+                        intent?.removeExtra(CaptureNotificationContract.EXTRA_NOTIFICATION_ID)
+                    }
                 )
             }
         }
@@ -237,13 +251,19 @@ fun ExpensesApp(
         }
     }
 
-    // Navigate to DraftsScreen if opened from notification (only after navGraph is ready)
+    // Wait for the graph, then open the exact captured draft (cold or warm start).
     LaunchedEffect(navigateTo, navGraphReady) {
-        if (navigateTo == "drafts" && navGraphReady) {
-            navController.navigate(Screen.Drafts.route) {
-                launchSingleTop = true
+        if (!navGraphReady || navigateTo == null) return@LaunchedEffect
+        val transactionId = CaptureNotificationContract.transactionId(navigateTo)
+        if (navigateTo == "drafts" || transactionId != null) {
+            val existing = transactionId?.let { viewModel.getTransactionById(it) }
+            val route = if (existing != null) Screen.EditTransaction.createRoute(existing.id) else Screen.Drafts.route
+            withContext(Dispatchers.Main.immediate) {
+                navController.navigate(route) {
+                    launchSingleTop = true
+                }
+                onNavigateToConsumed()
             }
-            onNavigateToConsumed()
         }
     }
 

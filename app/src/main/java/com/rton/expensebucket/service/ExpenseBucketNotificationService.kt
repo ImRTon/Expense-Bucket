@@ -11,7 +11,6 @@ import android.service.notification.NotificationListenerService
 import android.service.notification.StatusBarNotification
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import com.rton.expensebucket.MainActivity
 import com.rton.expensebucket.R
 import com.rton.expensebucket.data.model.NonPaymentNotification
 import com.rton.expensebucket.data.model.NotificationCapture
@@ -78,7 +77,6 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
     private val parser = NotificationParser()
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private val currencyFormat = NumberFormat.getCurrencyInstance(Locale("zh", "TW"))
-    private var notificationIdCounter = 10000
 
     private val processedNonPaymentNotifications = object : java.util.LinkedHashMap<String, Long>(50, 0.75f, true) {
         override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Long>?): Boolean {
@@ -214,7 +212,7 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
         transactionId: Long,
         parsed: com.rton.expensebucket.ocr.ParsedTransaction
     ) {
-        val notifId = notificationIdCounter++
+        val notifId = transactionId.toInt()
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
 
         val amountText = currencyFormat.format(parsed.amount)
@@ -232,18 +230,15 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        // Action 2: Edit (open app → DraftsScreen)
-        val editIntent = Intent(this, MainActivity::class.java).apply {
-            flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP
-            putExtra("navigate_to", "drafts")
-        }
+        // Open this draft directly, including from the HyperOS focus-card button.
+        val editIntent = CaptureNotificationContract.editIntent(this, transactionId, notifId)
         val editPendingIntent = PendingIntent.getActivity(
-            this, transactionId.toInt() + 50000, editIntent,
+            this, notifId, editIntent,
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setSmallIcon(R.drawable.ic_notification_expense)
             .setContentTitle("偵測到${typeText} $amountText")
             .setContentText("${typeText}${merchantText}，點擊確認記帳")
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -261,6 +256,11 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
                 editPendingIntent
             )
             .build()
+
+        val attachedIsland = HyperOsIslandNotification.attachIfSupported(
+            this, notification, editPendingIntent, amountText, typeText, parsed.merchant
+        )
+        Log.d(TAG, "HyperOS island template attached: $attachedIsland")
 
         nm.notify(notifId, notification)
         Log.d(TAG, "Heads-up notification shown: id=$notifId")
