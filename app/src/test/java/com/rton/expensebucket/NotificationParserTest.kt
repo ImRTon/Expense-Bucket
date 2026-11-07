@@ -15,6 +15,51 @@ class NotificationParserTest {
     private val parser = NotificationParser()
 
     @Test
+    fun rejectsSettlementBillingAndCampaignNotifications() {
+        val texts = listOf(
+            "交割款通知 2026/11/06 21:44:41 您於測試分公司的證券交割戶，將於11/10早上10:00前從交割戶扣款12,345元，請確保銀行餘額足夠。",
+            "交割款提醒 您於測試分公司的證券交割戶，將於11/05收到款項12,345元。",
+            "【週年慶贈最高21%】到指定分店，刷台新信用卡，消費滿5,000元贈最高1,050元等值回饋！",
+            "感謝您!台新銀行已於115年10月05日 收到信用卡帳單繳款金額:NT$12,345",
+            "消費扣款最高2.5%🔥 好評再延長！只要每月任7個營業日帳戶餘額存放新臺幣5萬元以上，次月享消費扣款最高2.5%回饋",
+            "消費通知 週年慶贈最高1,050元，刷卡滿5,000元享回饋",
+            "您上個月SPORT卡運動累積已達標且一般消費1234元，設定帳戶自動扣繳信用卡帳款，即可享有一般消費最高2%豐點回饋",
+            "提醒您已收到信用卡帳單，本期應繳NT$12,345",
+            "本行已收到您信用卡 2026/10/02 台幣繳款 12,345 元",
+            "刷卡失敗，消費NT$500，未完成授權"
+        )
+        texts.forEach { text ->
+            assertNull(text, parser.parse(text, "com.sinopac.DaCard"))
+            assertFalse(text, NotificationCapturePolicy.shouldKeepUnparsed(text))
+        }
+    }
+
+    @Test
+    fun parsesWalletMerchantWithoutPaymentCardText() {
+        listOf("••", "**").forEach { mask ->
+            val parsed = parser.parse(
+                "Sample Cafe B $413.00 (使用 示範現金回饋信用卡 ${mask}2468 付款)",
+                "com.google.android.apps.walletnfcrel"
+            )
+            assertNotNull(parsed)
+            assertEquals(413.0, parsed!!.amount, 0.001)
+            assertEquals("Sample Cafe B", parsed.merchant)
+            assertEquals("googlepay", parsed.paymentMethodHint)
+            assertTrue(parsed.isExpense)
+        }
+    }
+
+    @Test
+    fun keepsActualCardPurchaseWithBillingDisclaimerAndPromotionFooter() {
+        assertNotNull(parser.parse(
+            "永豐信用卡末四碼1234刷卡通知1150321_17:59金額台幣240元，商店名稱:TEST，資訊以帳單為準，指定通路最高回饋2%",
+            "com.sinopac.DaCard"
+        ))
+        assertNotNull(parser.parse("帳戶入帳通知 金額TWD$2,000元，自他行匯入您的新臺幣帳戶。2026/11/06 10:50:02"))
+        assertNotNull(parser.parse("退款成功 NT$500"))
+    }
+
+    @Test
     fun rejectsPromotionalAmountWithoutCompletedTransaction() {
         assertNull(parser.parse(
             "限時優惠！信用卡消費滿 NT$1,000 最高回饋 100 元，立即參加活動",
@@ -171,41 +216,41 @@ class NotificationParserTest {
     @Test
     fun parsesRealWorldFubonNotification() {
         val parsed = parser.parse(
-            text = "【刷卡消費通知】您的信用卡末四碼6773於03/28 13:09:10好市多中和店消費臺幣1,257元",
+            text = "【刷卡消費通知】您的信用卡末四碼2468於04/09 14:25:36示範量販甲店消費臺幣1,642元",
             packageName = "com.fubon.mobilebank"
         )
 
         assertNotNull(parsed)
         parsed!!
-        assertEquals(1257.0, parsed.amount, 0.001)
-        assertEquals("好市多中和店", parsed.merchant)
+        assertEquals(1642.0, parsed.amount, 0.001)
+        assertEquals("示範量販甲店", parsed.merchant)
         assertEquals("credit_card", parsed.paymentMethodHint)
 
         val calendar = Calendar.getInstance().apply { timeInMillis = parsed.date!! }
-        assertEquals(3, calendar.get(Calendar.MONTH) + 1)
-        assertEquals(28, calendar.get(Calendar.DAY_OF_MONTH))
-        assertEquals(13, calendar.get(Calendar.HOUR_OF_DAY))
-        assertEquals(9, calendar.get(Calendar.MINUTE))
+        assertEquals(4, calendar.get(Calendar.MONTH) + 1)
+        assertEquals(9, calendar.get(Calendar.DAY_OF_MONTH))
+        assertEquals(14, calendar.get(Calendar.HOUR_OF_DAY))
+        assertEquals(25, calendar.get(Calendar.MINUTE))
     }
 
     @Test
     fun parsesCreditCardNotificationWhenBankCopyChangesOrder() {
         val parsed = parser.parse(
-            text = "刷卡通知：卡號末四碼6773 03/28 13:09:10 好市多中和店 臺幣1,257 已授權",
+            text = "刷卡通知：卡號末四碼2468 04/09 14:25:36 示範量販甲店 臺幣1,642 已授權",
             packageName = "com.fubon.mobilebank"
         )
 
         assertNotNull(parsed)
         parsed!!
-        assertEquals(1257.0, parsed.amount, 0.001)
-        assertEquals("好市多中和店", parsed.merchant)
+        assertEquals(1642.0, parsed.amount, 0.001)
+        assertEquals("示範量販甲店", parsed.merchant)
         assertEquals("credit_card", parsed.paymentMethodHint)
 
         val calendar = Calendar.getInstance().apply { timeInMillis = parsed.date!! }
-        assertEquals(3, calendar.get(Calendar.MONTH) + 1)
-        assertEquals(28, calendar.get(Calendar.DAY_OF_MONTH))
-        assertEquals(13, calendar.get(Calendar.HOUR_OF_DAY))
-        assertEquals(9, calendar.get(Calendar.MINUTE))
+        assertEquals(4, calendar.get(Calendar.MONTH) + 1)
+        assertEquals(9, calendar.get(Calendar.DAY_OF_MONTH))
+        assertEquals(14, calendar.get(Calendar.HOUR_OF_DAY))
+        assertEquals(25, calendar.get(Calendar.MINUTE))
     }
 
     @Test

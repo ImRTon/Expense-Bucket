@@ -3,6 +3,8 @@ package com.rton.expensebucket.data.dao
 import androidx.room.*
 import androidx.room.Transaction as RoomTransaction
 import com.rton.expensebucket.data.model.Transaction
+import com.rton.expensebucket.data.model.NotificationCapture
+import com.rton.expensebucket.ocr.NotificationDeduplicator
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -44,34 +46,34 @@ interface TransactionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: Transaction): Long
 
-    @Query("""SELECT EXISTS(SELECT 1 FROM transactions
-        WHERE source = 'notification' AND amount = :amount AND note = :note
-          AND isExpense = :isExpense AND createdAt >= :recentSince
-          AND (:hasTransactionDate = 0 OR date = :transactionDate))""")
-    suspend fun hasMatchingNotificationTransaction(
-        amount: Double,
-        note: String,
-        isExpense: Boolean,
-        hasTransactionDate: Boolean,
-        transactionDate: Long,
-        recentSince: Long
-    ): Boolean
+    @Query("SELECT * FROM notification_captures WHERE capturedAt >= :recentSince ORDER BY capturedAt DESC")
+    suspend fun getRecentNotificationCaptures(recentSince: Long): List<NotificationCapture>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertNotificationCapture(capture: NotificationCapture)
+
+    @Query("DELETE FROM notification_captures WHERE capturedAt < :before")
+    suspend fun deleteOldNotificationCaptures(before: Long)
+
+    @Query("UPDATE transactions SET paymentMethodId = :paymentMethodId WHERE id = :id AND isDraft = 1 AND paymentMethodId IS NULL")
+    suspend fun fillDraftPaymentMethod(id: Long, paymentMethodId: Long)
 
     @RoomTransaction
     suspend fun insertNotificationDraftIfAbsent(
         transaction: Transaction,
-        hasTransactionDate: Boolean,
-        recentSince: Long
+        capture: NotificationCapture
     ): Long? {
-        if (hasMatchingNotificationTransaction(
-                transaction.amount,
-                transaction.note,
-                transaction.isExpense,
-                hasTransactionDate,
-                transaction.date,
-                recentSince
-            )) return null
-        return insertTransaction(transaction)
+        val recent = getRecentNotificationCaptures(capture.capturedAt - NotificationDeduplicator.MATCH_WINDOW_MS)
+        val duplicateId = NotificationDeduplicator.findDuplicate(capture, recent)
+        if (duplicateId != null) {
+            insertNotificationCapture(capture.copy(transactionId = duplicateId))
+            transaction.paymentMethodId?.let { fillDraftPaymentMethod(duplicateId, it) }
+            return null
+        }
+        val id = insertTransaction(transaction)
+        insertNotificationCapture(capture.copy(transactionId = id))
+        deleteOldNotificationCaptures(capture.capturedAt - 24 * 60 * 60 * 1000L)
+        return id
     }
 
     @Update

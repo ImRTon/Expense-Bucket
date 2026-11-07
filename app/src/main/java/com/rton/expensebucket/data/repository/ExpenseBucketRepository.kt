@@ -7,6 +7,7 @@ import com.rton.expensebucket.data.dao.ProjectDao
 import com.rton.expensebucket.data.dao.TransactionDao
 import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.NonPaymentNotification
+import com.rton.expensebucket.data.model.NotificationCapture
 import com.rton.expensebucket.data.model.PaymentMethod
 import com.rton.expensebucket.data.model.Project
 import com.rton.expensebucket.data.model.Transaction
@@ -46,9 +47,8 @@ class ExpenseBucketRepository @Inject constructor(
         transactionDao.insertTransaction(transaction)
     suspend fun insertNotificationDraftIfAbsent(
         transaction: Transaction,
-        hasTransactionDate: Boolean,
-        recentSince: Long
-    ): Long? = transactionDao.insertNotificationDraftIfAbsent(transaction, hasTransactionDate, recentSince)
+        capture: NotificationCapture
+    ): Long? = transactionDao.insertNotificationDraftIfAbsent(transaction, capture)
     suspend fun updateTransaction(transaction: Transaction) =
         transactionDao.updateTransaction(transaction)
     suspend fun deleteTransaction(transaction: Transaction) =

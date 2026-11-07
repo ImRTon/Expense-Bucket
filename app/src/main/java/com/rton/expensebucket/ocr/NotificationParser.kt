@@ -146,14 +146,33 @@ class NotificationParser {
      */
     fun parse(text: String, packageName: String? = null): ParsedTransaction? {
         val normalizedText = normalizeText(text)
-        if (NotificationCapturePolicy.isLikelyPromotion(normalizedText)) return null
+        if (NotificationCapturePolicy.shouldIgnore(normalizedText)) return null
+        val preferredAmount = NotificationAmountExtractor.bestAmount(normalizedText)
         var bestMatch: ParsedTransaction? = null
+
+        // Google Wallet places the merchant before the amount and the card after it.
+        if (packageName == "com.google.android.apps.walletnfcrel") {
+            val walletMatch = Regex("""^(.+?)\s+(?:NTD|TWD|NT)?\$\s*([\d,]+(?:\.\d+)?)\s*\(?使用\s+.+?付款""")
+                .find(normalizedText)
+            if (walletMatch != null) {
+                val amount = walletMatch.groupValues[2].replace(",", "").toDoubleOrNull()
+                if (amount != null && amount in 1.0..10_000_000.0) {
+                    return ParsedTransaction(
+                        amount = amount,
+                        merchant = walletMatch.groupValues[1].trim(),
+                        note = normalizedText.take(100),
+                        paymentMethodHint = "googlepay",
+                        confidence = 0.9f
+                    )
+                }
+            }
+        }
 
         for (p in patterns) {
             val matcher = p.regex.matcher(normalizedText)
             if (matcher.find()) {
                 val amountStr = matcher.group(p.amountGroup)?.replace(",", "") ?: continue
-                val amount = amountStr.toDoubleOrNull() ?: continue
+                val amount = preferredAmount ?: amountStr.toDoubleOrNull() ?: continue
                 if (amount < 1.0 || amount > 10_000_000) continue
 
                 val merchant = if (p.merchantGroup > 0) {
@@ -226,38 +245,7 @@ class NotificationParser {
         )
     }
 
-    private data class AmountCandidate(
-        val amount: Double,
-        val score: Int,
-        val index: Int
-    )
-
-    private fun extractBestAmount(text: String): Double? {
-        val candidates = mutableListOf<AmountCandidate>()
-
-        fun addMatches(regex: Regex, score: Int) {
-            regex.findAll(text).forEach { match ->
-                val amount = match.groupValues[1].replace(",", "").toDoubleOrNull() ?: return@forEach
-                val contextStart = (match.range.first - 16).coerceAtLeast(0)
-                val contextEnd = (match.range.last + 17).coerceAtMost(text.length)
-                val context = text.substring(contextStart, contextEnd)
-                val adjustedScore = score +
-                    (if (transactionKeywordRegex.containsMatchIn(context)) 12 else 0) -
-                    (if (balanceNoiseRegex.containsMatchIn(context)) 35 else 0)
-                candidates += AmountCandidate(amount, adjustedScore, match.range.first)
-            }
-        }
-
-        addMatches(Regex("""約當\s*$twdCurrencyToken\s*\$?\s*($amountNumber)\s*元?"""), 120)
-        addMatches(Regex("""(?:金額|消費金額|交易金額|請款金額|實付|刷卡|消費|扣款|支付|付款)\s*(?:約)?\s*(?:$genericAmountCurrencyToken\s*)?($amountNumber)\s*元?"""), 95)
-        addMatches(Regex("""$genericAmountCurrencyToken\s*($amountNumber)\s*元?"""), 85)
-        addMatches(Regex("""($amountNumber)\s*元"""), 65)
-
-        return candidates
-            .filter { it.amount in 1.0..10_000_000.0 }
-            .maxWithOrNull(compareBy<AmountCandidate> { it.score }.thenByDescending { -it.index })
-            ?.amount
-    }
+    private fun extractBestAmount(text: String): Double? = NotificationAmountExtractor.bestAmount(text)
 
     private fun extractDateText(text: String): String? {
         val datePatterns = listOf(

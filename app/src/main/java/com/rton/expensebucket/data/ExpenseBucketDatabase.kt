@@ -11,13 +11,14 @@ import com.rton.expensebucket.data.dao.ProjectDao
 import com.rton.expensebucket.data.dao.TransactionDao
 import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.NonPaymentNotification
+import com.rton.expensebucket.data.model.NotificationCapture
 import com.rton.expensebucket.data.model.PaymentMethod
 import com.rton.expensebucket.data.model.Project
 import com.rton.expensebucket.data.model.Transaction
 
 @Database(
-    entities = [Transaction::class, Category::class, Project::class, PaymentMethod::class, NonPaymentNotification::class],
-    version = 11,
+    entities = [Transaction::class, Category::class, Project::class, PaymentMethod::class, NonPaymentNotification::class, NotificationCapture::class],
+    version = 12,
     exportSchema = true
 )
 abstract class ExpenseBucketDatabase : RoomDatabase() {
@@ -28,6 +29,29 @@ abstract class ExpenseBucketDatabase : RoomDatabase() {
     abstract fun nonPaymentNotificationDao(): NonPaymentNotificationDao
 
     companion object {
+        val MIGRATION_11_12 = object : Migration(11, 12) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("""
+                    CREATE TABLE IF NOT EXISTS `notification_captures` (
+                        `transactionId` INTEGER NOT NULL,
+                        `packageName` TEXT NOT NULL,
+                        `notificationKey` TEXT NOT NULL,
+                        `textHash` TEXT NOT NULL,
+                        `amount` REAL NOT NULL,
+                        `currency` TEXT NOT NULL,
+                        `isExpense` INTEGER NOT NULL,
+                        `merchant` TEXT NOT NULL,
+                        `cardSuffix` TEXT,
+                        `transactionDate` INTEGER,
+                        `capturedAt` INTEGER NOT NULL,
+                        PRIMARY KEY(`transactionId`, `packageName`),
+                        FOREIGN KEY(`transactionId`) REFERENCES `transactions`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                """.trimIndent())
+                database.execSQL("CREATE INDEX IF NOT EXISTS `index_notification_captures_capturedAt` ON `notification_captures` (`capturedAt`)")
+            }
+        }
+
         /**
          * Migration from v1 → v2: adds payment_methods table and paymentMethodId column to transactions.
          */

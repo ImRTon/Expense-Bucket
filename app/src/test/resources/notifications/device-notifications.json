@@ -1,0 +1,133 @@
+[
+  {
+    "id": "settlement_debit_notice",
+    "origin": "device_note_reconstruction",
+    "text": "交割款通知 2025/04/09 14:25:36 您於示範分公司的證券交割戶,將於04/11早上09:30前從交割戶扣款12,345元,請確保銀行餘額足夠。",
+    "expectedAmount": null
+  },
+  {
+    "id": "settlement_debit_reminder",
+    "origin": "device_note_reconstruction",
+    "text": "交割款提醒 2025/04/09 14:25 您於示範分公司的證券交割戶,將於04/11早上09:30前從交割戶扣款23,456元,請確保銀行餘額足夠。",
+    "expectedAmount": null
+  },
+  {
+    "id": "settlement_credit_reminder",
+    "origin": "device_note_reconstruction",
+    "text": "交割款提醒 您於示範分公司的證券交割戶,將於04/11收到款項34,567元。",
+    "expectedAmount": null
+  },
+  {
+    "id": "anniversary_spending_threshold_and_reward",
+    "origin": "device_note_reconstruction",
+    "text": "【週年慶贈最高18%】114/04/1-06/13到示範百貨指定分店,刷示範信用卡,消費滿4,000元贈最高720元等值回饋！謹慎理財信用至上",
+    "expectedAmount": null
+  },
+  {
+    "id": "cashback_rate_and_account_balance",
+    "origin": "device_note_reconstruction",
+    "textMayBeTruncated": true,
+    "text": "消費扣款最高3.5%🔥 好評再延長！只要每月任9個營業日示範帳戶餘額存放新臺幣7萬元(含)以上,次月9日享示範帳戶消費扣款最高3.5%回饋,手刀參加>> ＊小提醒:本活動需至支付APP完成資",
+    "expectedAmount": null
+  },
+  {
+    "id": "monthly_spending_summary_and_cashback_ad",
+    "origin": "device_note_reconstruction",
+    "textMayBeTruncated": true,
+    "text": "親愛的示範卡友,您上個月示範卡運動累積已達標且一般消費3786元,為自己的汗水鼓鼓掌!! 提醒您記得設定銀行帳戶自動扣繳信用卡帳款,即可享有一般消費最高3%點數回饋,指定消費享最高6%點數回饋(",
+    "expectedAmount": null
+  },
+  {
+    "id": "bill_installment_minimum_ad",
+    "origin": "device_note_reconstruction",
+    "textMayBeTruncated": true,
+    "text": "預算告急？帳單壓力一鍵解 當月帳單可分期金額滿NT$4,200就能申請帳單分期,最高可拆24期！截止日前申請並繳足最低應繳,核准後下月起輕鬆還!立即設定👉謹慎理財信用至上,帳單消費分期各期利率及總費",
+    "expectedAmount": null
+  },
+  {
+    "id": "installment_prize_ad",
+    "origin": "device_note_reconstruction",
+    "textMayBeTruncated": true,
+    "text": "【了解分期減壓】月付金額清楚透明、現金流更好安排👉先試算再決定,輕鬆沒壓力,完成分期抽6,200元示範通路禮券,謹慎理財 信用至上｜單筆消費分期各期分期利率換算總費用年百分率為4%~14%。帳單消費分期",
+    "expectedAmount": null
+  },
+  {
+    "id": "credit_card_bill_payment_received",
+    "origin": "device_note_reconstruction",
+    "text": "感謝您!示範銀行已於114年04月09日 收到信用卡帳單繳款金額:NT$9,246",
+    "expectedAmount": null
+  },
+  {
+    "id": "bank_received_autopayment",
+    "origin": "device_note_reconstruction",
+    "text": "示範貴賓您好,本行已經收到您本行信用卡 2025/04/09 【示範自扣】台幣繳款 18,642 元。謹慎理財信用至上循環利率3.00~14%",
+    "expectedAmount": null
+  },
+  {
+    "id": "credit_card_statement_received",
+    "origin": "user_report_reconstruction",
+    "text": "收到信用卡帳單，本期應繳金額NT$6,314，請於期限內繳款。",
+    "expectedAmount": null
+  },
+  {
+    "id": "wallet_retail_payment",
+    "origin": "device_note_reconstruction",
+    "packageName": "com.google.android.apps.walletnfcrel",
+    "text": "SAMPLE MARKET A $1,642.00 (使用 示範聯名卡 ••2468 付款)",
+    "expectedAmount": 1642.0,
+    "expectedMerchant": "SAMPLE MARKET A",
+    "expectedIsExpense": true
+  },
+  {
+    "id": "wallet_cashback_card_product_name",
+    "origin": "device_note_reconstruction",
+    "packageName": "com.google.android.apps.walletnfcrel",
+    "text": "Sample Cafe B $413.00 (使用 示範現金回饋信用卡 ••1357 付款)",
+    "expectedAmount": 413.0,
+    "expectedMerchant": "Sample Cafe B",
+    "expectedIsExpense": true
+  },
+  {
+    "id": "wallet_transliterated_merchant",
+    "origin": "device_note_reconstruction",
+    "packageName": "com.google.android.apps.walletnfcrel",
+    "text": "sampleRetailC $82.00 (使用 示範SPORT卡 ••8642 付款)",
+    "expectedAmount": 82.0,
+    "expectedMerchant": "sampleRetailC",
+    "expectedIsExpense": true
+  },
+  {
+    "id": "wallet_merchant_with_branch_number",
+    "origin": "device_note_reconstruction",
+    "packageName": "com.google.android.apps.walletnfcrel",
+    "text": "Sample Meal D 31415 $1,326.00 (使用 示範SPORT卡 ••9753 付款)",
+    "expectedAmount": 1326.0,
+    "expectedMerchant": "Sample Meal D 31415",
+    "expectedIsExpense": true
+  },
+  {
+    "id": "wallet_second_retail_purchase",
+    "origin": "device_note_reconstruction",
+    "packageName": "com.google.android.apps.walletnfcrel",
+    "text": "SAMPLE MARKET E $1,138.00 (使用 示範聯名卡 ••6428 付款)",
+    "expectedAmount": 1138.0,
+    "expectedMerchant": "SAMPLE MARKET E",
+    "expectedIsExpense": true
+  },
+  {
+    "id": "wallet_uppercase_merchant",
+    "origin": "device_note_reconstruction",
+    "packageName": "com.google.android.apps.walletnfcrel",
+    "text": "SAMPLE STATIONERY F $2,486.00 (使用 示範SPORT卡 ••7531 付款)",
+    "expectedAmount": 2486.0,
+    "expectedMerchant": "SAMPLE STATIONERY F",
+    "expectedIsExpense": true
+  },
+  {
+    "id": "bank_incoming_transfer",
+    "origin": "device_note_reconstruction",
+    "text": "帳戶入帳通知 金額TWD$3,210元,自他行匯入您的新臺幣帳戶。2025/04/09 14:25:36",
+    "expectedAmount": 3210.0,
+    "expectedIsExpense": false
+  }
+]

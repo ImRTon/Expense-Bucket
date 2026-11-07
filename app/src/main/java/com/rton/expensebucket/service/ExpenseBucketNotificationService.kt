@@ -14,15 +14,19 @@ import androidx.core.app.NotificationCompat
 import com.rton.expensebucket.MainActivity
 import com.rton.expensebucket.R
 import com.rton.expensebucket.data.model.NonPaymentNotification
+import com.rton.expensebucket.data.model.NotificationCapture
 import com.rton.expensebucket.data.model.Transaction
 import com.rton.expensebucket.data.repository.ExpenseBucketRepository
 import com.rton.expensebucket.ocr.NotificationCapturePolicy
 import com.rton.expensebucket.ocr.NotificationParser
+import com.rton.expensebucket.ocr.NotificationDeduplicator
+import com.rton.expensebucket.ocr.NotificationPaymentMethodMatcher
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.first
 import java.text.NumberFormat
 import java.util.Locale
 import javax.inject.Inject
@@ -133,18 +137,33 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
         // Step 3: Insert as draft and show heads-up notification
         serviceScope.launch {
             try {
+                val paymentMethodId = if (pkg == "com.google.android.apps.walletnfcrel") {
+                    NotificationPaymentMethodMatcher.findPaymentMethodId(
+                        combined, repository.getAllPaymentMethods().first()
+                    )
+                } else null
                 val transactionId = repository.insertNotificationDraftIfAbsent(
                     Transaction(
                         amount = parsed.amount,
                         note = parsed.merchant.ifBlank { parsed.note },
                         isExpense = parsed.isExpense,
                         source = "notification",
+                        paymentMethodId = paymentMethodId,
                         isDraft = true,
-                        date = parsed.date ?: System.currentTimeMillis(),
-                        createdAt = System.currentTimeMillis()
+                        date = parsed.date ?: now,
+                        createdAt = now
                     ),
-                    hasTransactionDate = parsed.date != null,
-                    recentSince = now - 2 * 60 * 1000L
+                    NotificationCapture(
+                        packageName = pkg,
+                        notificationKey = sbn.key,
+                        textHash = NotificationDeduplicator.fingerprint(combined),
+                        amount = parsed.amount,
+                        isExpense = parsed.isExpense,
+                        merchant = parsed.merchant,
+                        cardSuffix = NotificationDeduplicator.extractCardSuffix(combined),
+                        transactionDate = parsed.date,
+                        capturedAt = now
+                    )
                 )
                 if (transactionId == null) {
                     Log.d(TAG, "[$pkg] Duplicate notification transaction, skipping")
