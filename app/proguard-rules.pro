@@ -5,17 +5,20 @@
 # For more details, see
 #   http://developer.android.com/guide/developing/tools/proguard.html
 
-# If your project uses WebView with JS, uncomment the following
-# and specify the fully qualified class name to the JavaScript interface
-# class:
-#-keepclassmembers class fqcn.of.javascript.interface.for.webview {
-#   public *;
-#}
+# Preserve line numbers for stack traces
+-keepattributes SourceFile,LineNumberTable
+-keepattributes Signature,InnerClasses,EnclosingMethod,RuntimeVisibleAnnotations
 
-# Uncomment this to preserve the line number information for
-# debugging stack traces.
-#-keepattributes SourceFile,LineNumberTable
-
-# If you keep the line number information, uncomment this to
-# hide the original source file name.
-#-renamesourcefileattribute SourceFile
+# Google ML Kit & Firebase Component discovery (prevents R8 from stripping DI fields like zzo.zza)
+-keep class com.google.mlkit.** { *; }
+-keep class com.google.android.gms.internal.mlkit** { *; }
+-keep class com.google.firebase.components.** { *; }
+-keep class * implements com.google.firebase.components.ComponentRegistrar { *; }
+-keep @com.google.android.gms.common.annotation.KeepName class *
+-keepclasseswithmembers class * {
+    @com.google.android.gms.common.annotation.KeepName *;
+}
+-keep @com.google.android.gms.common.annotation.KeepForSdk class * { *; }
+-keepnames class * implements android.os.Parcelable {
+    public static final ** CREATOR;
+}

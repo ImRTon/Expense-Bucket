@@ -40,16 +40,18 @@ import kotlin.math.min
 @Singleton
 class OcrEngine @Inject constructor() {
 
-    private val chineseRecognizer = TextRecognition.getClient(
-        ChineseTextRecognizerOptions.Builder().build()
-    )
-    private val japaneseRecognizer = TextRecognition.getClient(
-        JapaneseTextRecognizerOptions.Builder().build()
-    )
-    private val latinRecognizer = TextRecognition.getClient(
-        TextRecognizerOptions.DEFAULT_OPTIONS
-    )
-    private val languageIdentifier = LanguageIdentification.getClient()
+    private val chineseRecognizer by lazy {
+        TextRecognition.getClient(ChineseTextRecognizerOptions.Builder().build())
+    }
+    private val japaneseRecognizer by lazy {
+        TextRecognition.getClient(JapaneseTextRecognizerOptions.Builder().build())
+    }
+    private val latinRecognizer by lazy {
+        TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+    }
+    private val languageIdentifier by lazy {
+        LanguageIdentification.getClient()
+    }
     private val entityExtractorMutex = Mutex()
     private val entityExtractors = mutableMapOf<String, EntityExtractor>()
     private val entityModelReady = mutableMapOf<String, Boolean>()
