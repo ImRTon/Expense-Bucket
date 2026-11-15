@@ -51,7 +51,7 @@ class NotificationParser {
         ),
         // LINE Pay：「LINE Pay消費通知 在 全聯 支付 $356」
         NotifPattern(
-            regex = Pattern.compile("""(?:LINE\s*Pay).*[在於]\s*(.{2,20}?)\s*(?:支付|消費)\s*\$?\s*([\d,]+(?:\.\d+)?)""", Pattern.CASE_INSENSITIVE),
+            regex = Pattern.compile("""(?:LINE\s*Pay).*?[在於]\s*(.{2,30}?)\s*(?:支付|消費|付款)\s*$genericAmountCurrencyToken?\s*([\d,]+(?:\.\d+)?)""", Pattern.CASE_INSENSITIVE),
             amountGroup = 2,
             merchantGroup = 1,
             paymentHint = "linepay"
@@ -103,7 +103,7 @@ class NotificationParser {
         ),
         // 永豐信用卡新版：「永豐信用卡末四碼xxxx刷卡通知1150321_17:59金額日圓JPY$1,181.00，約當台幣$ 240元，商店名稱:XXXX，實際商店名稱......」
         NotifPattern(
-            regex = Pattern.compile("""永豐信用卡末四碼\d{4}刷卡通知\s*((?:\d{3,4})(?:\d{2}){2}_\d{1,2}:\d{1,2}).*?約當\s*$twdCurrencyToken\s*\$?\s*([\d,]+(?:\.\d+)?)\s*元.*?商店名稱[：:\s]*([^，,\n]+)"""),
+            regex = Pattern.compile("""永豐信用卡末四碼\d{4}刷卡通知\s*((?:\d{3,4})(?:\d{2}){2}_\d{1,2}:\d{1,2})(?:.*?約當|.*?金額)\s*$twdCurrencyToken\s*\$?\s*([\d,]+(?:\.\d+)?)\s*元.*?商店名稱[：:\s]*([^，,\n]+)"""),
             amountGroup = 2,
             merchantGroup = 3,
             paymentHint = "sinopac",
@@ -259,7 +259,7 @@ class NotificationParser {
         val dateThenMerchant =
             """(?:\d{1,4}[/-])?\d{1,2}[/-]\d{1,2}[\s-]\d{1,2}:\d{1,2}(?::\d{1,2})?"""
         val merchantPatterns = listOf(
-            Regex("""(?:商店名稱|特約商店|商店|店家)[：:\s]*([^,。；;\n]{2,40})"""),
+            Regex("""(?:商店名稱|消費商店|特約商店|商店|店家)[：:\s]*([^,。；;\n]{2,40})"""),
             Regex("""(?:實際消費|實際商店名稱)[：:\s]*([^,。；;\n]{2,40})"""),
             Regex("""[於在]\s*([^,。；;\n]{2,40}?)\s*(?:付款|支付|消費|刷卡)"""),
             Regex("""$dateThenMerchant\s*([^,。；;\n]{2,40}?)\s*(?:消費|刷卡|$genericAmountCurrencyToken|$amountNumber\s*元)""")
@@ -277,7 +277,8 @@ class NotificationParser {
         val cleaned = raw
             .trim()
             .trim(',', '，', '.', '。', ':', '：', ' ')
-            .replace(Regex("""^(商店名稱|特約商店|商店|店家|名稱)[：:\s]*"""), "")
+            .replace(Regex("""^(商店名稱|消費商店|特約商店|商店|店家|名稱)[：:\s]*"""), "")
+            .replace(Regex("""\s+(?:交易金額|消費金額|付款金額|實付金額|授權金額|金額|付款方式|支付方式|交易時間|消費時間|時間|卡號|訂單編號|獲得點數|點數折抵)[：:\s].*$"""), "")
             .replace(Regex("""(刷卡|消費|付款|支付|扣款|立即.*|如有.*|請以.*)$"""), "")
             .trim()
 

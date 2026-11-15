@@ -100,6 +100,109 @@ class NotificationDeduplicatorTest {
         assertEquals("1234", NotificationDeduplicator.extractCardSuffix("信用卡末四碼1234刷卡通知"))
         assertEquals("1234", NotificationDeduplicator.extractCardSuffix("使用 永豐SPORT卡 **1234 付款"))
         assertEquals("1234", NotificationDeduplicator.extractCardSuffix("使用 永豐SPORT卡 ••1234 付款"))
+        assertEquals("8888", NotificationDeduplicator.extractCardSuffix("中國信託 LINE Pay 卡 (尾號 8888)"))
         assertNull(NotificationDeduplicator.extractCardSuffix("末三碼123"))
+    }
+
+    @Test
+    fun deduplicatesSinopacDawhoAndDaCardCompanionApps() {
+        val dawho = bank.copy(
+            transactionId = 1,
+            packageName = "com.sinopac.dawho",
+            notificationKey = "dawho-key",
+            textHash = "dawho-text"
+        )
+        val daCard = bank.copy(
+            transactionId = 0,
+            packageName = "com.sinopac.DaCard",
+            notificationKey = "dacard-key",
+            textHash = "dacard-text",
+            capturedAt = dawho.capturedAt + 2_000L
+        )
+
+        assertEquals(1L, NotificationDeduplicator.findDuplicate(daCard, listOf(dawho)))
+        assertEquals(1L, NotificationDeduplicator.findDuplicate(
+            dawho.copy(transactionId = 0),
+            listOf(daCard.copy(transactionId = 1))
+        ))
+    }
+
+    @Test
+    fun deduplicatesLinePayAndBankCreditCardNotificationsIncludingThreeWay() {
+        val linePay = NotificationCapture(
+            transactionId = 1,
+            packageName = "jp.naver.line.android",
+            notificationKey = "line-key",
+            textHash = "line-text",
+            amount = 356.0,
+            isExpense = true,
+            merchant = "全聯",
+            cardSuffix = null,
+            transactionDate = null,
+            capturedAt = 1_000_000L
+        )
+        val dawho = NotificationCapture(
+            transactionId = 0,
+            packageName = "com.sinopac.dawho",
+            notificationKey = "dawho-key",
+            textHash = "dawho-text",
+            amount = 356.0,
+            isExpense = true,
+            merchant = "連加＊全聯福利中心",
+            cardSuffix = "1234",
+            transactionDate = 1_000_000L,
+            capturedAt = 1_002_000L
+        )
+        val daCard = dawho.copy(
+            packageName = "com.sinopac.DaCard",
+            notificationKey = "dacard-key",
+            textHash = "dacard-text",
+            capturedAt = 1_003_000L
+        )
+
+        // LINE Pay -> 大戶 -> 永豐大咖
+        assertEquals(1L, NotificationDeduplicator.findDuplicate(dawho, listOf(linePay)))
+        val capturedDawho = dawho.copy(transactionId = 1)
+        assertEquals(1L, NotificationDeduplicator.findDuplicate(daCard, listOf(capturedDawho, linePay)))
+
+        // 刷卡通知只有英文店名或「LINE PAY」且 LINE Pay 無末四碼時仍應去重
+        val bankEnglishMerchant = dawho.copy(merchant = "STARBUCKS")
+        assertEquals(1L, NotificationDeduplicator.findDuplicate(
+            bankEnglishMerchant,
+            listOf(linePay.copy(merchant = "星巴克"))
+        ))
+
+        val bankGatewayMerchant = dawho.copy(merchant = "連加網路")
+        assertEquals(1L, NotificationDeduplicator.findDuplicate(bankGatewayMerchant, listOf(linePay)))
+    }
+
+    @Test
+    fun deduplicatesLineWalletAndLineCardSwipeNotifications() {
+        val lineWallet = NotificationCapture(
+            transactionId = 1,
+            packageName = "jp.naver.line.android",
+            notificationKey = "line-wallet-key",
+            textHash = "line-wallet-text",
+            amount = 280.0,
+            isExpense = true,
+            merchant = "星巴克",
+            cardSuffix = null,
+            transactionDate = null,
+            capturedAt = 1_000_000L
+        )
+        val lineCardSwipe = NotificationCapture(
+            transactionId = 0,
+            packageName = "jp.naver.line.android#card",
+            notificationKey = "line-card-key",
+            textHash = "line-card-text",
+            amount = 280.0,
+            isExpense = true,
+            merchant = "LINE Pay-星巴克",
+            cardSuffix = "1234",
+            transactionDate = 1_000_000L,
+            capturedAt = 1_003_000L
+        )
+
+        assertEquals(1L, NotificationDeduplicator.findDuplicate(lineCardSwipe, listOf(lineWallet)))
     }
 }

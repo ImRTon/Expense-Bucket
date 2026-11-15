@@ -58,12 +58,15 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
 
             // Banks
             "tw.com.taishinbank.ccapp", // 台新 Richart Life
+            "tw.com.taishinbank.richart", // 台新 Richart
             "com.esunbank",             // 玉山銀行
             "com.cathaybk.mymobibank",  // 國泰世華
             "com.ctbcbank.ctbc",        // 中國信託
             "com.fubon.mobilebank",     // 富邦銀行
             "com.fubon.aibank",         // 富邦銀行 (aibank)
             "com.sinopac.DaCard",       // 永豐大咖
+            "com.sinopac.dawho",        // 永豐大戶
+            "com.sionpac.app.SinoPac",  // 永豐行動銀行
             "wbank.ubot.com.tw",        // 聯邦銀行
             "tw.gov.post.mpost",        // 郵局
 
@@ -140,6 +143,9 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
                         combined, repository.getAllPaymentMethods().first()
                     )
                 } else null
+                val capturePackage = if (pkg == "jp.naver.line.android" && combined.contains("刷卡")) {
+                    "$pkg#card"
+                } else pkg
                 val transactionId = repository.insertNotificationDraftIfAbsent(
                     Transaction(
                         amount = parsed.amount,
@@ -152,7 +158,7 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
                         createdAt = now
                     ),
                     NotificationCapture(
-                        packageName = pkg,
+                        packageName = capturePackage,
                         notificationKey = sbn.key,
                         textHash = NotificationDeduplicator.fingerprint(combined),
                         amount = parsed.amount,
@@ -336,6 +342,9 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
             "cathay",
             "ctbc",
             "sinopac",
+            "sionpac",
+            "dawho",
+            "dacard",
             "mpost",
             "jkos",
             "linepay",
