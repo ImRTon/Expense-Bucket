@@ -16,6 +16,27 @@ object CurrencyFormats {
         return "$currency ${numberFormat.format(amount)}"
     }
 
+    /**
+     * Compact amount format for list views: uses "$" for TWD (or matching settlement currency)
+     * to avoid repeating "TWD" on every line, and prefixes currency code only for foreign currencies.
+     */
+    fun formatCompactAmount(
+        currency: String,
+        amount: Double,
+        settlementCurrency: String = "TWD"
+    ): String {
+        val numberFormat = NumberFormat.getNumberInstance(Locale.getDefault()).apply {
+            minimumFractionDigits = 0
+            maximumFractionDigits = fractionDigitsFor(currency)
+        }
+        val formattedNumber = numberFormat.format(amount)
+        return if (currency == settlementCurrency && currency == "TWD") {
+            "$$formattedNumber"
+        } else {
+            "$currency $formattedNumber"
+        }
+    }
+
     fun formatRate(rate: Double): String {
         val numberFormat = NumberFormat.getNumberInstance(Locale.getDefault()).apply {
             minimumFractionDigits = 0

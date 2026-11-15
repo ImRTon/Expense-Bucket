@@ -9,7 +9,11 @@ import androidx.compose.material3.dynamicDarkColorScheme
 import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.ReadOnlyComposable
 import androidx.compose.runtime.SideEffect
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.platform.LocalContext
@@ -330,6 +334,41 @@ private val TropicalCactusLightColorScheme = lightColorScheme(
     surfaceContainerHighest = Color(0xFFE2D9EC)
 )
 
+@Immutable
+data class SemanticColors(
+    val expense: Color,
+    val expenseContainer: Color,
+    val onExpenseContainer: Color,
+    val income: Color,
+    val incomeContainer: Color,
+    val onIncomeContainer: Color
+)
+
+private val LightSemanticColors = SemanticColors(
+    expense = Color(0xFFE11D48),
+    expenseContainer = Color(0xFFFFE4E6),
+    onExpenseContainer = Color(0xFF881337),
+    income = Color(0xFF059669),
+    incomeContainer = Color(0xFFD1FAE5),
+    onIncomeContainer = Color(0xFF064E3B)
+)
+
+private val DarkSemanticColors = SemanticColors(
+    expense = Color(0xFFFB7185),
+    expenseContainer = Color(0xFF4C0519),
+    onExpenseContainer = Color(0xFFFFE4E6),
+    income = Color(0xFF34D399),
+    incomeContainer = Color(0xFF064E3B),
+    onIncomeContainer = Color(0xFFD1FAE5)
+)
+
+val LocalSemanticColors = staticCompositionLocalOf { LightSemanticColors }
+
+val MaterialTheme.semanticColors: SemanticColors
+    @Composable
+    @ReadOnlyComposable
+    get() = LocalSemanticColors.current
+
 @Composable
 fun ExpensesTheme(
     appTheme: AppTheme = AppTheme.SYSTEM,
@@ -357,6 +396,8 @@ fun ExpensesTheme(
         else -> LightColorScheme
     }
 
+    val semanticColors = if (darkTheme) DarkSemanticColors else LightSemanticColors
+
     val view = LocalView.current
     if (!view.isInEditMode) {
         SideEffect {
@@ -371,9 +412,12 @@ fun ExpensesTheme(
         }
     }
 
-    MaterialTheme(
-        colorScheme = colorScheme,
-        typography = Typography,
-        content = content
-    )
+    CompositionLocalProvider(LocalSemanticColors provides semanticColors) {
+        MaterialTheme(
+            colorScheme = colorScheme,
+            typography = Typography,
+            shapes = Shapes,
+            content = content
+        )
+    }
 }

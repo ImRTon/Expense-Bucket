@@ -115,3 +115,31 @@ val Typography = Typography(
         letterSpacing = 0.5.sp
     )
 )
+
+private const val TABULAR_NUMS = "tnum"
+
+val Typography.amountDisplay: TextStyle
+    get() = displaySmall.copy(
+        fontWeight = FontWeight.Bold,
+        letterSpacing = (-1).sp,
+        fontFeatureSettings = TABULAR_NUMS
+    )
+
+val Typography.amountLarge: TextStyle
+    get() = headlineMedium.copy(
+        fontWeight = FontWeight.Bold,
+        letterSpacing = (-0.5).sp,
+        fontFeatureSettings = TABULAR_NUMS
+    )
+
+val Typography.amountMedium: TextStyle
+    get() = titleMedium.copy(
+        fontWeight = FontWeight.Bold,
+        fontFeatureSettings = TABULAR_NUMS
+    )
+
+val Typography.amountSmall: TextStyle
+    get() = labelLarge.copy(
+        fontWeight = FontWeight.SemiBold,
+        fontFeatureSettings = TABULAR_NUMS
+    )
