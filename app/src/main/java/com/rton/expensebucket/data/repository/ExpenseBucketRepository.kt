@@ -55,6 +55,8 @@ class ExpenseBucketRepository @Inject constructor(
         transactionDao.deleteTransaction(transaction)
     suspend fun deleteTransactionById(id: Long) =
         transactionDao.deleteTransactionById(id)
+    suspend fun deleteAllDrafts() =
+        transactionDao.deleteAllDrafts()
     suspend fun confirmDraft(id: Long) =
         transactionDao.confirmDraft(id)
 

@@ -40,12 +40,14 @@ fun DraftsScreen(
     onConfirm: (Long) -> Unit,
     onDelete: (Transaction) -> Unit,
     onEdit: (Transaction) -> Unit,
+    onClearDrafts: () -> Unit = {},
     onClearNonPaymentNotifications: () -> Unit,
     onBack: () -> Unit
 ) {
     val dateFormat = remember { SimpleDateFormat("MM/dd HH:mm", Locale.getDefault()) }
     val categoryMap = remember(categories) { categories.associateBy { it.id } }
     var showNonPaymentInbox by remember { mutableStateOf(false) }
+    var showClearDraftsDialog by remember { mutableStateOf(false) }
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
@@ -65,6 +67,11 @@ fun DraftsScreen(
                     }
                 },
                 actions = {
+                    if (drafts.isNotEmpty()) {
+                        TextButton(onClick = { showClearDraftsDialog = true }) {
+                            Text("清空", color = MaterialTheme.colorScheme.error)
+                        }
+                    }
                     BadgedBox(
                         badge = {
                             if (nonPaymentNotifications.isNotEmpty()) {
@@ -136,6 +143,29 @@ fun DraftsScreen(
                 }
             }
         }
+    }
+
+    if (showClearDraftsDialog) {
+        AlertDialog(
+            onDismissRequest = { showClearDraftsDialog = false },
+            title = { Text("清空待確認記帳") },
+            text = { Text("確定要清空全部 ${drafts.size} 筆待確認紀錄嗎？") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        onClearDrafts()
+                        showClearDraftsDialog = false
+                    }
+                ) {
+                    Text("清空", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showClearDraftsDialog = false }) {
+                    Text("取消")
+                }
+            }
+        )
     }
 
     if (showNonPaymentInbox) {

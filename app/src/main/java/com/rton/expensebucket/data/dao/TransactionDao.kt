@@ -58,6 +58,9 @@ interface TransactionDao {
     @Query("UPDATE transactions SET paymentMethodId = :paymentMethodId WHERE id = :id AND isDraft = 1 AND paymentMethodId IS NULL")
     suspend fun fillDraftPaymentMethod(id: Long, paymentMethodId: Long)
 
+    @Query("DELETE FROM transactions WHERE isDraft = 1")
+    suspend fun deleteAllDrafts()
+
     @RoomTransaction
     suspend fun insertNotificationDraftIfAbsent(
         transaction: Transaction,

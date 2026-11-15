@@ -405,6 +405,10 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { repository.confirmDraft(id) }
     }
 
+    fun clearDrafts() {
+        viewModelScope.launch { repository.deleteAllDrafts() }
+    }
+
     fun clearNonPaymentNotifications() {
         viewModelScope.launch { repository.clearNonPaymentNotifications() }
     }
