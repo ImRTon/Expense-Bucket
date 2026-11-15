@@ -464,12 +464,6 @@ fun SettingsScreen(
                     importLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "application/csv", "*/*"))
                 }
             )
-            SettingsItem(
-                icon = Icons.Filled.Category,
-                title = "管理分類",
-                subtitle = "新增或編輯記帳分類",
-                onClick = onNavigateToCategories
-            )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
 
@@ -525,9 +519,9 @@ private fun SettingsItem(
 ) {
     Card(
         onClick = onClick,
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )
     ) {
         Row(
@@ -575,9 +569,9 @@ private fun SettingsToggleItem(
     onClick: (() -> Unit)? = null
 ) {
     Card(
-        shape = RoundedCornerShape(12.dp),
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f)
+            containerColor = MaterialTheme.colorScheme.surfaceContainerLow
         )
     ) {
         val modifier = if (onClick != null) {

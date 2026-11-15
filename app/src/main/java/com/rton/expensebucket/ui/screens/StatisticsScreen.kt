@@ -33,6 +33,8 @@ import androidx.compose.ui.unit.dp
 import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.Transaction
 import com.rton.expensebucket.data.model.effectiveConvertedAmount
+import com.rton.expensebucket.ui.theme.amountLarge
+import com.rton.expensebucket.ui.theme.amountSmall
 import com.rton.expensebucket.ui.util.IconMapper
 import kotlinx.coroutines.launch
 import java.text.NumberFormat
@@ -196,7 +198,7 @@ fun StatisticsScreen(
             // ─── Donut Chart ────────────────────────────────────
             item {
                 Card(
-                    shape = RoundedCornerShape(24.dp),
+                    shape = MaterialTheme.shapes.large,
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                     )
@@ -215,21 +217,12 @@ fun StatisticsScreen(
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
                             currencyFormat.format(totalExpense),
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Bold
-                            )
+                            style = MaterialTheme.typography.amountLarge
                         )
-                        Spacer(modifier = Modifier.height(20.dp))
+                        Spacer(modifier = Modifier.height(16.dp))
 
                         // Donut chart
                         if (chartData.isNotEmpty()) {
-                            Text(
-                                "左右滑動切換圖表",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.height(16.dp))
-
                             HorizontalPager(
                                 state = pagerState,
                                 modifier = Modifier
@@ -324,7 +317,7 @@ private fun CategoryStatItem(
     val color = Color(category?.color ?: 0xFF6B7280)
 
     Card(
-        shape = RoundedCornerShape(16.dp),
+        shape = MaterialTheme.shapes.medium,
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surface
         ),
@@ -340,9 +333,7 @@ private fun CategoryStatItem(
                 modifier = Modifier
                     .size(40.dp)
                     .clip(CircleShape)
-                    .then(
-                        Modifier.padding(0.dp)
-                    ),
+                    .background(color.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
@@ -368,9 +359,7 @@ private fun CategoryStatItem(
                     )
                     Text(
                         amount,
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.SemiBold
-                        )
+                        style = MaterialTheme.typography.amountSmall
                     )
                 }
                 Spacer(modifier = Modifier.height(6.dp))

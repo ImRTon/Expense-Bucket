@@ -377,6 +377,8 @@ fun ExpensesApp(
                 HomeScreen(
                     transactions = filteredTransactions,
                     categories = allCategories,
+                    paymentMethods = allPaymentMethods,
+                    projects = allProjects,
                     periodData = periodData,
                     monthlyBudget = monthlyBudget,
                     compareMode = compareMode,
@@ -513,6 +515,7 @@ fun ExpensesApp(
                     project = project,
                     transactions = projectTransactions,
                     categories = allCategories,
+                    paymentMethods = allPaymentMethods,
                     totalExpense = projectTotal ?: 0.0,
                     appPalette = currentPalette,
                     isDarkTheme = isDarkTheme,
@@ -631,14 +634,26 @@ fun ExpensesApp(
 
             // ─── Drafts ─────────────────────────────────────────────
             composable(Screen.Drafts.route) {
+                val context = androidx.compose.ui.platform.LocalContext.current
                 DraftsScreen(
                     drafts = draftTransactions,
                     nonPaymentNotifications = nonPaymentNotifications,
                     categories = allCategories,
-                    onConfirm = { viewModel.confirmDraft(it) },
-                    onDelete = { viewModel.deleteTransaction(it) },
+                    onConfirm = { id ->
+                        context.getSystemService(NotificationManager::class.java)?.cancel(id.toInt())
+                        viewModel.confirmDraft(id)
+                    },
+                    onDelete = { draft ->
+                        context.getSystemService(NotificationManager::class.java)?.cancel(draft.id.toInt())
+                        viewModel.deleteTransaction(draft)
+                    },
                     onEdit = { transaction ->
                         navController.navigate(Screen.EditTransaction.createRoute(transaction.id))
+                    },
+                    onClearDrafts = {
+                        val nm = context.getSystemService(NotificationManager::class.java)
+                        draftTransactions.forEach { draft -> nm?.cancel(draft.id.toInt()) }
+                        viewModel.clearDrafts()
                     },
                     onClearNonPaymentNotifications = { viewModel.clearNonPaymentNotifications() },
                     onBack = { navController.popBackStack() }

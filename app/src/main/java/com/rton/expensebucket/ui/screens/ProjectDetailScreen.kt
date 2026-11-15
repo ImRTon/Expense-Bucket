@@ -38,16 +38,20 @@ import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import com.rton.expensebucket.data.AppPalette
 import com.rton.expensebucket.data.model.Category
+import com.rton.expensebucket.data.model.PaymentMethod
 import com.rton.expensebucket.data.model.Project
 import com.rton.expensebucket.data.model.Transaction
 import com.rton.expensebucket.data.model.effectiveConvertedAmount
@@ -58,6 +62,8 @@ import com.rton.expensebucket.ui.components.TransactionListItemStyle
 import com.rton.expensebucket.ui.components.WaterLevelSurface
 import com.rton.expensebucket.ui.components.rememberWaterMotionState
 import com.rton.expensebucket.ui.components.waterLevelColor
+import com.rton.expensebucket.ui.theme.amountDisplay
+import com.rton.expensebucket.ui.theme.amountSmall
 import com.rton.expensebucket.ui.util.CurrencyFormats
 import com.rton.expensebucket.ui.util.IconMapper
 import java.text.NumberFormat
@@ -73,6 +79,7 @@ fun ProjectDetailScreen(
     project: Project? = null,
     transactions: List<Transaction>,
     categories: List<Category>,
+    paymentMethods: List<PaymentMethod> = emptyList(),
     totalExpense: Double,
     appPalette: AppPalette = AppPalette.DEFAULT,
     isDarkTheme: Boolean = false,
@@ -87,6 +94,7 @@ fun ProjectDetailScreen(
 ) {
     val settlementCurrency = project?.defaultCurrency ?: "TWD"
     val categoryMap = remember(categories) { categories.associateBy { it.id } }
+    val paymentMethodMap = remember(paymentMethods) { paymentMethods.associateBy { it.id } }
     val sortedTransactions = remember(transactions) { transactions.sortedByDescending { it.date } }
     val waterMotionState = rememberWaterMotionState()
     val categoryStats = remember(transactions) {
@@ -97,8 +105,16 @@ fun ProjectDetailScreen(
             .toList()
             .sortedByDescending { it.second }
     }
-    val transactionEntries: List<ProjectTransactionEntry> = remember(sortedTransactions) {
-        buildProjectTransactionEntries(sortedTransactions)
+    val groupedTransactions = remember(sortedTransactions) {
+        sortedTransactions.groupBy { transaction ->
+            Calendar.getInstance().apply {
+                timeInMillis = transaction.date
+                set(Calendar.HOUR_OF_DAY, 0)
+                set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0)
+                set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
+        }
     }
     
     var showEditDialog by remember { mutableStateOf(false) }
@@ -198,7 +214,7 @@ fun ProjectDetailScreen(
                     waterColor = waterColor,
                     motionState = waterMotionState,
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp)
+                    shape = MaterialTheme.shapes.large
                 ) {
                     val primaryTextColor = MaterialTheme.colorScheme.onSurface
                     val secondaryTextColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f)
@@ -219,10 +235,8 @@ fun ProjectDetailScreen(
                             )
                             Spacer(modifier = Modifier.height(4.dp))
                             Text(
-                                CurrencyFormats.formatAmount(settlementCurrency, totalExpense),
-                                style = MaterialTheme.typography.headlineMedium.copy(
-                                    fontWeight = FontWeight.Bold
-                                ),
+                                CurrencyFormats.formatCompactAmount(settlementCurrency, totalExpense, settlementCurrency),
+                                style = MaterialTheme.typography.amountDisplay,
                                 color = primaryTextColor
                             )
 
@@ -236,16 +250,16 @@ fun ProjectDetailScreen(
                                     modifier = Modifier.padding(end = 104.dp)
                                 ) {
                                     Text(
-                                        "預算 $currency ${NumberFormat.getNumberInstance().apply { maximumFractionDigits = 0 }.format(budget)}",
+                                        "預算 ${CurrencyFormats.formatCompactAmount(currency, budget, settlementCurrency)}",
                                         style = MaterialTheme.typography.labelMedium,
                                         color = tertiaryTextColor
                                     )
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(
                                         if (displayedRemainingAmount >= 0)
-                                            "剩餘 $currency ${NumberFormat.getNumberInstance().apply { maximumFractionDigits = 0 }.format(displayedRemainingAmount)}"
+                                            "剩餘 ${CurrencyFormats.formatCompactAmount(currency, displayedRemainingAmount, settlementCurrency)}"
                                         else
-                                            "超支 $currency ${NumberFormat.getNumberInstance().apply { maximumFractionDigits = 0 }.format(-displayedRemainingAmount)}",
+                                            "超支 ${CurrencyFormats.formatCompactAmount(currency, -displayedRemainingAmount, settlementCurrency)}",
                                         style = MaterialTheme.typography.bodySmall.copy(
                                             fontWeight = FontWeight.Medium
                                         ),
@@ -308,7 +322,7 @@ fun ProjectDetailScreen(
                             )
                         )
                         Surface(
-                            shape = RoundedCornerShape(24.dp),
+                            shape = MaterialTheme.shapes.medium,
                             color = MaterialTheme.colorScheme.surfaceContainerLow
                         ) {
                             Column {
@@ -327,40 +341,96 @@ fun ProjectDetailScreen(
                 }
             }
 
+            // ─── Grouped Day Transaction Cards (Unified with HomeScreen) ───
             item {
-                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Text(
-                        "交易明細",
-                        style = MaterialTheme.typography.titleMedium.copy(
-                            fontWeight = FontWeight.SemiBold
-                        ),
+                Text(
+                    "交易明細",
+                    style = MaterialTheme.typography.titleMedium.copy(
+                        fontWeight = FontWeight.SemiBold
                     )
+                )
+            }
+
+            if (groupedTransactions.isEmpty()) {
+                item {
                     Surface(
-                        shape = RoundedCornerShape(24.dp),
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = MaterialTheme.shapes.medium,
                         color = MaterialTheme.colorScheme.surfaceContainerLow
                     ) {
-                        if (transactionEntries.isEmpty()) {
-                            Text(
-                                text = "這個專案還沒有交易",
-                                style = MaterialTheme.typography.bodyMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp)
-                            )
-                        } else {
-                            Column {
-                                for (entry in transactionEntries) {
-                                    when (entry) {
-                                        is ProjectTransactionEntry.DateHeader -> {
-                                            ProjectDateDivider(label = entry.label)
-                                        }
-                                        is ProjectTransactionEntry.TransactionRow -> {
+                        Text(
+                            text = "這個專案還沒有交易",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp)
+                        )
+                    }
+                }
+            } else {
+                groupedTransactions.forEach { (dateMillis, dayTransactions) ->
+                    val dailyExpense = dayTransactions
+                        .filter { it.isExpense }
+                        .sumOf { it.effectiveConvertedAmount() }
+                    val dailyIncome = dayTransactions
+                        .filter { !it.isExpense }
+                        .sumOf { it.effectiveConvertedAmount() }
+
+                    item(key = "project_day_$dateMillis") {
+                        Column(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 4.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Text(
+                                    text = formatHomeDateHeader(dateMillis),
+                                    style = MaterialTheme.typography.titleSmall.copy(
+                                        fontWeight = FontWeight.Bold
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                val summaryText = buildList {
+                                    if (dailyExpense > 0) {
+                                        add("支出 ${CurrencyFormats.formatCompactAmount(settlementCurrency, dailyExpense, settlementCurrency)}")
+                                    }
+                                    if (dailyIncome > 0) {
+                                        add("收入 ${CurrencyFormats.formatCompactAmount(settlementCurrency, dailyIncome, settlementCurrency)}")
+                                    }
+                                }.joinToString(" · ")
+
+                                if (summaryText.isNotEmpty()) {
+                                    Text(
+                                        text = summaryText,
+                                        style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
+                                    )
+                                }
+                            }
+
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(MaterialTheme.shapes.medium),
+                                shape = MaterialTheme.shapes.medium,
+                                color = MaterialTheme.colorScheme.surfaceContainerLow
+                            ) {
+                                Column(modifier = Modifier.fillMaxWidth()) {
+                                    dayTransactions.forEach { transaction ->
+                                        key("tx_${transaction.id}") {
                                             TransactionListItem(
-                                                transaction = entry.transaction,
-                                                category = categoryMap[entry.transaction.categoryId],
+                                                transaction = transaction,
+                                                category = categoryMap[transaction.categoryId],
+                                                paymentMethodName = transaction.paymentMethodId?.let { paymentMethodMap[it]?.name },
                                                 settlementCurrency = settlementCurrency,
-                                                onDelete = { onDeleteTransaction(entry.transaction) },
-                                                onClick = { onTransactionClick(entry.transaction) },
-                                                style = TransactionListItemStyle.List
+                                                style = TransactionListItemStyle.List,
+                                                showDivider = false,
+                                                onDelete = { onDeleteTransaction(transaction) },
+                                                onClick = { onTransactionClick(transaction) }
                                             )
                                         }
                                     }
@@ -371,7 +441,7 @@ fun ProjectDetailScreen(
                 }
             }
 
-            item { Spacer(modifier = Modifier.height(16.dp)) }
+            item { Spacer(modifier = Modifier.height(80.dp)) }
         }
     }
 
@@ -446,94 +516,34 @@ private fun CategoryStatRow(
         supportingContent = {
             Column(
                 modifier = Modifier.padding(top = 6.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 LinearProgressIndicator(
                     progress = { ratio.coerceAtMost(1f) },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(6.dp),
+                        .height(6.dp)
+                        .clip(RoundedCornerShape(3.dp)),
                     color = categoryColor,
-                    trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f),
+                    trackColor = categoryColor.copy(alpha = 0.12f),
+                    strokeCap = StrokeCap.Round,
                     drawStopIndicator = {}
                 )
                 Text(
                     text = "${(ratio * 100).toInt()}%",
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         },
         trailingContent = {
             Text(
-                text = CurrencyFormats.formatAmount(settlementCurrency, totalAmount),
-                style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
+                text = CurrencyFormats.formatCompactAmount(settlementCurrency, totalAmount, settlementCurrency),
+                style = MaterialTheme.typography.amountSmall
             )
         },
         colors = ListItemDefaults.colors(
             containerColor = Color.Transparent
         )
     )
-}
-
-@Composable
-private fun ProjectDateDivider(label: String) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 10.dp),
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        Text(
-            text = label,
-            style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
-            color = MaterialTheme.colorScheme.primary
-        )
-        Spacer(modifier = Modifier.width(12.dp))
-        HorizontalDivider(
-            modifier = Modifier
-                .weight(1f)
-                .padding(top = 1.dp),
-            color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f)
-        )
-    }
-}
-
-private sealed interface ProjectTransactionEntry {
-    data class DateHeader(val label: String) : ProjectTransactionEntry
-    data class TransactionRow(val transaction: Transaction, val showDivider: Boolean) : ProjectTransactionEntry
-}
-
-private fun buildProjectTransactionEntries(
-    transactions: List<Transaction>
-): List<ProjectTransactionEntry> {
-    if (transactions.isEmpty()) return emptyList()
-
-    val grouped = transactions.groupBy { transaction ->
-        Calendar.getInstance().apply {
-            timeInMillis = transaction.date
-            set(Calendar.HOUR_OF_DAY, 0)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }.timeInMillis
-    }
-
-    val headerFormat = SimpleDateFormat("MM/dd EEE", Locale.getDefault())
-
-    return grouped
-        .toSortedMap(compareByDescending { it })
-        .flatMap { (dayStart, dayTransactions) ->
-            buildList {
-                add(ProjectTransactionEntry.DateHeader(headerFormat.format(Date(dayStart))))
-                dayTransactions.forEachIndexed { index, transaction ->
-                    add(
-                        ProjectTransactionEntry.TransactionRow(
-                            transaction = transaction,
-                            showDivider = index < dayTransactions.lastIndex
-                        )
-                    )
-                }
-            }
-        }
 }
