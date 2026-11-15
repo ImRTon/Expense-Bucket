@@ -3,10 +3,10 @@ package com.rton.expensebucket.ui.components
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
@@ -18,34 +18,31 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.rton.expensebucket.ui.util.ExpressionEvaluator
 
 /**
- * Custom 9-pad numpad with arithmetic operator support.
+ * Compact arithmetic numpad without duplicate amount header.
  * Layout:
- *   [ 7 ] [ 8 ] [ 9 ] [ ÷ ]
- *   [ 4 ] [ 5 ] [ 6 ] [ × ]
- *   [ 1 ] [ 2 ] [ 3 ] [ − ]
- *   [ . ] [ 0 ] [ ⌫ ] [ + ]
- *   [        ✓ 完成        ]
+ *   [ ÷ ] [ × ] [ − ] [ + ]
+ *   [ 7 ] [ 8 ] [ 9 ] [ ⌫ ]
+ *   [ 4 ] [ 5 ] [ 6 ] [   ]
+ *   [ 1 ] [ 2 ] [ 3 ] [ ✓ ]  (shows "=" when expression has operators)
+ *   [ . ] [ 0 ] [00 ] [   ]
  */
 @Composable
 fun ExpenseNumpad(
     displayAmount: String,
-    categories: List<com.rton.expensebucket.data.model.Category> = emptyList(),
-    selectedCategory: com.rton.expensebucket.data.model.Category? = null,
-    onCategorySelected: (com.rton.expensebucket.data.model.Category) -> Unit = {},
     onDigitClick: (String) -> Unit,
     onDotClick: () -> Unit,
     onBackspaceClick: () -> Unit,
     onConfirm: () -> Unit,
+    onEvaluate: (() -> Unit)? = null,
     includeNavigationBarInset: Boolean = true,
     bottomContentPadding: Dp = 0.dp,
     modifier: Modifier = Modifier
@@ -60,150 +57,131 @@ fun ExpenseNumpad(
         view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
     }
 
-    // Calculate result preview if expression has operators
-    val hasOperator = displayAmount.any { it in "+−×÷" }
-    val previewResult = if (hasOperator) {
-        ExpressionEvaluator.evaluate(displayAmount)?.let {
-            "= ${ExpressionEvaluator.formatResult(it)}"
-        }
-    } else null
+    val hasOperator = ExpressionEvaluator.hasOperator(displayAmount)
+    val keyHeight = 50.dp
+    val rowGap = 8.dp
+    val tallKeyHeight = keyHeight * 2 + rowGap
+    val topSheetShape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp)
 
     Surface(
         modifier = modifier
             .fillMaxWidth()
             .imePadding(),
-        color = MaterialTheme.colorScheme.surface
+        color = MaterialTheme.colorScheme.surfaceContainerHigh,
+        shape = topSheetShape,
+        tonalElevation = 3.dp
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .background(MaterialTheme.colorScheme.surface)
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                .padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(rowGap)
         ) {
-        Surface(
-            modifier = Modifier.fillMaxWidth(),
-            shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
-            // Combining solid surface color with the semi-transparent variant overlay
-            color = MaterialTheme.colorScheme.surface,
-            tonalElevation = 2.dp
-        ) {
-            Surface(
+            // ─── Top Operator Row: ÷ × − + ──────────────────────────
+            val operators = listOf("÷", "×", "−", "+")
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                color = MaterialTheme.colorScheme.surfaceContainerHigh,
-                shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp)
+                horizontalArrangement = Arrangement.spacedBy(rowGap)
             ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 12.dp, vertical = 8.dp)
-            ) {
-                // ─── Amount Display ─────────────────────────────────────
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = if (displayAmount.isEmpty()) "0" else displayAmount,
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            letterSpacing = (-0.5).sp
-                        ),
-                        color = MaterialTheme.colorScheme.onSurface,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        textAlign = TextAlign.End,
-                        modifier = Modifier.fillMaxWidth()
+                operators.forEach { op ->
+                    NumpadKey(
+                        label = op,
+                        height = 40.dp,
+                        containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                        isBold = true,
+                        onClick = {
+                            performKeyHaptic()
+                            onDigitClick(op)
+                        },
+                        modifier = Modifier.weight(1f)
                     )
-                    // Preview result when expression has operators
-                    if (previewResult != null) {
-                        Text(
-                            text = previewResult,
-                            style = MaterialTheme.typography.titleMedium,
-                            color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                            textAlign = TextAlign.End,
-                            modifier = Modifier.fillMaxWidth()
-                        )
-                    }
                 }
+            }
 
-                HorizontalDivider(
-                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
-                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f)
-                )
+            // ─── Main Grid: 3x4 digits on left + 2 tall keys on right ──
+            val digitRows = listOf(
+                listOf("7", "8", "9"),
+                listOf("4", "5", "6"),
+                listOf("1", "2", "3"),
+                listOf(".", "0", "00")
+            )
 
-                // ─── Numpad Grid (4×4 with operators) ───────────────────
-                val grid = listOf(
-                    listOf("7", "8", "9", "÷"),
-                    listOf("4", "5", "6", "×"),
-                    listOf("1", "2", "3", "−"),
-                    listOf(".", "0", "⌫", "+")
-                )
-
-                grid.forEach { row ->
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(vertical = 2.dp),
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
-                    ) {
-                        row.forEach { key ->
-                            val isOperator = key in listOf("+", "−", "×", "÷")
-                            val isBackspace = key == "⌫"
-
-                            NumpadKey(
-                                label = key,
-                                isOperator = isOperator,
-                                isBackspace = isBackspace,
-                                onClick = {
-                                    performKeyHaptic()
-                                    when (key) {
-                                        "⌫" -> onBackspaceClick()
-                                        "." -> onDotClick()
-                                        in listOf("+", "−", "×", "÷") -> onDigitClick(key)
-                                        else -> onDigitClick(key)
-                                    }
-                                },
-                                modifier = Modifier.weight(1f)
-                            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(rowGap)
+            ) {
+                // Left 3 columns
+                Column(
+                    modifier = Modifier.weight(3f),
+                    verticalArrangement = Arrangement.spacedBy(rowGap)
+                ) {
+                    digitRows.forEach { row ->
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(rowGap)
+                        ) {
+                            row.forEach { key ->
+                                NumpadKey(
+                                    label = key,
+                                    height = keyHeight,
+                                    containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+                                    contentColor = MaterialTheme.colorScheme.onSurface,
+                                    onClick = {
+                                        performKeyHaptic()
+                                        if (key == ".") {
+                                            onDotClick()
+                                        } else {
+                                            onDigitClick(key)
+                                        }
+                                    },
+                                    modifier = Modifier.weight(1f)
+                                )
+                            }
                         }
                     }
                 }
 
-                Spacer(modifier = Modifier.height(6.dp))
-
-                // ─── Confirm Button ─────────────────────────────────────
-                Button(
-                    onClick = {
-                        performConfirmHaptic()
-                        onConfirm()
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(50.dp)
-                        .padding(horizontal = 4.dp),
-                    shape = MaterialTheme.shapes.large,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = MaterialTheme.colorScheme.primary
-                    )
+                // Right column: Backspace (top 2 rows) + Confirm/Equals (bottom 2 rows)
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(rowGap)
                 ) {
-                    Icon(
-                        Icons.Filled.Check,
-                        contentDescription = "完成",
-                        modifier = Modifier.size(22.dp)
+                    NumpadKey(
+                        label = "⌫",
+                        height = tallKeyHeight,
+                        containerColor = MaterialTheme.colorScheme.surfaceContainer,
+                        contentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                        isBackspace = true,
+                        onClick = {
+                            performKeyHaptic()
+                            onBackspaceClick()
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
-                    Text(
-                        "完成",
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.SemiBold
-                        )
+
+                    NumpadKey(
+                        label = if (hasOperator) "=" else "✓",
+                        height = tallKeyHeight,
+                        containerColor = MaterialTheme.colorScheme.primary,
+                        contentColor = MaterialTheme.colorScheme.onPrimary,
+                        isConfirm = !hasOperator,
+                        isBold = true,
+                        onClick = {
+                            if (hasOperator && onEvaluate != null) {
+                                performKeyHaptic()
+                                onEvaluate()
+                            } else {
+                                performConfirmHaptic()
+                                onConfirm()
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     )
                 }
+            }
 
-                Spacer(modifier = Modifier.height(4.dp))
-            }
-            }
-        }
             if (includeNavigationBarInset) {
                 Spacer(
                     modifier = Modifier.windowInsetsBottomHeight(WindowInsets.navigationBars)
@@ -219,59 +197,61 @@ fun ExpenseNumpad(
 @Composable
 private fun NumpadKey(
     label: String,
-    isOperator: Boolean = false,
+    height: Dp,
+    containerColor: Color,
+    contentColor: Color,
     isBackspace: Boolean = false,
+    isConfirm: Boolean = false,
+    isBold: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
-        targetValue = if (isPressed) 0.92f else 1f,
-        animationSpec = tween(durationMillis = 100),
+        targetValue = if (isPressed) 0.94f else 1f,
+        animationSpec = tween(durationMillis = 90),
         label = "numpadScale"
     )
 
-    val bgColor = when {
-        isBackspace -> MaterialTheme.colorScheme.errorContainer
-        isOperator -> MaterialTheme.colorScheme.secondaryContainer
-        else -> MaterialTheme.colorScheme.surfaceContainerHighest
-    }
-    val textColor = when {
-        isBackspace -> MaterialTheme.colorScheme.onErrorContainer
-        isOperator -> MaterialTheme.colorScheme.onSecondaryContainer
-        else -> MaterialTheme.colorScheme.onSurface
-    }
-
-    Surface(
+    Box(
         modifier = modifier
-            .height(52.dp)
+            .height(height)
             .scale(scale)
-            .clip(RoundedCornerShape(12.dp))
+            .clip(MaterialTheme.shapes.medium)
+            .background(containerColor)
             .clickable(
                 interactionSource = interactionSource,
                 indication = ripple(bounded = true),
                 onClick = onClick
             ),
-        shape = RoundedCornerShape(12.dp),
-        color = bgColor,
-        tonalElevation = 1.dp
+        contentAlignment = Alignment.Center
     ) {
-        Box(contentAlignment = Alignment.Center) {
-            if (isBackspace) {
+        when {
+            isBackspace -> {
                 Icon(
                     Icons.AutoMirrored.Filled.Backspace,
                     contentDescription = "刪除",
-                    tint = textColor,
+                    tint = contentColor,
                     modifier = Modifier.size(22.dp)
                 )
-            } else {
+            }
+            isConfirm -> {
+                Icon(
+                    Icons.Filled.Check,
+                    contentDescription = "完成金額",
+                    tint = contentColor,
+                    modifier = Modifier.size(26.dp)
+                )
+            }
+            else -> {
                 Text(
                     text = label,
                     style = MaterialTheme.typography.titleLarge.copy(
-                        fontWeight = if (isOperator) FontWeight.Bold else FontWeight.Medium
+                        fontWeight = if (isBold) FontWeight.Bold else FontWeight.Medium,
+                        fontSize = if (label == "=") 24.sp else 20.sp
                     ),
-                    color = textColor
+                    color = contentColor
                 )
             }
         }

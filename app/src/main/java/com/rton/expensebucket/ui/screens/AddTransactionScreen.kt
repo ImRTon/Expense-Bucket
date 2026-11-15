@@ -1,13 +1,16 @@
 package com.rton.expensebucket.ui.screens
 
+import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectHorizontalDragGestures
+import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
@@ -15,44 +18,34 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import android.view.HapticFeedbackConstants
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.layout.onSizeChanged
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.compose.ui.window.Dialog
-import androidx.compose.ui.window.DialogProperties
 import com.rton.expensebucket.data.HistoricalCashRateProvider
 import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.PaymentMethod
 import com.rton.expensebucket.data.model.Project
 import com.rton.expensebucket.data.model.Transaction
-import com.rton.expensebucket.data.model.amortizationEndYearMonth
-import com.rton.expensebucket.data.model.amortizedShare
 import com.rton.expensebucket.data.model.millisForYearMonth
 import com.rton.expensebucket.data.model.yearMonthFromMillis
 import com.rton.expensebucket.ui.components.ExpenseNumpad
 import com.rton.expensebucket.ui.components.YearMonthPickerDialog
 import com.rton.expensebucket.ui.model.TransactionPrefill
+import com.rton.expensebucket.ui.theme.amountLarge
+import com.rton.expensebucket.ui.theme.semanticColors
 import com.rton.expensebucket.ui.util.CurrencyFormats
 import com.rton.expensebucket.ui.util.ExpressionEvaluator
-import com.rton.expensebucket.ui.util.PaymentIconMapper
-import java.text.SimpleDateFormat
-import java.util.*
+import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun AddTransactionScreen(
     categories: List<Category>,
@@ -74,14 +67,16 @@ fun AddTransactionScreen(
     val initialIsExpense = existingTransaction?.isExpense ?: prefill?.isExpense ?: true
 
     var amountText by remember {
-        mutableStateOf(initialAmount?.let {
-            if (it == it.toLong().toDouble()) it.toLong().toString() else it.toString()
-        } ?: "")
+        mutableStateOf(
+            initialAmount?.let { AddTransactionFormLogic.formatEditableTransactionAmount(it) } ?: ""
+        )
     }
     var personalAmountText by remember {
-        mutableStateOf(initialPersonalAmount?.let { formatEditableTransactionAmount(it) } ?: "")
+        mutableStateOf(
+            initialPersonalAmount?.let { AddTransactionFormLogic.formatEditableTransactionAmount(it) } ?: ""
+        )
     }
-    var showPersonalAmountDialog by remember { mutableStateOf(false) }
+    var showPersonalAmountSheet by remember { mutableStateOf(false) }
     var showAmortizationDialog by remember { mutableStateOf(false) }
     var amortizationEnabled by remember {
         mutableStateOf(existingTransaction?.amortizationEnabled == true)
@@ -95,17 +90,23 @@ fun AddTransactionScreen(
     var amortizationMonthCount by remember {
         mutableStateOf(existingTransaction?.amortizationMonthCount?.takeIf { it >= 2 } ?: 6)
     }
-    var selectedCategory by remember { mutableStateOf<Category?>(
-        existingTransaction?.categoryId?.let { catId -> categories.find { it.id == catId } }
-    ) }
+    var selectedCategory by remember {
+        mutableStateOf(
+            existingTransaction?.categoryId?.let { catId -> categories.find { it.id == catId } }
+        )
+    }
     var isExpense by remember { mutableStateOf(initialIsExpense) }
     var note by remember { mutableStateOf(initialNote) }
-    var showNoteField by remember { mutableStateOf(initialNote.isNotBlank()) }
     var selectedProjectId by remember { mutableStateOf(initialProjectSelectionId) }
     var hasUserEditedProjectSelection by remember {
         mutableStateOf(initialProjectSelectionId != null)
     }
-    var showProjectDropdown by remember { mutableStateOf(false) }
+    var showProjectSheet by remember { mutableStateOf(false) }
+    var showCurrencySheet by remember { mutableStateOf(false) }
+    var showDateTimeSheet by remember { mutableStateOf(false) }
+    var showPaymentMethodSheet by remember { mutableStateOf(false) }
+    var showDiscardDialog by remember { mutableStateOf(false) }
+
     val initialSettlementCurrency = initialProjectSelectionId
         ?.let { projectId -> projects.find { it.id == projectId }?.defaultCurrency }
         ?: "TWD"
@@ -115,7 +116,6 @@ fun AddTransactionScreen(
     var exchangeRateText by remember {
         mutableStateOf(CurrencyFormats.formatRate(existingTransaction?.exchangeRate ?: prefill?.exchangeRate ?: 1.0))
     }
-    var showCurrencyMenu by remember { mutableStateOf(false) }
     var previousSettlementCurrency by remember { mutableStateOf(initialSettlementCurrency) }
     var isFetchingExchangeRate by remember { mutableStateOf(false) }
     var exchangeRateError by remember { mutableStateOf<String?>(null) }
@@ -137,69 +137,50 @@ fun AddTransactionScreen(
         )
     }
 
-    // ─── Two-level category and payment methods state ────────────────────────────
     var expandedParentId by remember { mutableStateOf<Long?>(null) }
-    var expandedPaymentParentId by remember { mutableStateOf<Long?>(null) }
-
-    // ─── Numpad visibility state ─────────────────────────────
     var showNumpad by remember { mutableStateOf(!isEditMode) }
-
-    // ─── Back handler: close numpad first, then exit ─────────
-
-    BackHandler(enabled = showNumpad) {
-        showNumpad = false
-    }
-
-
+    var isNoteFocused by remember { mutableStateOf(false) }
     var selectedDateTime by remember {
         mutableStateOf(existingTransaction?.date ?: prefill?.date ?: System.currentTimeMillis())
     }
-    
-    var showDatePicker by remember { mutableStateOf(false) }
-    var showTimePicker by remember { mutableStateOf(false) }
-    
-    val datePickerState = rememberDatePickerState(
-        initialSelectedDateMillis = selectedDateTime
-    )
-    val timePickerState = rememberTimePickerState(
-        initialHour = Calendar.getInstance().apply { timeInMillis = selectedDateTime }.get(Calendar.HOUR_OF_DAY),
-        initialMinute = Calendar.getInstance().apply { timeInMillis = selectedDateTime }.get(Calendar.MINUTE),
-        is24Hour = true
-    )
 
     val view = LocalView.current
     val focusManager = LocalFocusManager.current
+    val density = androidx.compose.ui.platform.LocalDensity.current
+    val imeBottomPx = WindowInsets.ime.getBottom(density)
+    val snackbarHostState = remember { SnackbarHostState() }
+    val coroutineScope = rememberCoroutineScope()
 
-    // Auto-select active travel project that covers the selected transaction date.
+    val hasUnsavedInput = AddTransactionFormLogic.hasUnsavedInput(
+        amountText = amountText,
+        selectedCategoryId = selectedCategory?.id,
+        note = note,
+        personalAmountText = personalAmountText,
+        isEditMode = isEditMode
+    )
+
+    BackHandler(enabled = isNoteFocused) {
+        focusManager.clearFocus()
+    }
+
+    BackHandler(enabled = !isNoteFocused && showNumpad) {
+        showNumpad = false
+    }
+
+    BackHandler(enabled = !isNoteFocused && !showNumpad && hasUnsavedInput) {
+        showDiscardDialog = true
+    }
+
+    // Auto-select active travel project that covers the selected transaction date
     LaunchedEffect(projects, selectedDateTime, existingTransaction, hasUserEditedProjectSelection) {
         if (existingTransaction != null || hasUserEditedProjectSelection) return@LaunchedEffect
-
-        val match = projects
-            .filter { project ->
-                project.isActive &&
-                    project.startDate != null &&
-                    project.endDate != null &&
-                    isWithinProjectDateRange(
-                        targetDateTime = selectedDateTime,
-                        startDate = project.startDate,
-                        endDate = project.endDate
-                    )
-            }
-            .minByOrNull { project ->
-                (project.endDate ?: Long.MAX_VALUE) - (project.startDate ?: Long.MIN_VALUE)
-            }
-
-        selectedProjectId = match?.id
-    }
-    
-    LaunchedEffect(timePickerState.hour, timePickerState.minute) {
-        view.performHapticFeedback(HapticFeedbackConstants.CLOCK_TICK)
+        selectedProjectId = AddTransactionFormLogic.matchActiveProjectForDate(projects, selectedDateTime)?.id
     }
 
     // Update selectedCategory when isExpense changes (only in add mode)
     LaunchedEffect(isExpense, categories) {
         if (!isEditMode && selectedCategory != null) {
-            val matchesType = categories.find { it.id == selectedCategory?.id }
+            val matchesType = categories.find { it.id == selectedCategory?.id && it.isExpense == isExpense }
             if (matchesType == null) selectedCategory = null
         }
     }
@@ -207,7 +188,7 @@ fun AddTransactionScreen(
     LaunchedEffect(isExpense) {
         if (!isExpense) {
             personalAmountText = ""
-            showPersonalAmountDialog = false
+            showPersonalAmountSheet = false
             showAmortizationDialog = false
             amortizationEnabled = false
         }
@@ -219,7 +200,6 @@ fun AddTransactionScreen(
         }
     }
 
-    // Auto-hide numpad on scroll
     val scrollState = rememberScrollState()
     LaunchedEffect(scrollState.isScrollInProgress) {
         if (scrollState.isScrollInProgress && showNumpad) {
@@ -227,33 +207,32 @@ fun AddTransactionScreen(
         }
     }
 
+    // Automatically scroll down to reveal the expanded Note box as the software keyboard opens
+    LaunchedEffect(isNoteFocused, imeBottomPx, scrollState.maxValue) {
+        if (isNoteFocused) {
+            scrollState.animateScrollTo(scrollState.maxValue)
+        }
+    }
+
     val parentCategories = remember(categories, isExpense) {
-        categories.filter { it.isExpense == isExpense && it.parentId == null }
+        categories.filter { it.isExpense == isExpense && it.parentId == null }.sortedBy { it.sortOrder }
     }
     val childCategoriesMap = remember(categories) {
         categories.filter { it.parentId != null }.groupBy { it.parentId }
     }
-
     val parentPaymentMethods = remember(paymentMethods) {
         paymentMethods.filter { it.parentId == null }.sortedBy { it.sortOrder }
     }
     val childPaymentMethodsMap = remember(paymentMethods) {
         paymentMethods.filter { it.parentId != null }.groupBy { it.parentId }
     }
+    val selectedPaymentMethod = remember(selectedPaymentMethodId, paymentMethods) {
+        paymentMethods.find { it.id == selectedPaymentMethodId }
+    }
     val selectedProject = remember(selectedProjectId, projects) {
         projects.find { it.id == selectedProjectId }
     }
     val settlementCurrency = selectedProject?.defaultCurrency ?: "TWD"
-
-    // Resolve selected payment method parent for UI initialization
-    LaunchedEffect(selectedPaymentMethodId, paymentMethods) {
-        if (selectedPaymentMethodId != null && expandedPaymentParentId == null) {
-            val selectedMethod = paymentMethods.find { it.id == selectedPaymentMethodId }
-            if (selectedMethod?.parentId != null) {
-                expandedPaymentParentId = selectedMethod.parentId
-            }
-        }
-    }
 
     LaunchedEffect(settlementCurrency) {
         if (selectedCurrency == previousSettlementCurrency) {
@@ -288,1079 +267,615 @@ fun AddTransactionScreen(
             exchangeRateText = CurrencyFormats.formatRate(fetchedRate)
         }.onFailure {
             exchangeRateText = ""
-            exchangeRateError = "歷史現鈔匯率抓取失敗，可手動修正"
+            exchangeRateError = "匯率取得失敗，請手動輸入"
         }
         isFetchingExchangeRate = false
     }
 
-    // Can save?
-    val resolvedAmount = if (amountText.any { it in "+−×÷" }) {
-        ExpressionEvaluator.evaluate(amountText)
-    } else {
-        amountText.toDoubleOrNull()
-    }
+    val resolvedAmount = AddTransactionFormLogic.resolveAmount(amountText)
     val requiresExchangeRate = selectedCurrency != settlementCurrency
     val parsedExchangeRate = if (requiresExchangeRate) exchangeRateText.toDoubleOrNull() else 1.0
-    val parsedPersonalAmount = if (isExpense) personalAmountText.toDoubleOrNull() else null
+    val parsedPersonalAmount = if (isExpense && personalAmountText.isNotBlank()) {
+        AddTransactionFormLogic.resolveAmount(personalAmountText)
+    } else {
+        null
+    }
     val convertedAmount = if (resolvedAmount != null && parsedExchangeRate != null) {
         resolvedAmount * parsedExchangeRate
     } else {
         null
     }
     val budgetBaseAmount = if (isExpense) parsedPersonalAmount ?: resolvedAmount else null
-    val amortizationSummary = remember(
-        isExpense,
-        amortizationEnabled,
-        amortizationStartYearMonth,
-        amortizationMonthCount,
-        budgetBaseAmount,
-        selectedCurrency
-    ) {
-        if (isExpense && amortizationEnabled && amortizationMonthCount >= 2) {
-            formatAmortizationSummary(
-                currency = selectedCurrency,
-                amount = budgetBaseAmount,
-                startYearMonth = amortizationStartYearMonth,
-                monthCount = amortizationMonthCount
-            )
-        } else {
-            null
-        }
-    }
-    val personalAmountError = when {
-        parsedPersonalAmount == null && personalAmountText.isNotBlank() -> "請輸入正確金額"
-        parsedPersonalAmount != null && parsedPersonalAmount <= 0 -> "我的花費需大於 0"
-        parsedPersonalAmount != null && resolvedAmount != null && parsedPersonalAmount > resolvedAmount ->
-            "我的花費不能大於支出總額"
-        else -> null
-    }
-    val canSave = resolvedAmount?.let { it > 0 } == true &&
-        parsedExchangeRate?.let { it > 0 } == true &&
-        personalAmountError == null
+    val personalAmountError = AddTransactionFormLogic.validatePersonalAmount(
+        personalAmountText = personalAmountText,
+        isExpense = isExpense,
+        resolvedAmount = resolvedAmount
+    )
+    val canSave = AddTransactionFormLogic.canSave(
+        resolvedAmount = resolvedAmount,
+        parsedExchangeRate = parsedExchangeRate,
+        personalAmountError = personalAmountError
+    )
 
-    fun openPersonalAmountEditor() {
-        if (!isExpense) return
-        focusManager.clearFocus()
-        showNumpad = false
-        showPersonalAmountDialog = true
-    }
+    fun currentFormDraft() = AddTransactionFormDraft(
+        amountText = amountText,
+        personalAmountText = personalAmountText,
+        selectedCategoryId = selectedCategory?.id,
+        isExpense = isExpense,
+        note = note,
+        selectedDateTime = selectedDateTime,
+        selectedPaymentMethodId = selectedPaymentMethodId,
+        selectedProjectId = selectedProjectId,
+        selectedCurrency = selectedCurrency,
+        exchangeRateText = exchangeRateText,
+        amortizationEnabled = amortizationEnabled,
+        amortizationStartYearMonth = amortizationStartYearMonth,
+        amortizationMonthCount = amortizationMonthCount,
+        showNumpad = showNumpad
+    )
 
-    fun doSave() {
-        val amount = resolvedAmount ?: return
-        val exchangeRate = parsedExchangeRate ?: return
-        if (amount <= 0) return
+    fun doSave(exitAfterSave: Boolean = true) {
+        val transaction = AddTransactionFormLogic.buildTransaction(
+            existingTransaction = existingTransaction,
+            prefillSource = prefill?.source,
+            draft = currentFormDraft(),
+            settlementCurrency = settlementCurrency
+        ) ?: return
 
-        val transaction = Transaction(
-            id = existingTransaction?.id ?: 0,
-            amount = amount,
-            personalAmount = if (isExpense) parsedPersonalAmount?.takeIf { it > 0 } else null,
-            note = note,
-            categoryId = selectedCategory?.id,
-            isExpense = isExpense,
-            date = selectedDateTime,
-            source = existingTransaction?.source ?: prefill?.source ?: "manual",
-            projectId = selectedProjectId,
-            paymentMethodId = selectedPaymentMethodId,
-            currency = selectedCurrency,
-            exchangeRate = exchangeRate,
-            isDraft = false,
-            amortizationEnabled = isExpense && amortizationEnabled && amortizationMonthCount >= 2,
-            amortizationStartYearMonth = if (isExpense && amortizationEnabled && amortizationMonthCount >= 2) {
-                amortizationStartYearMonth
-            } else {
-                null
-            },
-            amortizationMonthCount = if (isExpense && amortizationEnabled && amortizationMonthCount >= 2) {
-                amortizationMonthCount
-            } else {
-                null
-            },
-            createdAt = existingTransaction?.createdAt ?: System.currentTimeMillis()
-        )
         onSave(transaction)
-        onBack()
-    }
-
-    // Operator input handler
-    fun handleInput(key: String) {
-        when (key) {
-            "+", "−", "×", "÷" -> {
-                // Don't add operator at start or after another operator
-                if (amountText.isEmpty()) return
-                val lastChar = amountText.last()
-                if (lastChar in "+−×÷") {
-                    // Replace last operator
-                    amountText = amountText.dropLast(1) + key
-                } else {
-                    amountText += key
-                }
-            }
-            else -> {
-                // Digit input
-                if (amountText.length >= 20) return
-                // After a calculation result, start fresh on digit
-                amountText += key
+        if (exitAfterSave) {
+            onBack()
+        } else {
+            view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+            val resetDraft = AddTransactionFormLogic.resetForSaveAndAddAnother(currentFormDraft())
+            amountText = resetDraft.amountText
+            personalAmountText = resetDraft.personalAmountText
+            selectedCategory = null
+            expandedParentId = null
+            note = resetDraft.note
+            amortizationEnabled = resetDraft.amortizationEnabled
+            amortizationStartYearMonth = resetDraft.amortizationStartYearMonth
+            amortizationMonthCount = resetDraft.amortizationMonthCount
+            showNumpad = resetDraft.showNumpad
+            focusManager.clearFocus()
+            coroutineScope.launch {
+                snackbarHostState.currentSnackbarData?.dismiss()
+                snackbarHostState.showSnackbar(
+                    message = "已儲存",
+                    duration = SnackbarDuration.Short
+                )
             }
         }
     }
+
+    val semanticColors = MaterialTheme.semanticColors
 
     Scaffold(
+        modifier = Modifier
+            .fillMaxSize()
+            .imePadding(),
+        snackbarHost = {
+            SnackbarHost(hostState = snackbarHostState)
+        },
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        when {
-                            isEditMode -> "編輯記帳"
-                            isExpense -> "新增支出"
-                            else -> "新增收入"
-                        },
-                        style = MaterialTheme.typography.titleLarge
-                    )
-                },
+            CenterAlignedTopAppBar(
                 navigationIcon = {
-                    IconButton(onClick = onBack) {
+                    IconButton(
+                        onClick = {
+                            if (hasUnsavedInput) {
+                                showDiscardDialog = true
+                            } else {
+                                onBack()
+                            }
+                        }
+                    ) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
                     }
                 },
-                actions = {
-                    IconButton(
-                        onClick = { doSave() },
-                        enabled = canSave
+                title = {
+                    // Expense / Income Pill Toggle: uniform 4.dp inset padding around outer track
+                    Box(
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh)
+                            .padding(4.dp)
                     ) {
-                        Icon(
-                            Icons.Filled.Check,
-                            contentDescription = "儲存",
-                            tint = if (canSave) MaterialTheme.colorScheme.primary
-                                   else MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                        )
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(2.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            val expenseSelected = isExpense
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(if (expenseSelected) semanticColors.expense else Color.Transparent)
+                                    .clickable {
+                                        isExpense = true
+                                        expandedParentId = null
+                                        focusManager.clearFocus()
+                                    }
+                                    .padding(horizontal = 22.dp, vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "支出",
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        fontWeight = if (expenseSelected) FontWeight.Bold else FontWeight.Medium
+                                    ),
+                                    color = if (expenseSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+
+                            val incomeSelected = !isExpense
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(if (incomeSelected) semanticColors.income else Color.Transparent)
+                                    .clickable {
+                                        isExpense = false
+                                        expandedParentId = null
+                                        focusManager.clearFocus()
+                                    }
+                                    .padding(horizontal = 22.dp, vertical = 6.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "收入",
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        fontWeight = if (incomeSelected) FontWeight.Bold else FontWeight.Medium
+                                    ),
+                                    color = if (incomeSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                        }
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(
+                colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                     containerColor = MaterialTheme.colorScheme.surface
                 )
             )
+        },
+        bottomBar = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.surface)
+            ) {
+                AnimatedVisibility(
+                    visible = showNumpad,
+                    enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                    exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+                ) {
+                    ExpenseNumpad(
+                        displayAmount = amountText,
+                        includeNavigationBarInset = true,
+                        onDigitClick = { key ->
+                            amountText = AddTransactionFormLogic.appendAmountKey(amountText, key)
+                        },
+                        onDotClick = {
+                            amountText = AddTransactionFormLogic.appendAmountDot(amountText)
+                        },
+                        onBackspaceClick = {
+                            if (amountText.isNotEmpty()) {
+                                amountText = amountText.dropLast(1)
+                            }
+                        },
+                        onEvaluate = {
+                            amountText = AddTransactionFormLogic.evaluateExpressionToText(amountText)
+                        },
+                        onConfirm = {
+                            amountText = AddTransactionFormLogic.evaluateExpressionToText(amountText)
+                            showNumpad = false
+                        }
+                    )
+                }
+
+                AnimatedVisibility(
+                    visible = !showNumpad && !isNoteFocused,
+                    enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
+                    exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
+                ) {
+                    Surface(
+                        color = MaterialTheme.colorScheme.surface,
+                        tonalElevation = 2.dp
+                    ) {
+                        val buttonBgColor = if (canSave) {
+                            MaterialTheme.colorScheme.primary
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.12f)
+                        }
+                        val buttonContentColor = if (canSave) {
+                            MaterialTheme.colorScheme.onPrimary
+                        } else {
+                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f)
+                        }
+
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .navigationBarsPadding()
+                                .padding(horizontal = 16.dp, vertical = 10.dp)
+                        ) {
+                            Surface(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(52.dp)
+                                    .clip(MaterialTheme.shapes.large)
+                                    .combinedClickable(
+                                        enabled = canSave,
+                                        onClick = { doSave(exitAfterSave = true) },
+                                        onLongClick = {
+                                            if (!isEditMode && canSave) {
+                                                doSave(exitAfterSave = false)
+                                            }
+                                        }
+                                    ),
+                                shape = MaterialTheme.shapes.large,
+                                color = buttonBgColor
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxSize(),
+                                    horizontalArrangement = Arrangement.Center,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Check,
+                                        contentDescription = null,
+                                        tint = buttonContentColor,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(
+                                        text = if (isEditMode) "更新" else "儲存",
+                                        style = MaterialTheme.typography.titleMedium.copy(
+                                            fontWeight = FontWeight.SemiBold
+                                        ),
+                                        color = buttonContentColor
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     ) { padding ->
-        Box(
+        Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
         ) {
-            // ═══════════════════════════════════════════════════════
-            // Scrollable form
-            // ═══════════════════════════════════════════════════════
+            // ─── Fixed Amount Header at Top (includes Currency & Split) ───
+            val parentCategoryName = remember(selectedCategory, parentCategories) {
+                selectedCategory?.parentId?.let { pId ->
+                    parentCategories.find { it.id == pId }?.name
+                }
+            }
+
+            AmountHeader(
+                amountText = amountText,
+                resolvedAmount = resolvedAmount,
+                isExpense = isExpense,
+                selectedCategory = selectedCategory,
+                parentCategoryName = parentCategoryName,
+                selectedCurrency = selectedCurrency,
+                settlementCurrency = settlementCurrency,
+                parsedExchangeRate = parsedExchangeRate,
+                convertedAmount = convertedAmount,
+                parsedPersonalAmount = parsedPersonalAmount,
+                personalAmountError = personalAmountError,
+                isNumpadVisible = showNumpad,
+                onAmountClick = {
+                    focusManager.clearFocus()
+                    showNumpad = true
+                },
+                onCurrencyClick = {
+                    focusManager.clearFocus()
+                    showNumpad = false
+                    showCurrencySheet = true
+                },
+                onPersonalAmountClick = {
+                    if (isExpense) {
+                        focusManager.clearFocus()
+                        showNumpad = false
+                        showPersonalAmountSheet = true
+                    }
+                }
+            )
+
+            // ─── Scrollable Form Content ────────────────────────────
             Column(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
+                    .weight(1f)
                     .verticalScroll(scrollState)
-                    .imePadding()
-                    .padding(bottom = 8.dp)
+                    .padding(bottom = 16.dp)
             ) {
-                // ─── Amount Display (tappable) ───────────────────
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                ) {
-                    Card(
-                        onClick = {
-                            focusManager.clearFocus()
-                            showNumpad = true
-                        },
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = MaterialTheme.shapes.extraLarge,
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
-                        )
-                    ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 20.dp, vertical = 16.dp),
-                            verticalArrangement = Arrangement.spacedBy(6.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                if (isExpense) {
-                                    PersonalAmountHandle(
-                                        isActive = parsedPersonalAmount != null,
-                                        onTrigger = { openPersonalAmountEditor() }
-                                    )
-                                }
-                                Text(
-                                    if (isExpense) "支出總額" else "收入金額",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
-                                if (isExpense && parsedPersonalAmount != null) {
-                                    Text(
-                                        "已設定我的花費",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                }
-                            }
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Text(
-                                    selectedCurrency,
-                                    style = MaterialTheme.typography.titleLarge.copy(
-                                        fontWeight = FontWeight.Bold,
-                                        color = MaterialTheme.colorScheme.primary
-                                    )
-                                )
-                                Spacer(modifier = Modifier.width(4.dp))
-                                Column(
-                                    modifier = Modifier.weight(1f),
-                                    horizontalAlignment = Alignment.End
-                                ) {
-                                    Text(
-                                        text = if (amountText.isEmpty()) "0" else amountText,
-                                        style = MaterialTheme.typography.displaySmall.copy(
-                                            fontWeight = FontWeight.Bold,
-                                            letterSpacing = (-1).sp
-                                        ),
-                                        color = if (amountText.isEmpty())
-                                            MaterialTheme.colorScheme.onSurface.copy(alpha = 0.3f)
-                                        else
-                                            MaterialTheme.colorScheme.onSurface,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        textAlign = TextAlign.End
-                                    )
-                                    if (amountText.any { it in "+−×÷" }) {
-                                        resolvedAmount?.let { result ->
-                                            Text(
-                                                "= ${ExpressionEvaluator.formatResult(result)}",
-                                                style = MaterialTheme.typography.titleSmall,
-                                                color = MaterialTheme.colorScheme.primary.copy(alpha = 0.7f),
-                                                textAlign = TextAlign.End,
-                                                modifier = Modifier.fillMaxWidth()
-                                            )
-                                        }
-                                    }
-                                    if (isExpense) parsedPersonalAmount?.let {
-                                        Text(
-                                            "我的花費 ${CurrencyFormats.formatAmount(selectedCurrency, it)}",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                            textAlign = TextAlign.End,
-                                            modifier = Modifier.fillMaxWidth()
-                                        )
-                                    }
-                                }
-                                if (!showNumpad) {
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Icon(
-                                        Icons.Filled.Edit,
-                                        contentDescription = "編輯金額",
-                                        tint = MaterialTheme.colorScheme.primary.copy(alpha = 0.6f),
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                }
-                            }
-                            if (isExpense) personalAmountError?.let { error ->
-                                Text(
-                                    error,
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.error
-                                )
-                            }
-                        }
+                CategoryGrid(
+                    parentCategories = parentCategories,
+                    childCategoriesMap = childCategoriesMap,
+                    selectedCategory = selectedCategory,
+                    expandedParentId = expandedParentId,
+                    onSelectCategory = { cat ->
+                        selectedCategory = cat
+                        focusManager.clearFocus()
+                        showNumpad = false
+                    },
+                    onToggleExpandParent = { parentId ->
+                        expandedParentId = parentId
+                        focusManager.clearFocus()
+                        showNumpad = false
                     }
-                }
+                )
 
-                // ─── Expense / Income Toggle ─────────────────────
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    horizontalArrangement = Arrangement.Center
-                ) {
-                    SingleChoiceSegmentedButtonRow(
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        SegmentedButton(
-                            selected = isExpense,
-                            onClick = { 
-                                isExpense = true
-                                expandedParentId = null
-                                focusManager.clearFocus()
-                                showNumpad = false
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = 0, count = 2),
-                            label = { Text("支出") }
-                        )
-                        SegmentedButton(
-                            selected = !isExpense,
-                            onClick = { 
-                                isExpense = false
-                                expandedParentId = null
-                                focusManager.clearFocus()
-                                showNumpad = false
-                            },
-                            shape = SegmentedButtonDefaults.itemShape(index = 1, count = 2),
-                            label = { Text("收入") }
-                        )
-                    }
-                }
-
-                // ─── Date display ────────────────────────────────
-                OutlinedCard(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp),
-                    shape = MaterialTheme.shapes.large
-                ) {
-                    val cal = Calendar.getInstance().apply { timeInMillis = selectedDateTime }
-                    val dFormat = remember { SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()) }
-                    val tFormat = remember { SimpleDateFormat("HH:mm", Locale.getDefault()) }
-                    
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(0.dp)
-                    ) {
-                    TextButton(
-                        onClick = { 
-                            showDatePicker = true
-                            focusManager.clearFocus()
-                            showNumpad = false
-                        },
-                        modifier = Modifier.weight(1f).heightIn(min = 56.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Filled.DateRange,
-                                contentDescription = "選擇日期",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(dFormat.format(cal.time), style = MaterialTheme.typography.bodyMedium)
-                        }
-                    }
-                    VerticalDivider(
-                        modifier = Modifier.height(24.dp).align(Alignment.CenterVertically),
-                        color = MaterialTheme.colorScheme.outlineVariant
-                    )
-                    TextButton(
-                        onClick = { 
-                            showTimePicker = true
-                            focusManager.clearFocus()
-                            showNumpad = false
-                        },
-                        modifier = Modifier.weight(1f).heightIn(min = 56.dp)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Filled.Schedule,
-                                contentDescription = "選擇時間",
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(tFormat.format(cal.time), style = MaterialTheme.typography.bodyMedium)
-                        }
-                    }
-                }
-
-                }
-                if (isExpense) {
-                    OutlinedCard(
-                        onClick = {
+                TransactionDetailList(
+                    selectedDateTime = selectedDateTime,
+                    selectedPaymentMethod = selectedPaymentMethod,
+                    projects = projects,
+                    selectedProject = selectedProject,
+                    isExpense = isExpense,
+                    amortizationEnabled = amortizationEnabled,
+                    amortizationMonthCount = amortizationMonthCount,
+                    note = note,
+                    isNoteFocused = isNoteFocused,
+                    onDateClick = {
+                        focusManager.clearFocus()
+                        showNumpad = false
+                        showDateTimeSheet = true
+                    },
+                    onPaymentMethodClick = {
+                        focusManager.clearFocus()
+                        showNumpad = false
+                        showPaymentMethodSheet = true
+                    },
+                    onProjectClick = {
+                        focusManager.clearFocus()
+                        showNumpad = false
+                        showProjectSheet = true
+                    },
+                    onAmortizationClick = {
+                        if (isExpense) {
                             focusManager.clearFocus()
                             showNumpad = false
                             showAmortizationDialog = true
-                        },
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                        shape = MaterialTheme.shapes.large,
-                        colors = CardDefaults.outlinedCardColors(
-                            containerColor = if (amortizationEnabled) {
-                                MaterialTheme.colorScheme.secondaryContainer
-                            } else {
-                                MaterialTheme.colorScheme.surfaceContainerLow
-                            }
-                        )
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 14.dp, vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Icon(
-                                Icons.Filled.CalendarMonth,
-                                contentDescription = null,
-                                tint = if (amortizationEnabled) {
-                                    MaterialTheme.colorScheme.primary
-                                } else {
-                                    MaterialTheme.colorScheme.onSurfaceVariant
-                                },
-                                modifier = Modifier.size(22.dp)
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text(
-                                    "攤提",
-                                    style = MaterialTheme.typography.labelLarge.copy(
-                                        fontWeight = FontWeight.SemiBold
-                                    ),
-                                    color = MaterialTheme.colorScheme.onSurface
-                                )
-                                Text(
-                                    amortizationSummary ?: "將一筆支出平均分配到多個月份的預算",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = if (amortizationEnabled) {
-                                        MaterialTheme.colorScheme.primary
-                                    } else {
-                                        MaterialTheme.colorScheme.onSurfaceVariant
-                                    },
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                            Icon(
-                                Icons.Filled.ChevronRight,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
                         }
-                    }
-                }
-
-                // ─── Two-Level Category Selector ─────────────────
-                if (parentCategories.isNotEmpty()) {
-                    Text(
-                        "分類",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 20.dp, top = 8.dp, bottom = 6.dp)
-                    )
-                    // Parent categories
-                    Row(
-                        modifier = Modifier
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        parentCategories.forEach { parent ->
-                            val chipColor = Color(parent.color)
-                            val isParentSelected = expandedParentId == parent.id ||
-                                selectedCategory?.parentId == parent.id ||
-                                selectedCategory?.id == parent.id
-                            FilterChip(
-                                selected = isParentSelected,
-                                onClick = {
-                                    val children = childCategoriesMap[parent.id]
-                                    if (children.isNullOrEmpty()) {
-                                        selectedCategory = parent
-                                        expandedParentId = null
-                                    } else {
-                                        expandedParentId = if (expandedParentId == parent.id) null else parent.id
-                                    }
-                                    focusManager.clearFocus()
-                                    showNumpad = false
-                                },
-                                label = { Text(parent.name, style = MaterialTheme.typography.labelMedium) },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    containerColor = chipColor.copy(alpha = 0.1f),
-                                    labelColor = chipColor,
-                                    selectedContainerColor = chipColor,
-                                    selectedLabelColor = Color.White
-                                ),
-                                border = FilterChipDefaults.filterChipBorder(
-                                    borderColor = chipColor.copy(alpha = 0.3f),
-                                    selectedBorderColor = chipColor,
-                                    enabled = true,
-                                    selected = isParentSelected
-                                )
-                            )
-                        }
-                    }
-
-                    // Child categories (animated expand)
-                    AnimatedVisibility(visible = expandedParentId != null) {
-                        val children = childCategoriesMap[expandedParentId] ?: emptyList()
-                        if (children.isNotEmpty()) {
-                            Row(
-                                modifier = Modifier
-                                    .horizontalScroll(rememberScrollState())
-                                    .padding(start = 32.dp, end = 16.dp, top = 6.dp),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.SubdirectoryArrowRight,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                children.forEach { child ->
-                                    val chipColor = Color(child.color)
-                                    val isSelected = selectedCategory?.id == child.id
-                                    AssistChip(
-                                        onClick = { 
-                                            selectedCategory = child 
-                                            focusManager.clearFocus()
-                                            showNumpad = false
-                                        },
-                                        label = { Text(child.name, style = MaterialTheme.typography.labelSmall) },
-                                        leadingIcon = {
-                                            Icon(
-                                                Icons.Filled.Circle,
-                                                contentDescription = null,
-                                                modifier = Modifier.size(8.dp),
-                                                tint = chipColor
-                                            )
-                                        },
-                                        colors = AssistChipDefaults.assistChipColors(
-                                            containerColor = if (isSelected) MaterialTheme.colorScheme.secondaryContainer
-                                                else MaterialTheme.colorScheme.surfaceContainerLow,
-                                            labelColor = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer
-                                                else MaterialTheme.colorScheme.onSurfaceVariant
-                                        ),
-                                        border = AssistChipDefaults.assistChipBorder(
-                                            borderColor = if (isSelected) MaterialTheme.colorScheme.secondary
-                                                else MaterialTheme.colorScheme.outlineVariant,
-                                            enabled = true
-                                        )
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Show selected category label
-                    selectedCategory?.let { cat ->
-                        val parentName = if (cat.parentId != null) {
-                            parentCategories.find { it.id == cat.parentId }?.name ?: ""
-                        } else ""
-                        val label = if (parentName.isNotBlank()) "$parentName > ${cat.name}" else cat.name
-                        Text(
-                            "已選: $label",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = Color(cat.color),
-                            modifier = Modifier.padding(start = 20.dp, top = 4.dp)
-                        )
-                    }
-                }
-
-                // ─── Two-Level Payment Method Selector ─────────────────────
-                if (parentPaymentMethods.isNotEmpty()) {
-                    Text(
-                        "支付工具",
-                        style = MaterialTheme.typography.titleSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        modifier = Modifier.padding(start = 20.dp, top = 12.dp, bottom = 6.dp)
-                    )
-                    // Parent payment methods
-                    Row(
-                        modifier = Modifier
-                            .horizontalScroll(rememberScrollState())
-                            .padding(horizontal = 16.dp),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        parentPaymentMethods.forEach { parent ->
-                            val chipColor = Color(parent.color)
-                            val isParentSelected = expandedPaymentParentId == parent.id ||
-                                (selectedPaymentMethodId != null && paymentMethods.find { it.id == selectedPaymentMethodId }?.parentId == parent.id) ||
-                                selectedPaymentMethodId == parent.id
-                                
-                            FilterChip(
-                                selected = isParentSelected,
-                                onClick = {
-                                    val children = childPaymentMethodsMap[parent.id]
-                                    if (children.isNullOrEmpty()) {
-                                        selectedPaymentMethodId = parent.id
-                                        expandedPaymentParentId = null
-                                    } else {
-                                        expandedPaymentParentId = if (expandedPaymentParentId == parent.id) null else parent.id
-                                    }
-                                    focusManager.clearFocus()
-                                    showNumpad = false
-                                },
-                                label = { Text(parent.name, style = MaterialTheme.typography.labelMedium) },
-                                leadingIcon = {
-                                    Icon(
-                                        PaymentIconMapper.getIcon(parent.icon),
-                                        contentDescription = null,
-                                        modifier = Modifier.size(16.dp),
-                                        tint = if (isParentSelected) Color.White else chipColor
-                                    )
-                                },
-                                colors = FilterChipDefaults.filterChipColors(
-                                    containerColor = chipColor.copy(alpha = 0.1f),
-                                    labelColor = chipColor,
-                                    selectedContainerColor = chipColor,
-                                    selectedLabelColor = Color.White
-                                ),
-                                border = FilterChipDefaults.filterChipBorder(
-                                    borderColor = chipColor.copy(alpha = 0.3f),
-                                    selectedBorderColor = chipColor,
-                                    enabled = true,
-                                    selected = isParentSelected
-                                )
-                            )
-                        }
-                    }
-
-                    // Child payment methods (animated expand)
-                    AnimatedVisibility(visible = expandedPaymentParentId != null) {
-                        val children = childPaymentMethodsMap[expandedPaymentParentId] ?: emptyList()
-                        if (children.isNotEmpty()) {
-                            Row(
-                                modifier = Modifier
-                                    .horizontalScroll(rememberScrollState())
-                                    .padding(start = 32.dp, end = 16.dp, top = 6.dp),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.SubdirectoryArrowRight,
-                                    contentDescription = null,
-                                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    modifier = Modifier.size(18.dp)
-                                )
-                                children.forEach { child ->
-                                    val chipColor = Color(child.color)
-                                    val isSelected = selectedPaymentMethodId == child.id
-                                    AssistChip(
-                                        onClick = { 
-                                            selectedPaymentMethodId = child.id 
-                                            focusManager.clearFocus()
-                                            showNumpad = false
-                                        },
-                                        label = { Text(child.name, style = MaterialTheme.typography.labelSmall) },
-                                        leadingIcon = {
-                                            Icon(
-                                                PaymentIconMapper.getIcon(child.icon),
-                                                contentDescription = null,
-                                                modifier = Modifier.size(14.dp),
-                                                tint = chipColor
-                                            )
-                                        },
-                                        colors = AssistChipDefaults.assistChipColors(
-                                            containerColor = if (isSelected) MaterialTheme.colorScheme.secondaryContainer
-                                                else MaterialTheme.colorScheme.surfaceContainerLow,
-                                            labelColor = if (isSelected) MaterialTheme.colorScheme.onSecondaryContainer
-                                                else MaterialTheme.colorScheme.onSurfaceVariant
-                                        ),
-                                        border = AssistChipDefaults.assistChipBorder(
-                                            borderColor = if (isSelected) MaterialTheme.colorScheme.secondary
-                                                else MaterialTheme.colorScheme.outlineVariant,
-                                            enabled = true
-                                        )
-                                    )
-                                }
-                            }
-                        }
-                    }
-
-                    // Show selected payment method label
-                    selectedPaymentMethodId?.let { methodId ->
-                        val method = paymentMethods.find { it.id == methodId }
-                        method?.let { m ->
-                            val parentName = if (m.parentId != null) {
-                                parentPaymentMethods.find { it.id == m.parentId }?.name ?: ""
-                            } else ""
-                            val label = if (parentName.isNotBlank()) "$parentName > ${m.name}" else m.name
-                            Text(
-                                "已選: $label",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color(m.color),
-                                modifier = Modifier.padding(start = 20.dp, top = 4.dp)
-                            )
-                        }
-                    }
-                }
-
-                // ─── Project Selector ────────────────────────────
-                if (projects.isNotEmpty()) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 8.dp)
-                    ) {
-                        OutlinedCard(
-                            onClick = { 
-                                showProjectDropdown = true 
-                                focusManager.clearFocus()
-                                showNumpad = false
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(horizontal = 16.dp, vertical = 12.dp),
-                                horizontalArrangement = Arrangement.SpaceBetween
-                            ) {
-                                Row {
-                                    Icon(
-                                        Icons.Filled.Luggage,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(modifier = Modifier.width(8.dp))
-                                    Text(
-                                        text = projects.find { it.id == selectedProjectId }?.name
-                                            ?: "選擇旅行專案 (選填)",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = if (selectedProjectId != null)
-                                            MaterialTheme.colorScheme.onSurface
-                                        else
-                                            MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                }
-                                if (selectedProjectId != null) {
-                                    IconButton(
-                                        onClick = {
-                                            val oldSettlementCurrency = settlementCurrency
-                                            hasUserEditedProjectSelection = true
-                                            selectedProjectId = null
-                                            if (selectedCurrency == oldSettlementCurrency) {
-                                                selectedCurrency = "TWD"
-                                                exchangeRateText = "1"
-                                            }
-                                        },
-                                    ) {
-                                        Icon(
-                                            Icons.Filled.Close,
-                                            contentDescription = "清除",
-                                            modifier = Modifier.size(16.dp)
-                                        )
-                                    }
-                                }
-                            }
-                        }
-
-                        DropdownMenu(
-                            expanded = showProjectDropdown,
-                            onDismissRequest = { showProjectDropdown = false }
-                        ) {
-                            projects.forEach { project ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Text("${project.name}  (${project.defaultCurrency})")
-                                    },
-                                    onClick = {
-                                        val oldSettlementCurrency = settlementCurrency
-                                        hasUserEditedProjectSelection = true
-                                        selectedProjectId = project.id
-                                        if (selectedCurrency == oldSettlementCurrency) {
-                                            selectedCurrency = project.defaultCurrency
-                                            exchangeRateText = "1"
-                                        }
-                                        showProjectDropdown = false
-                                    },
-                                    leadingIcon = {
-                                        Icon(Icons.Filled.Luggage, contentDescription = null)
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 16.dp, vertical = 4.dp)
-                ) {
-                    OutlinedCard(
-                        onClick = {
-                            showCurrencyMenu = true
-                            focusManager.clearFocus()
+                    },
+                    onNoteChange = { note = it },
+                    onNoteFocusChanged = { focused ->
+                        isNoteFocused = focused
+                        if (focused) {
                             showNumpad = false
+                        }
+                    }
+                )
+            }
+        }
+    }
+
+    // ─── Sheets & Dialogs ───────────────────────────────────────────
+    if (showDateTimeSheet) {
+        DateTimeSheet(
+            initialDateTimeMillis = selectedDateTime,
+            onDismiss = { showDateTimeSheet = false },
+            onConfirm = { updatedMillis ->
+                selectedDateTime = updatedMillis
+                showDateTimeSheet = false
+            }
+        )
+    }
+
+    if (showPaymentMethodSheet) {
+        PaymentMethodSheet(
+            parentPaymentMethods = parentPaymentMethods,
+            childPaymentMethodsMap = childPaymentMethodsMap,
+            selectedPaymentMethodId = selectedPaymentMethodId,
+            onSelectPaymentMethod = { methodId ->
+                selectedPaymentMethodId = methodId
+            },
+            onDismiss = { showPaymentMethodSheet = false }
+        )
+    }
+
+    if (showProjectSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showProjectSheet = false },
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "選擇專案",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
+                )
+                ListItem(
+                    headlineContent = { Text("日常帳 (無專案)") },
+                    leadingContent = {
+                        Icon(Icons.Filled.Close, contentDescription = null)
+                    },
+                    trailingContent = {
+                        if (selectedProjectId == null) {
+                            Icon(
+                                Icons.Filled.Check,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    },
+                    modifier = Modifier
+                        .clip(MaterialTheme.shapes.small)
+                        .clickable {
+                            val oldSettlementCurrency = settlementCurrency
+                            hasUserEditedProjectSelection = true
+                            selectedProjectId = null
+                            if (selectedCurrency == oldSettlementCurrency) {
+                                selectedCurrency = "TWD"
+                                exchangeRateText = "1"
+                            }
+                            showProjectSheet = false
+                        }
+                )
+                projects.forEach { project ->
+                    val isSelected = selectedProjectId == project.id
+                    ListItem(
+                        headlineContent = { Text(project.name) },
+                        supportingContent = { Text("結算幣別：${project.defaultCurrency}") },
+                        leadingContent = {
+                            Icon(
+                                Icons.Filled.Luggage,
+                                contentDescription = null,
+                                tint = MaterialTheme.colorScheme.primary
+                            )
                         },
-                        shape = RoundedCornerShape(12.dp),
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(horizontal = 12.dp, vertical = 10.dp),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
+                        trailingContent = {
+                            if (isSelected) {
                                 Icon(
-                                    Icons.Filled.SwapHoriz,
+                                    Icons.Filled.Check,
                                     contentDescription = null,
-                                    modifier = Modifier.size(18.dp),
                                     tint = MaterialTheme.colorScheme.primary
                                 )
-                                Column {
-                                    Text(
-                                        "記帳幣別",
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                                    )
-                                    Text(
-                                        if (requiresExchangeRate) {
-                                            "$selectedCurrency -> $settlementCurrency"
-                                        } else {
-                                            selectedCurrency
-                                        },
-                                        style = MaterialTheme.typography.bodyLarge.copy(
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                    )
-                                }
                             }
-                            Icon(
-                                Icons.Filled.ExpandMore,
-                                contentDescription = null
-                            )
-                        }
-                    }
+                        },
+                        modifier = Modifier
+                            .clip(MaterialTheme.shapes.small)
+                            .clickable {
+                                val oldSettlementCurrency = settlementCurrency
+                                hasUserEditedProjectSelection = true
+                                selectedProjectId = project.id
+                                if (selectedCurrency == oldSettlementCurrency) {
+                                    selectedCurrency = project.defaultCurrency
+                                    exchangeRateText = "1"
+                                }
+                                showProjectSheet = false
+                            }
+                    )
+                }
+            }
+        }
+    }
 
-                    DropdownMenu(
-                        expanded = showCurrencyMenu,
-                        onDismissRequest = { showCurrencyMenu = false }
+    if (showCurrencySheet) {
+        val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ModalBottomSheet(
+            onDismissRequest = { showCurrencySheet = false },
+            sheetState = sheetState,
+            containerColor = MaterialTheme.colorScheme.surface
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp)
+                    .padding(bottom = 28.dp),
+                verticalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "記帳幣別",
+                        style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                        modifier = Modifier.padding(horizontal = 4.dp)
+                    )
+                    Text(
+                        text = "結算幣別：$settlementCurrency",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+
+                CurrencyFormats.supportedCurrencies.chunked(3).forEach { rowCurrencies ->
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        CurrencyFormats.supportedCurrencies.forEach { currency ->
-                            DropdownMenuItem(
-                                text = { Text(currency) },
+                        rowCurrencies.forEach { currency ->
+                            val isSelected = selectedCurrency == currency
+                            FilterChip(
+                                selected = isSelected,
                                 onClick = {
                                     selectedCurrency = currency
                                     if (currency == settlementCurrency) {
                                         exchangeRateText = "1"
+                                        showCurrencySheet = false
                                     } else if (exchangeRateText == "1") {
                                         exchangeRateText = ""
                                     }
-                                    showCurrencyMenu = false
-                                }
+                                },
+                                label = {
+                                    Text(
+                                        text = currency,
+                                        modifier = Modifier.fillMaxWidth(),
+                                        textAlign = TextAlign.Center,
+                                        style = MaterialTheme.typography.labelLarge.copy(
+                                            fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium
+                                        )
+                                    )
+                                },
+                                modifier = Modifier.weight(1f)
                             )
+                        }
+                        repeat(3 - rowCurrencies.size) {
+                            Spacer(modifier = Modifier.weight(1f))
                         }
                     }
                 }
 
                 AnimatedVisibility(visible = requiresExchangeRate) {
-                    Card(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                        shape = RoundedCornerShape(14.dp),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.35f)
-                        )
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        Column(
-                            modifier = Modifier.padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Text(
-                                "結算幣別: $settlementCurrency${selectedProject?.let { " (${it.name})" } ?: " (日常帳)"}",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-
-                            OutlinedTextField(
-                                value = exchangeRateText,
-                                onValueChange = { newValue ->
-                                    if (newValue.isEmpty() || newValue.all { it.isDigit() || it == '.' }) {
-                                        exchangeRateText = newValue
-                                    }
-                                },
-                                label = { Text("現鈔匯率") },
-                                placeholder = { Text("1 $selectedCurrency = ? $settlementCurrency") },
-                                singleLine = true,
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp),
-                                keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(
-                                    keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal
-                                ),
-                                supportingText = {
-                                    Text(
-                                        when {
-                                            isFetchingExchangeRate -> "正在依記帳日期抓取歷史現鈔匯率..."
-                                            exchangeRateError != null -> exchangeRateError!!
-                                            else -> "已依記帳日期自動帶入歷史現鈔匯率，之後統整與專案預算都用它換算。"
-                                        }
-                                    )
+                        OutlinedTextField(
+                            value = exchangeRateText,
+                            onValueChange = { newValue ->
+                                if (newValue.isEmpty() || newValue.all { it.isDigit() || it == '.' }) {
+                                    exchangeRateText = newValue
                                 }
-                            )
-
-                            convertedAmount?.let {
-                                Text(
-                                    "換算後約 ${CurrencyFormats.formatAmount(settlementCurrency, it)}",
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
+                            },
+                            label = { Text("匯率 (1 $selectedCurrency = ? $settlementCurrency)") },
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.small,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            supportingText = {
+                                if (isFetchingExchangeRate || exchangeRateError != null) {
+                                    Text(
+                                        text = if (isFetchingExchangeRate) "正在取得歷史匯率…" else exchangeRateError.orEmpty()
+                                    )
+                                } else if (convertedAmount != null) {
+                                    Text("換算後約 ${CurrencyFormats.formatAmount(settlementCurrency, convertedAmount)}")
+                                }
                             }
-                        }
-                    }
-                }
-
-                // ─── Note Field ──────────────────────────────────
-                if (showNoteField) {
-                    OutlinedTextField(
-                        value = note,
-                        onValueChange = { note = it },
-                        placeholder = { Text("備註...") },
-                        singleLine = false,
-                        minLines = 3,
-                        maxLines = 6,
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(horizontal = 16.dp, vertical = 4.dp),
-                        shape = RoundedCornerShape(12.dp)
-                    )
-                }
-
-                TextButton(
-                    onClick = { 
-                        showNoteField = !showNoteField 
-                        if (!showNoteField) focusManager.clearFocus()
-                        showNumpad = false
-                    },
-                    modifier = Modifier.padding(start = 8.dp)
-                ) {
-                    Text(if (showNoteField) "隱藏備註" else "＋ 新增備註")
-                }
-
-                // ─── Save Button (always visible) ────────────────
-                Spacer(modifier = Modifier.height(8.dp))
-                Button(
-                    onClick = { doSave() },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp)
-                        .padding(horizontal = 16.dp),
-                    shape = MaterialTheme.shapes.large,
-                    enabled = canSave
-                ) {
-                    Icon(Icons.Filled.Check, contentDescription = null)
-                    Spacer(modifier = Modifier.width(8.dp))
-                    Text(
-                        if (isEditMode) "儲存變更" else "確認記帳",
-                        style = MaterialTheme.typography.titleSmall.copy(
-                            fontWeight = FontWeight.SemiBold
                         )
-                    )
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-            }
-
-            // ═══════════════════════════════════════════════════════
-            // Collapsible Numpad
-            // ═══════════════════════════════════════════════════════
-            AnimatedVisibility(
-                visible = showNumpad,
-                modifier = Modifier.align(Alignment.BottomCenter),
-                enter = slideInVertically(initialOffsetY = { it }) + fadeIn(),
-                exit = slideOutVertically(targetOffsetY = { it }) + fadeOut()
-            ) {
-                ExpenseNumpad(
-                    displayAmount = amountText,
-                    includeNavigationBarInset = false,
-                    onDigitClick = { key -> handleInput(key) },
-                    onDotClick = {
-                        // Find last number segment (after last operator)
-                        val lastSegment = amountText.takeLastWhile { it !in "+−×÷" }
-                        if (!lastSegment.contains('.')) {
-                            amountText = if (amountText.isEmpty() || amountText.last() in "+−×÷") {
-                                amountText + "0."
-                            } else {
-                                "$amountText."
-                            }
+                        Button(
+                            onClick = { showCurrencySheet = false },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = MaterialTheme.shapes.medium
+                        ) {
+                            Text("確定")
                         }
-                    },
-                    onBackspaceClick = {
-                        if (amountText.isNotEmpty()) {
-                            amountText = amountText.dropLast(1)
-                        }
-                    },
-                    onConfirm = { showNumpad = false }
-                )
-            }
-        }
-    }
-
-    if (showDatePicker) {
-        DatePickerDialog(
-            onDismissRequest = { showDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { millis ->
-                        val currentCal = Calendar.getInstance().apply { timeInMillis = selectedDateTime }
-                        val newCal = Calendar.getInstance().apply { timeInMillis = millis }
-                        currentCal.set(Calendar.YEAR, newCal.get(Calendar.YEAR))
-                        currentCal.set(Calendar.MONTH, newCal.get(Calendar.MONTH))
-                        currentCal.set(Calendar.DAY_OF_MONTH, newCal.get(Calendar.DAY_OF_MONTH))
-                        selectedDateTime = currentCal.timeInMillis
                     }
-                    showDatePicker = false
-                }) {
-                    Text("確定")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showDatePicker = false }) {
-                    Text("取消")
                 }
             }
-        ) {
-            DatePicker(state = datePickerState)
         }
     }
 
-    if (showTimePicker) {
-        AlertDialog(
-            onDismissRequest = { showTimePicker = false },
-            title = { Text("選擇時間") },
-            text = {
-                Box(contentAlignment = Alignment.Center, modifier = Modifier.fillMaxWidth()) {
-                    TimePicker(state = timePickerState)
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = {
-                    val currentCal = Calendar.getInstance().apply { timeInMillis = selectedDateTime }
-                    currentCal.set(Calendar.HOUR_OF_DAY, timePickerState.hour)
-                    currentCal.set(Calendar.MINUTE, timePickerState.minute)
-                    selectedDateTime = currentCal.timeInMillis
-                    showTimePicker = false
-                }) {
-                    Text("確定")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showTimePicker = false }) {
-                    Text("取消")
-                }
-            }
-        )
-    }
-
-    if (showPersonalAmountDialog && isExpense) {
-        PersonalAmountDialog(
+    if (showPersonalAmountSheet && isExpense) {
+        PersonalAmountSheet(
             currency = selectedCurrency,
             totalAmount = resolvedAmount,
             initialValue = personalAmountText,
-            onDismiss = { showPersonalAmountDialog = false },
+            onDismiss = { showPersonalAmountSheet = false },
             onConfirm = { updatedValue ->
                 personalAmountText = updatedValue
-                showPersonalAmountDialog = false
+                showPersonalAmountSheet = false
             }
         )
     }
@@ -1387,6 +902,209 @@ fun AddTransactionScreen(
             }
         )
     }
+
+    if (showDiscardDialog) {
+        AlertDialog(
+            onDismissRequest = { showDiscardDialog = false },
+            title = { Text("捨棄變更？") },
+            text = { Text("尚未儲存目前已輸入的記帳內容，確定要離開嗎？") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        showDiscardDialog = false
+                        onBack()
+                    }
+                ) {
+                    Text("捨棄", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDiscardDialog = false }) {
+                    Text("繼續編輯")
+                }
+            }
+        )
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun PersonalAmountSheet(
+    currency: String,
+    totalAmount: Double?,
+    initialValue: String,
+    onDismiss: () -> Unit,
+    onConfirm: (String) -> Unit
+) {
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+    var tempValue by remember(initialValue) { mutableStateOf(initialValue) }
+    val parsedValue = AddTransactionFormLogic.resolveAmount(tempValue)
+    val hasOperator = ExpressionEvaluator.hasOperator(tempValue)
+    val errorText = AddTransactionFormLogic.validatePersonalAmount(
+        personalAmountText = tempValue,
+        isExpense = true,
+        resolvedAmount = totalAmount
+    )
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = sheetState,
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            // ─── Sheet Header ───────────────────────────────────────
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "分攤 · 我的花費",
+                    style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                if (tempValue.isNotBlank() || initialValue.isNotBlank()) {
+                    TextButton(
+                        onClick = { onConfirm("") },
+                        contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
+                    ) {
+                        Text("重設為全額")
+                    }
+                }
+            }
+
+            // ─── Amount Display & Quick Import Card ─────────────────
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp),
+                shape = MaterialTheme.shapes.large,
+                color = MaterialTheme.colorScheme.surfaceContainerHigh
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 16.dp, vertical = 14.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = totalAmount?.let {
+                                "支出總額 ${CurrencyFormats.formatAmount(currency, it)}"
+                            } ?: "個人實際負擔金額",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        totalAmount?.let { total ->
+                            Box(
+                                modifier = Modifier
+                                    .clip(CircleShape)
+                                    .background(MaterialTheme.colorScheme.primaryContainer)
+                                    .clickable {
+                                        tempValue = AddTransactionFormLogic.formatEditableTransactionAmount(total)
+                                    }
+                                    .padding(horizontal = 10.dp, vertical = 4.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Text(
+                                    text = "帶入總額",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.SemiBold
+                                    ),
+                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                                )
+                            }
+                        }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Text(
+                            text = currency,
+                            style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                            color = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.alignByBaseline()
+                        )
+                        Text(
+                            text = if (tempValue.isBlank()) "全額算自己" else tempValue,
+                            style = if (tempValue.isBlank()) {
+                                MaterialTheme.typography.titleMedium
+                            } else {
+                                MaterialTheme.typography.amountLarge
+                            },
+                            color = if (tempValue.isBlank()) {
+                                MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
+                            } else {
+                                MaterialTheme.colorScheme.onSurface
+                            },
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier
+                                .weight(1f)
+                                .alignByBaseline()
+                        )
+                    }
+
+                    if (hasOperator && parsedValue != null) {
+                        Text(
+                            text = "= ${ExpressionEvaluator.formatResult(parsedValue)}",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+
+                    if (errorText != null) {
+                        Text(
+                            text = errorText,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.error,
+                            textAlign = TextAlign.End,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+            }
+
+            // ─── Docked Numpad Inside Sheet ─────────────────────────
+            ExpenseNumpad(
+                displayAmount = tempValue,
+                includeNavigationBarInset = true,
+                onDigitClick = { key ->
+                    tempValue = AddTransactionFormLogic.appendAmountKey(tempValue, key)
+                },
+                onDotClick = {
+                    tempValue = AddTransactionFormLogic.appendAmountDot(tempValue)
+                },
+                onBackspaceClick = {
+                    if (tempValue.isNotEmpty()) {
+                        tempValue = tempValue.dropLast(1)
+                    }
+                },
+                onEvaluate = {
+                    tempValue = AddTransactionFormLogic.evaluateExpressionToText(tempValue)
+                },
+                onConfirm = {
+                    if (errorText == null) {
+                        onConfirm(AddTransactionFormLogic.evaluateExpressionToText(tempValue))
+                    }
+                }
+            )
+        }
+    }
 }
 
 @Composable
@@ -1405,8 +1123,8 @@ private fun AmortizationDialog(
     var showMonthPicker by remember { mutableStateOf(false) }
     val monthCount = monthCountText.toIntOrNull()
     val isValid = monthCount != null && monthCount >= 2
-    val summary = if (isValid) {
-        formatAmortizationSummary(
+    val summary = if (isValid && monthCount != null) {
+        AddTransactionFormLogic.formatAmortizationSummary(
             currency = currency,
             amount = budgetAmount,
             startYearMonth = startYearMonth,
@@ -1420,17 +1138,11 @@ private fun AmortizationDialog(
         onDismissRequest = onDismiss,
         title = { Text("設定攤提") },
         text = {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
-                Text(
-                    "攤提只影響預算與月份列表；支付工具額度仍使用付款日期與支出總額。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedCard(
                     onClick = { showMonthPicker = true },
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = MaterialTheme.shapes.medium
                 ) {
                     Row(
                         modifier = Modifier
@@ -1452,7 +1164,7 @@ private fun AmortizationDialog(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Text(
-                                formatYearMonth(startYearMonth),
+                                AddTransactionFormLogic.formatYearMonth(startYearMonth),
                                 style = MaterialTheme.typography.titleMedium
                             )
                         }
@@ -1474,10 +1186,9 @@ private fun AmortizationDialog(
                     label = { Text("攤提月數") },
                     singleLine = true,
                     isError = monthCountText.isNotBlank() && !isValid,
-                    supportingText = { Text("總共 N 個月，包含起始月份") },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp)
+                    shape = MaterialTheme.shapes.small
                 )
 
                 Row(
@@ -1488,14 +1199,14 @@ private fun AmortizationDialog(
                         FilterChip(
                             selected = monthCount == quickMonthCount,
                             onClick = { monthCountText = quickMonthCount.toString() },
-                            label = { Text("${quickMonthCount}月") }
+                            label = { Text("${quickMonthCount}期") }
                         )
                     }
                 }
 
                 Surface(
                     modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(12.dp),
+                    shape = MaterialTheme.shapes.small,
                     color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.28f)
                 ) {
                     Text(
@@ -1506,7 +1217,7 @@ private fun AmortizationDialog(
                         } else {
                             MaterialTheme.colorScheme.error
                         },
-                        modifier = Modifier.padding(14.dp)
+                        modifier = Modifier.padding(12.dp)
                     )
                 }
             }
@@ -1523,7 +1234,7 @@ private fun AmortizationDialog(
             Row {
                 if (canRemove) {
                     TextButton(onClick = onRemove) {
-                        Text("移除攤提")
+                        Text("移除")
                     }
                 }
                 TextButton(onClick = onDismiss) {
@@ -1543,341 +1254,4 @@ private fun AmortizationDialog(
             onDismiss = { showMonthPicker = false }
         )
     }
-}
-
-@Composable
-private fun PersonalAmountHandle(
-    isActive: Boolean,
-    onTrigger: () -> Unit,
-    modifier: Modifier = Modifier
-) {
-    val thresholdPx = with(LocalDensity.current) { 28.dp.toPx() }
-    var dragDistance by remember { mutableStateOf(0f) }
-    val contentColor = if (isActive) {
-        MaterialTheme.colorScheme.primary.copy(alpha = 0.9f)
-    } else {
-        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.82f)
-    }
-
-    Row(
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(4.dp),
-        modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
-            .pointerInput(isActive) {
-                detectHorizontalDragGestures(
-                    onDragEnd = { dragDistance = 0f },
-                    onHorizontalDrag = { change, dragAmount ->
-                        dragDistance += dragAmount
-                        if (dragDistance >= thresholdPx) {
-                            dragDistance = 0f
-                            change.consume()
-                            onTrigger()
-                        }
-                    }
-                )
-            }
-            .clickable(onClick = onTrigger)
-            .padding(horizontal = 2.dp, vertical = 1.dp)
-    ) {
-        Icon(
-            imageVector = if (isActive) Icons.Filled.People else Icons.Filled.Person,
-            contentDescription = "設定我的花費",
-            tint = contentColor,
-            modifier = Modifier.size(16.dp)
-        )
-        Text(
-            text = if (isActive) "分攤" else "我的花費",
-            style = MaterialTheme.typography.labelSmall,
-            color = contentColor,
-            textDecoration = if (isActive) null else TextDecoration.Underline
-        )
-    }
-        if (!isActive) {
-            Icon(
-                imageVector = Icons.Filled.SwipeRightAlt,
-                contentDescription = null,
-                tint = contentColor,
-                modifier = Modifier.size(16.dp)
-            )
-        }
-}
-
-@Composable
-private fun PersonalAmountDialog(
-    currency: String,
-    totalAmount: Double?,
-    initialValue: String,
-    onDismiss: () -> Unit,
-    onConfirm: (String) -> Unit
-) {
-    var tempValue by remember(initialValue) { mutableStateOf(initialValue) }
-    val parsedValue = evaluatePersonalAmountInput(tempValue)
-    val errorText = when {
-        tempValue.isBlank() -> null
-        parsedValue == null -> "請輸入正確金額"
-        parsedValue <= 0 -> "我的花費需大於 0"
-        totalAmount != null && parsedValue > totalAmount -> "我的花費不能大於支出總額"
-        else -> null
-    }
-    val density = LocalDensity.current
-    val keyboardLift = 28.dp
-    val cardKeyboardGap = 12.dp
-    var keyboardHeightPx by remember { mutableStateOf(0) }
-    var cardHeightPx by remember { mutableStateOf(0) }
-
-    Dialog(
-        onDismissRequest = onDismiss,
-        properties = DialogProperties(
-            usePlatformDefaultWidth = false,
-            decorFitsSystemWindows = false
-        )
-    ) {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val topSafePadding = with(density) {
-                WindowInsets.safeDrawing.getTop(this).toDp()
-            } + 12.dp
-            val keyboardBottomPadding = with(density) {
-                maxOf(
-                    WindowInsets.navigationBars.getBottom(this),
-                    WindowInsets.mandatorySystemGestures.getBottom(this),
-                    WindowInsets.safeDrawing.getBottom(this)
-                ).toDp()
-            } + keyboardLift
-            val keyboardHeight = if (keyboardHeightPx > 0) {
-                with(density) { keyboardHeightPx.toDp() }
-            } else {
-                352.dp + keyboardBottomPadding
-            }
-            val cardHeight = if (cardHeightPx > 0) {
-                with(density) { cardHeightPx.toDp() }
-            } else {
-                260.dp
-            }
-            val desiredCardBottomPadding = keyboardHeight + cardKeyboardGap
-            val maxCardBottomPadding = (maxHeight - topSafePadding - cardHeight).coerceAtLeast(0.dp)
-            val cardBottomPadding = minOf(desiredCardBottomPadding, maxCardBottomPadding)
-
-            Surface(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .widthIn(max = 560.dp)
-                    .align(Alignment.BottomCenter)
-                    .padding(horizontal = 24.dp)
-                    .padding(bottom = cardBottomPadding)
-                    .onSizeChanged { cardHeightPx = it.height },
-                shape = RoundedCornerShape(28.dp),
-                color = MaterialTheme.colorScheme.surface,
-                tonalElevation = 6.dp
-            ) {
-                Column(
-                    modifier = Modifier.padding(24.dp),
-                    verticalArrangement = Arrangement.spacedBy(10.dp)
-                ) {
-                    Text(
-                        "設定我的花費",
-                        style = MaterialTheme.typography.headlineSmall,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
-                    Text(
-                        "支出總額會用於支付工具額度統計；這裡填的金額則會用於預算與一般統計。",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    totalAmount?.let {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "支出總額 ${CurrencyFormats.formatAmount(currency, it)}",
-                                style = MaterialTheme.typography.labelLarge,
-                                color = MaterialTheme.colorScheme.primary
-                            )
-                            TextButton(
-                                onClick = { tempValue = formatEditableTransactionAmount(it) }
-                            ) {
-                                Text("導入總額")
-                            }
-                        }
-                    }
-                    Surface(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(12.dp),
-                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.55f)
-                    ) {
-                        Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Text(
-                                "我的花費",
-                                style = MaterialTheme.typography.labelMedium,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                            Spacer(modifier = Modifier.width(12.dp))
-                            Text(
-                                if (tempValue.isBlank()) "留空代表全額都算在自己" else tempValue,
-                                style = MaterialTheme.typography.headlineSmall,
-                                color = if (tempValue.isBlank()) {
-                                    MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
-                                } else {
-                                    MaterialTheme.colorScheme.onSurface
-                                },
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                textAlign = TextAlign.End,
-                                modifier = Modifier.weight(1f)
-                            )
-                        }
-                    }
-                    Text(
-                        errorText ?: "例如聚餐刷卡 1200，可先導入總額再按 ÷ 人數",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = if (errorText != null) {
-                            MaterialTheme.colorScheme.error
-                        } else {
-                            MaterialTheme.colorScheme.onSurfaceVariant
-                        }
-                    )
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.End
-                    ) {
-                        TextButton(onClick = { onConfirm("") }) {
-                            Text("清除")
-                        }
-                        TextButton(onClick = onDismiss) {
-                            Text("取消")
-                        }
-                        TextButton(
-                            onClick = { onConfirm(formatPersonalAmountInputForSave(tempValue)) },
-                            enabled = errorText == null
-                        ) {
-                            Text("確定")
-                        }
-                    }
-                }
-            }
-            AnimatedVisibility(
-                visible = true,
-                modifier = Modifier.align(Alignment.BottomCenter),
-                enter = slideInVertically(initialOffsetY = { it }) + fadeIn()
-            ) {
-                ExpenseNumpad(
-                    displayAmount = tempValue,
-                    includeNavigationBarInset = false,
-                    bottomContentPadding = keyboardBottomPadding,
-                    modifier = Modifier.onSizeChanged { keyboardHeightPx = it.height },
-                    onDigitClick = { key ->
-                        tempValue = appendPersonalAmountKey(tempValue, key)
-                    },
-                    onDotClick = {
-                        tempValue = appendPersonalAmountDot(tempValue)
-                    },
-                    onBackspaceClick = {
-                        if (tempValue.isNotEmpty()) {
-                            tempValue = tempValue.dropLast(1)
-                        }
-                    },
-                    onConfirm = {
-                        if (errorText == null) {
-                            onConfirm(formatPersonalAmountInputForSave(tempValue))
-                        }
-                    }
-                )
-            }
-        }
-    }
-}
-
-private fun appendPersonalAmountKey(current: String, key: String): String {
-    val operators = "+−×÷"
-    return when {
-        key in operators -> {
-            if (current.isBlank()) {
-                current
-            } else if (current.last() in operators) {
-                current.dropLast(1) + key
-            } else {
-                current + key
-            }
-        }
-        current.length >= 20 -> current
-        else -> current + key
-    }
-}
-
-private fun appendPersonalAmountDot(current: String): String {
-    val lastSegment = current.takeLastWhile { it !in "+−×÷" }
-    return when {
-        lastSegment.contains('.') -> current
-        current.isEmpty() || current.last() in "+−×÷" -> current + "0."
-        else -> "$current."
-    }
-}
-
-private fun evaluatePersonalAmountInput(input: String): Double? {
-    val trimmed = input.trim()
-    if (trimmed.isBlank()) return null
-    return if (trimmed.any { it in "+−×÷" }) {
-        ExpressionEvaluator.evaluate(trimmed)
-    } else {
-        trimmed.toDoubleOrNull()
-    }
-}
-
-private fun formatPersonalAmountInputForSave(input: String): String {
-    if (input.isBlank()) return ""
-    return evaluatePersonalAmountInput(input)?.let { ExpressionEvaluator.formatResult(it) } ?: input
-}
-
-private fun formatAmortizationSummary(
-    currency: String,
-    amount: Double?,
-    startYearMonth: Int,
-    monthCount: Int
-): String {
-    val endYearMonth = amortizationEndYearMonth(startYearMonth, monthCount)
-    val periodText = "${formatYearMonth(startYearMonth)} - ${formatYearMonth(endYearMonth)}"
-    val amountText = amount?.let {
-        "，每月 ${CurrencyFormats.formatAmount(currency, amortizedShare(it, monthCount, 0))}"
-    } ?: "，輸入金額後計算每月金額"
-    return "攤提：$periodText，共 ${monthCount} 個月$amountText"
-}
-
-private fun formatYearMonth(yearMonth: Int): String =
-    "%04d/%02d".format(Locale.TAIWAN, yearMonth / 100, yearMonth % 100)
-
-private fun formatEditableTransactionAmount(amount: Double): String =
-    if (amount == amount.toLong().toDouble()) amount.toLong().toString() else amount.toString()
-
-private fun isWithinProjectDateRange(
-    targetDateTime: Long,
-    startDate: Long?,
-    endDate: Long?
-): Boolean {
-    if (startDate == null || endDate == null) return false
-    val rangeStart = startOfDay(startDate)
-    val rangeEnd = endOfDay(endDate)
-    return targetDateTime in rangeStart..rangeEnd
-}
-
-private fun startOfDay(timeMillis: Long): Long = Calendar.getInstance().run {
-    timeInMillis = timeMillis
-    set(Calendar.HOUR_OF_DAY, 0)
-    set(Calendar.MINUTE, 0)
-    set(Calendar.SECOND, 0)
-    set(Calendar.MILLISECOND, 0)
-    timeInMillis
-}
-
-private fun endOfDay(timeMillis: Long): Long = Calendar.getInstance().run {
-    timeInMillis = timeMillis
-    set(Calendar.HOUR_OF_DAY, 23)
-    set(Calendar.MINUTE, 59)
-    set(Calendar.SECOND, 59)
-    set(Calendar.MILLISECOND, 999)
-    timeInMillis
 }
