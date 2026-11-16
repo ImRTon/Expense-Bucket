@@ -237,6 +237,7 @@ fun ExpensesApp(
     val allPaymentMethods by viewModel.allPaymentMethods.collectAsStateWithLifecycle()
     val paymentMethodBillingSummaries by viewModel.paymentMethodBillingSummaries.collectAsStateWithLifecycle()
     val compareMode by viewModel.compareMode.collectAsStateWithLifecycle()
+    val firstDayOfWeek by viewModel.firstDayOfWeek.collectAsStateWithLifecycle()
 
     val allCategories = remember(expenseCategories, incomeCategories) {
         expenseCategories + incomeCategories
@@ -482,7 +483,11 @@ fun ExpensesApp(
             composable(Screen.Statistics.route) {
                 StatisticsScreen(
                     transactions = transactions,
-                    categories = allCategories
+                    categories = allCategories,
+                    firstDayOfWeek = firstDayOfWeek,
+                    onTransactionClick = { transaction ->
+                        navController.navigate(Screen.EditTransaction.createRoute(transaction.id))
+                    }
                 )
             }
 
