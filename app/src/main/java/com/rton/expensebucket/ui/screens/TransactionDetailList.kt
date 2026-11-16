@@ -10,7 +10,6 @@ import androidx.compose.foundation.relocation.BringIntoViewRequester
 import androidx.compose.foundation.relocation.bringIntoViewRequester
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.BasicTextField
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
@@ -33,11 +32,18 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rton.expensebucket.data.model.PaymentMethod
 import com.rton.expensebucket.data.model.Project
+import com.rton.expensebucket.data.model.TransactionItem
+import com.rton.expensebucket.ui.components.TransactionItemsCard
 import com.rton.expensebucket.ui.util.PaymentIconMapper
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun TransactionDetailList(
+    items: List<TransactionItem>,
+    currency: String,
+    onAddItem: () -> Unit,
+    onEditItem: (Int) -> Unit,
+    onRemoveItem: (Int) -> Unit,
     selectedDateTime: Long,
     selectedPaymentMethod: PaymentMethod?,
     projects: List<Project>,
@@ -139,10 +145,19 @@ fun TransactionDetailList(
         }
 
         // ─── Expandable Note Input Card ─────────────────────────
+        TransactionItemsCard(
+            items = items,
+            currency = currency,
+            onAdd = onAddItem,
+            onEdit = onEditItem,
+            onRemove = onRemoveItem
+        )
+
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
                 .bringIntoViewRequester(bringIntoViewRequester)
+                .heightIn(min = 56.dp)
                 .animateContentSize()
                 .clip(MaterialTheme.shapes.medium)
                 .clickable {
@@ -199,16 +214,13 @@ fun TransactionDetailList(
                         BasicTextField(
                             value = note,
                             onValueChange = onNoteChange,
-                            singleLine = !isNoteFocused,
+                            singleLine = false,
                             minLines = if (isNoteFocused) 3 else 1,
                             maxLines = if (isNoteFocused) 5 else 1,
                             textStyle = MaterialTheme.typography.bodyMedium.copy(
                                 color = MaterialTheme.colorScheme.onSurface
                             ),
-                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
-                            keyboardActions = KeyboardActions(
-                                onDone = { focusManager.clearFocus() }
-                            ),
+                            keyboardOptions = KeyboardOptions(imeAction = ImeAction.Default),
                             cursorBrush = SolidColor(MaterialTheme.colorScheme.primary),
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -255,6 +267,7 @@ private fun DetailBentoTile(
 
     Surface(
         modifier = modifier
+            .heightIn(min = 56.dp)
             .clip(MaterialTheme.shapes.medium)
             .clickable(onClick = onClick),
         shape = MaterialTheme.shapes.medium,

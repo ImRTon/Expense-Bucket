@@ -7,6 +7,8 @@ import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.PaymentMethod
 import com.rton.expensebucket.data.model.Project
 import com.rton.expensebucket.data.model.Transaction
+import com.rton.expensebucket.data.model.TransactionItem
+import com.rton.expensebucket.data.model.TransactionItemConverter
 import com.rton.expensebucket.data.repository.ExpenseBucketRepository
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
@@ -97,6 +99,7 @@ class DataExportImportManager @Inject constructor(
         val amount: Double,
         val personalAmount: Double?,
         val note: String,
+        val items: List<TransactionItem>,
         val categoryPath: String,
         val projectName: String,
         val projectCurrency: String,
@@ -217,7 +220,7 @@ class DataExportImportManager @Inject constructor(
                     writer.write("\n")
 
                     writer.write("#SECTION:TRANSACTIONS\n")
-                    writer.write("amount,personalAmount,note,categoryPath,projectName,projectCurrency,projectStartDate,projectEndDate,paymentMethodPath,date,currency,exchangeRate,isExpense,source,isDraft,amortizationEnabled,amortizationStartYearMonth,amortizationMonthCount,createdAt\n")
+                    writer.write("amount,personalAmount,note,categoryPath,projectName,projectCurrency,projectStartDate,projectEndDate,paymentMethodPath,date,currency,exchangeRate,isExpense,source,isDraft,amortizationEnabled,amortizationStartYearMonth,amortizationMonthCount,createdAt,items\n")
                     transactions.forEach { transaction ->
                         val categoryPath = transaction.categoryId
                             ?.let { categoryById[it] }
@@ -250,7 +253,8 @@ class DataExportImportManager @Inject constructor(
                                     transaction.amortizationEnabled.toString(),
                                     transaction.amortizationStartYearMonth?.toString().orEmpty(),
                                     transaction.amortizationMonthCount?.toString().orEmpty(),
-                                    transaction.createdAt.toString()
+                                    transaction.createdAt.toString(),
+                                    TransactionItemConverter().encode(transaction.items)
                                 )
                             ) + "\n"
                         )
@@ -349,6 +353,7 @@ class DataExportImportManager @Inject constructor(
                             amount = valueAt(values, currentHeader, "amount").toDoubleOrNull() ?: 0.0,
                             personalAmount = valueAt(values, currentHeader, "personalAmount").toDoubleOrNull(),
                             note = valueAt(values, currentHeader, "note"),
+                            items = TransactionItemConverter().decode(valueAt(values, currentHeader, "items")),
                             categoryPath = valueAt(values, currentHeader, "categoryPath"),
                             projectName = valueAt(values, currentHeader, "projectName"),
                             projectCurrency = valueAt(values, currentHeader, "projectCurrency"),
@@ -403,6 +408,7 @@ class DataExportImportManager @Inject constructor(
                     amount = valueAt(values, header, "amount").toDoubleOrNull() ?: 0.0,
                     personalAmount = valueAt(values, header, "personalAmount").toDoubleOrNull(),
                     note = valueAt(values, header, "note"),
+                    items = TransactionItemConverter().decode(valueAt(values, header, "items")),
                     categoryPath = valueAt(values, header, "categoryName"),
                     projectName = valueAt(values, header, "projectName"),
                     projectCurrency = "",
@@ -668,6 +674,7 @@ class DataExportImportManager @Inject constructor(
                     amount = record.amount,
                     personalAmount = record.personalAmount?.takeIf { record.isExpense && it > 0 },
                     note = record.note,
+                    items = record.items,
                     categoryId = categoryId,
                     projectId = projectId,
                     paymentMethodId = paymentMethodId,

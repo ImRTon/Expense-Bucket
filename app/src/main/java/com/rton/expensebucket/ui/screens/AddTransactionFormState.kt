@@ -2,6 +2,7 @@ package com.rton.expensebucket.ui.screens
 
 import com.rton.expensebucket.data.model.Project
 import com.rton.expensebucket.data.model.Transaction
+import com.rton.expensebucket.data.model.TransactionItem
 import com.rton.expensebucket.data.model.amortizationEndYearMonth
 import com.rton.expensebucket.data.model.amortizedShare
 import com.rton.expensebucket.data.model.yearMonthFromMillis
@@ -16,6 +17,7 @@ data class AddTransactionFormDraft(
     val selectedCategoryId: Long? = null,
     val isExpense: Boolean = true,
     val note: String = "",
+    val items: List<TransactionItem> = emptyList(),
     val selectedDateTime: Long = System.currentTimeMillis(),
     val selectedPaymentMethodId: Long? = null,
     val selectedProjectId: Long? = null,
@@ -127,13 +129,14 @@ object AddTransactionFormLogic {
         selectedCategoryId: Long?,
         note: String,
         personalAmountText: String,
-        isEditMode: Boolean
+        isEditMode: Boolean,
+        items: List<TransactionItem> = emptyList()
     ): Boolean {
         if (isEditMode) return false
         return amountText.isNotBlank() ||
             selectedCategoryId != null ||
             note.isNotBlank() ||
-            personalAmountText.isNotBlank()
+            personalAmountText.isNotBlank() || items.isNotEmpty()
     }
 
     fun buildTransaction(
@@ -171,6 +174,7 @@ object AddTransactionFormLogic {
             amount = resolvedAmount,
             personalAmount = parsedPersonalAmount,
             note = draft.note.trim(),
+            items = draft.items,
             categoryId = draft.selectedCategoryId,
             isExpense = draft.isExpense,
             date = draft.selectedDateTime,
@@ -193,6 +197,7 @@ object AddTransactionFormLogic {
             personalAmountText = "",
             selectedCategoryId = null,
             note = "",
+            items = emptyList(),
             amortizationEnabled = false,
             amortizationStartYearMonth = yearMonthFromMillis(draft.selectedDateTime),
             amortizationMonthCount = 6,

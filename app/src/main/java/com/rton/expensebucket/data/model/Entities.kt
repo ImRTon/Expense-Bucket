@@ -1,5 +1,6 @@
 package com.rton.expensebucket.data.model
 
+import androidx.room.ColumnInfo
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -126,6 +127,7 @@ data class Transaction(
     val amortizationEnabled: Boolean = false,
     val amortizationStartYearMonth: Int? = null, // YYYYMM
     val amortizationMonthCount: Int? = null,
+    @ColumnInfo(defaultValue = "'[]'") val items: List<TransactionItem> = emptyList(),
     val createdAt: Long = System.currentTimeMillis()
 )
 

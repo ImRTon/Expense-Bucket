@@ -44,9 +44,11 @@ import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.PaymentMethod
 import com.rton.expensebucket.data.model.Project
 import com.rton.expensebucket.data.model.Transaction
+import com.rton.expensebucket.data.model.TransactionItem
 import com.rton.expensebucket.data.model.millisForYearMonth
 import com.rton.expensebucket.data.model.yearMonthFromMillis
 import com.rton.expensebucket.ui.components.ExpenseNumpad
+import com.rton.expensebucket.ui.components.TransactionItemSheet
 import com.rton.expensebucket.ui.components.YearMonthPickerDialog
 import com.rton.expensebucket.ui.model.TransactionPrefill
 import com.rton.expensebucket.ui.theme.amountLarge
@@ -115,6 +117,9 @@ fun AddTransactionScreen(
         }
     }
     var note by remember { mutableStateOf(initialNote) }
+    var items by remember { mutableStateOf(existingTransaction?.items.orEmpty()) }
+    var showItemSheet by remember { mutableStateOf(false) }
+    var editingItemIndex by remember { mutableStateOf<Int?>(null) }
     var selectedProjectId by remember { mutableStateOf(initialProjectSelectionId) }
     var hasUserEditedProjectSelection by remember {
         mutableStateOf(initialProjectSelectionId != null)
@@ -174,8 +179,9 @@ fun AddTransactionScreen(
         selectedCategoryId = selectedCategory?.id,
         note = note,
         personalAmountText = personalAmountText,
-        isEditMode = isEditMode
-    )
+        isEditMode = isEditMode,
+        items = items
+    ) || items != existingTransaction?.items.orEmpty()
 
     BackHandler(enabled = isNoteFocused) {
         focusManager.clearFocus()
@@ -321,6 +327,7 @@ fun AddTransactionScreen(
         isExpense = isExpense,
         note = note,
         selectedDateTime = selectedDateTime,
+        items = items,
         selectedPaymentMethodId = selectedPaymentMethodId,
         selectedProjectId = selectedProjectId,
         selectedCurrency = selectedCurrency,
@@ -350,6 +357,7 @@ fun AddTransactionScreen(
             selectedCategory = null
             expandedParentId = null
             note = resetDraft.note
+            items = resetDraft.items
             amortizationEnabled = resetDraft.amortizationEnabled
             amortizationStartYearMonth = resetDraft.amortizationStartYearMonth
             amortizationMonthCount = resetDraft.amortizationMonthCount
@@ -682,6 +690,21 @@ fun AddTransactionScreen(
                     )
 
                     TransactionDetailList(
+                        items = items,
+                        currency = selectedCurrency,
+                        onAddItem = {
+                            focusManager.clearFocus()
+                            showNumpad = false
+                            editingItemIndex = null
+                            showItemSheet = true
+                        },
+                        onEditItem = { index ->
+                            focusManager.clearFocus()
+                            showNumpad = false
+                            editingItemIndex = index
+                            showItemSheet = true
+                        },
+                        onRemoveItem = { index -> items = items.filterIndexed { itemIndex, _ -> itemIndex != index } },
                         selectedDateTime = selectedDateTime,
                         selectedPaymentMethod = selectedPaymentMethod,
                         projects = projects,
@@ -729,6 +752,19 @@ fun AddTransactionScreen(
     }
 
     // ─── Sheets & Dialogs ───────────────────────────────────────────
+    if (showItemSheet) {
+        TransactionItemSheet(
+            currency = selectedCurrency,
+            initialItem = editingItemIndex?.let { items.getOrNull(it) },
+            itemCount = items.size,
+            onSaveItem = { item: TransactionItem ->
+                val index = editingItemIndex
+                items = if (index == null) items + item else items.toMutableList().also { it[index] = item }
+            },
+            onDismiss = { showItemSheet = false }
+        )
+    }
+
     if (showDateTimeSheet) {
         DateTimeSheet(
             initialDateTimeMillis = selectedDateTime,

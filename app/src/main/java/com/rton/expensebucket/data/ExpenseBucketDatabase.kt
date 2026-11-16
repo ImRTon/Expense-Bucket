@@ -2,6 +2,7 @@ package com.rton.expensebucket.data
 
 import androidx.room.Database
 import androidx.room.RoomDatabase
+import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.rton.expensebucket.data.dao.CategoryDao
@@ -15,12 +16,14 @@ import com.rton.expensebucket.data.model.NotificationCapture
 import com.rton.expensebucket.data.model.PaymentMethod
 import com.rton.expensebucket.data.model.Project
 import com.rton.expensebucket.data.model.Transaction
+import com.rton.expensebucket.data.model.TransactionItemConverter
 
 @Database(
     entities = [Transaction::class, Category::class, Project::class, PaymentMethod::class, NonPaymentNotification::class, NotificationCapture::class],
-    version = 12,
+    version = 13,
     exportSchema = true
 )
+@TypeConverters(TransactionItemConverter::class)
 abstract class ExpenseBucketDatabase : RoomDatabase() {
     abstract fun transactionDao(): TransactionDao
     abstract fun categoryDao(): CategoryDao
@@ -29,6 +32,12 @@ abstract class ExpenseBucketDatabase : RoomDatabase() {
     abstract fun nonPaymentNotificationDao(): NonPaymentNotificationDao
 
     companion object {
+        val MIGRATION_12_13 = object : Migration(12, 13) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE `transactions` ADD COLUMN `items` TEXT NOT NULL DEFAULT '[]'")
+            }
+        }
+
         val MIGRATION_11_12 = object : Migration(11, 12) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("""

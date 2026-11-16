@@ -304,6 +304,15 @@ private fun TransactionListRowContent(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+            if (transaction.items.isNotEmpty()) {
+                Text(
+                    "${transaction.items.size} 項 · " + transaction.items.joinToString("、") { it.name },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.primary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
         }
 
         Spacer(modifier = Modifier.width(10.dp))
