@@ -7,6 +7,10 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.gestures.awaitEachGesture
+import androidx.compose.foundation.gestures.awaitFirstDown
+import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellation
+import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -22,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.font.FontWeight
@@ -350,6 +355,12 @@ fun AddTransactionScreen(
 
     val semanticColors = MaterialTheme.semanticColors
 
+    fun selectTransactionType(expense: Boolean) {
+        isExpense = expense
+        expandedParentId = null
+        focusManager.clearFocus()
+    }
+
     Scaffold(
         modifier = Modifier
             .fillMaxSize()
@@ -390,9 +401,7 @@ fun AddTransactionScreen(
                                     .clip(CircleShape)
                                     .background(if (expenseSelected) semanticColors.expense else Color.Transparent)
                                     .clickable {
-                                        isExpense = true
-                                        expandedParentId = null
-                                        focusManager.clearFocus()
+                                        selectTransactionType(true)
                                     }
                                     .padding(horizontal = 22.dp, vertical = 6.dp),
                                 contentAlignment = Alignment.Center
@@ -412,9 +421,7 @@ fun AddTransactionScreen(
                                     .clip(CircleShape)
                                     .background(if (incomeSelected) semanticColors.income else Color.Transparent)
                                     .clickable {
-                                        isExpense = false
-                                        expandedParentId = null
-                                        focusManager.clearFocus()
+                                        selectTransactionType(false)
                                     }
                                     .padding(horizontal = 22.dp, vertical = 6.dp),
                                 contentAlignment = Alignment.Center
@@ -544,6 +551,28 @@ fun AddTransactionScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .pointerInput(density) {
+                    val swipeThreshold = with(density) { 56.dp.toPx() }
+                    awaitEachGesture {
+                        // Clickable fields consume the down event; only start in blank space.
+                        val down = awaitFirstDown(requireUnconsumed = true)
+                        var dragDistance = 0f
+                        val dragStart = awaitHorizontalTouchSlopOrCancellation(down.id) { change, overSlop ->
+                            dragDistance = overSlop
+                            change.consume()
+                        }
+                        if (dragStart != null) {
+                            val completed = horizontalDrag(dragStart.id) { change ->
+                                dragDistance += change.position.x - change.previousPosition.x
+                                change.consume()
+                            }
+                            if (completed && kotlin.math.abs(dragDistance) >= swipeThreshold) {
+                                val expense = dragDistance > 0f
+                                if (expense != isExpense) selectTransactionType(expense)
+                            }
+                        }
+                    }
+                }
         ) {
             // ─── Fixed Amount Header at Top (includes Currency & Split) ───
             val parentCategoryName = remember(selectedCategory, parentCategories) {
