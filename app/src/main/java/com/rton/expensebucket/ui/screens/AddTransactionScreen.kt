@@ -3,6 +3,7 @@ package com.rton.expensebucket.ui.screens
 import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -13,6 +14,8 @@ import androidx.compose.foundation.gestures.awaitHorizontalTouchSlopOrCancellati
 import androidx.compose.foundation.gestures.horizontalDrag
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -26,9 +29,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
@@ -48,6 +53,7 @@ import com.rton.expensebucket.ui.theme.amountLarge
 import com.rton.expensebucket.ui.theme.semanticColors
 import com.rton.expensebucket.ui.util.CurrencyFormats
 import com.rton.expensebucket.ui.util.ExpressionEvaluator
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
@@ -101,6 +107,13 @@ fun AddTransactionScreen(
         )
     }
     var isExpense by remember { mutableStateOf(initialIsExpense) }
+    val typePagerState = rememberPagerState(initialPage = if (initialIsExpense) 0 else 1) { 2 }
+    var typeAnimationJob by remember { mutableStateOf<Job?>(null) }
+    val typeProgress by remember {
+        derivedStateOf {
+            (typePagerState.currentPage + typePagerState.currentPageOffsetFraction).coerceIn(0f, 1f)
+        }
+    }
     var note by remember { mutableStateOf(initialNote) }
     var selectedProjectId by remember { mutableStateOf(initialProjectSelectionId) }
     var hasUserEditedProjectSelection by remember {
@@ -205,7 +218,9 @@ fun AddTransactionScreen(
         }
     }
 
-    val scrollState = rememberScrollState()
+    val expenseScrollState = rememberScrollState()
+    val incomeScrollState = rememberScrollState()
+    val scrollState = if (isExpense) expenseScrollState else incomeScrollState
     LaunchedEffect(scrollState.isScrollInProgress) {
         if (scrollState.isScrollInProgress && showNumpad) {
             showNumpad = false
@@ -219,9 +234,6 @@ fun AddTransactionScreen(
         }
     }
 
-    val parentCategories = remember(categories, isExpense) {
-        categories.filter { it.isExpense == isExpense && it.parentId == null }.sortedBy { it.sortOrder }
-    }
     val childCategoriesMap = remember(categories) {
         categories.filter { it.parentId != null }.groupBy { it.parentId }
     }
@@ -356,9 +368,18 @@ fun AddTransactionScreen(
     val semanticColors = MaterialTheme.semanticColors
 
     fun selectTransactionType(expense: Boolean) {
-        isExpense = expense
-        expandedParentId = null
-        focusManager.clearFocus()
+        typeAnimationJob?.cancel()
+        if (isExpense != expense) {
+            focusManager.clearFocus()
+            isExpense = expense
+            expandedParentId = null
+        }
+        typeAnimationJob = coroutineScope.launch {
+            typePagerState.animateScrollToPage(
+                page = if (expense) 0 else 1,
+                animationSpec = tween(durationMillis = 260)
+            )
+        }
     }
 
     Scaffold(
@@ -391,15 +412,25 @@ fun AddTransactionScreen(
                             .background(MaterialTheme.colorScheme.surfaceContainerHigh)
                             .padding(4.dp)
                     ) {
+                        BoxWithConstraints(modifier = Modifier.matchParentSize()) {
+                            val pillWidth = (maxWidth - 2.dp) / 2
+                            Box(
+                                modifier = Modifier
+                                    .offset(x = (pillWidth + 2.dp) * typeProgress)
+                                    .width(pillWidth)
+                                    .fillMaxHeight()
+                                    .clip(CircleShape)
+                                    .background(lerp(semanticColors.expense, semanticColors.income, typeProgress))
+                            )
+                        }
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(2.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            val expenseSelected = isExpense
+                            val expenseSelected = typeProgress < 0.5f
                             Box(
                                 modifier = Modifier
                                     .clip(CircleShape)
-                                    .background(if (expenseSelected) semanticColors.expense else Color.Transparent)
                                     .clickable {
                                         selectTransactionType(true)
                                     }
@@ -411,15 +442,14 @@ fun AddTransactionScreen(
                                     style = MaterialTheme.typography.labelLarge.copy(
                                         fontWeight = if (expenseSelected) FontWeight.Bold else FontWeight.Medium
                                     ),
-                                    color = if (expenseSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = lerp(Color.White, MaterialTheme.colorScheme.onSurfaceVariant, typeProgress)
                                 )
                             }
 
-                            val incomeSelected = !isExpense
+                            val incomeSelected = typeProgress >= 0.5f
                             Box(
                                 modifier = Modifier
                                     .clip(CircleShape)
-                                    .background(if (incomeSelected) semanticColors.income else Color.Transparent)
                                     .clickable {
                                         selectTransactionType(false)
                                     }
@@ -431,7 +461,7 @@ fun AddTransactionScreen(
                                     style = MaterialTheme.typography.labelLarge.copy(
                                         fontWeight = if (incomeSelected) FontWeight.Bold else FontWeight.Medium
                                     ),
-                                    color = if (incomeSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant
+                                    color = lerp(MaterialTheme.colorScheme.onSurfaceVariant, Color.White, typeProgress)
                                 )
                             }
                         }
@@ -547,10 +577,14 @@ fun AddTransactionScreen(
             }
         }
     ) { padding ->
-        Column(
+        HorizontalPager(
+            state = typePagerState,
+            // Blank-space gestures below drive the pager so fields keep their own gestures.
+            userScrollEnabled = false,
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .testTag("transaction_type_pager")
                 .pointerInput(density) {
                     val swipeThreshold = with(density) { 56.dp.toPx() }
                     awaitEachGesture {
@@ -558,125 +592,138 @@ fun AddTransactionScreen(
                         val down = awaitFirstDown(requireUnconsumed = true)
                         var dragDistance = 0f
                         val dragStart = awaitHorizontalTouchSlopOrCancellation(down.id) { change, overSlop ->
+                            typeAnimationJob?.cancel()
                             dragDistance = overSlop
+                            typePagerState.dispatchRawDelta(-overSlop)
                             change.consume()
                         }
                         if (dragStart != null) {
                             val completed = horizontalDrag(dragStart.id) { change ->
-                                dragDistance += change.position.x - change.previousPosition.x
+                                val delta = change.position.x - change.previousPosition.x
+                                dragDistance += delta
+                                typePagerState.dispatchRawDelta(-delta)
                                 change.consume()
                             }
-                            if (completed && kotlin.math.abs(dragDistance) >= swipeThreshold) {
-                                val expense = dragDistance > 0f
-                                if (expense != isExpense) selectTransactionType(expense)
-                            }
+                            val expense = if (completed && kotlin.math.abs(dragDistance) >= swipeThreshold) {
+                                dragDistance > 0f
+                            } else isExpense
+                            selectTransactionType(expense)
                         }
                     }
                 }
-        ) {
-            // ─── Fixed Amount Header at Top (includes Currency & Split) ───
-            val parentCategoryName = remember(selectedCategory, parentCategories) {
-                selectedCategory?.parentId?.let { pId ->
-                    parentCategories.find { it.id == pId }?.name
-                }
+        ) { page ->
+            val pageIsExpense = page == 0
+            val pageCategory = selectedCategory?.takeIf { it.isExpense == pageIsExpense }
+            val parentCategories = remember(categories, pageIsExpense) {
+                categories.filter { it.isExpense == pageIsExpense && it.parentId == null }.sortedBy { it.sortOrder }
             }
-
-            AmountHeader(
-                amountText = amountText,
-                resolvedAmount = resolvedAmount,
-                isExpense = isExpense,
-                selectedCategory = selectedCategory,
-                parentCategoryName = parentCategoryName,
-                selectedCurrency = selectedCurrency,
-                settlementCurrency = settlementCurrency,
-                parsedExchangeRate = parsedExchangeRate,
-                convertedAmount = convertedAmount,
-                parsedPersonalAmount = parsedPersonalAmount,
-                personalAmountError = personalAmountError,
-                isNumpadVisible = showNumpad,
-                onAmountClick = {
-                    focusManager.clearFocus()
-                    showNumpad = true
-                },
-                onCurrencyClick = {
-                    focusManager.clearFocus()
-                    showNumpad = false
-                    showCurrencySheet = true
-                },
-                onPersonalAmountClick = {
-                    if (isExpense) {
-                        focusManager.clearFocus()
-                        showNumpad = false
-                        showPersonalAmountSheet = true
+            Column(modifier = Modifier.fillMaxSize()) {
+                // ─── Fixed Amount Header at Top (includes Currency & Split) ───
+                val parentCategoryName = remember(pageCategory, parentCategories) {
+                    pageCategory?.parentId?.let { pId ->
+                        parentCategories.find { it.id == pId }?.name
                     }
                 }
-            )
 
-            // ─── Scrollable Form Content ────────────────────────────
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f)
-                    .verticalScroll(scrollState)
-                    .padding(bottom = 16.dp)
-            ) {
-                CategoryGrid(
-                    parentCategories = parentCategories,
-                    childCategoriesMap = childCategoriesMap,
-                    selectedCategory = selectedCategory,
-                    expandedParentId = expandedParentId,
-                    onSelectCategory = { cat ->
-                        selectedCategory = cat
+                AmountHeader(
+                    amountText = amountText,
+                    resolvedAmount = resolvedAmount,
+                    isExpense = pageIsExpense,
+                    selectedCategory = pageCategory,
+                    parentCategoryName = parentCategoryName,
+                    selectedCurrency = selectedCurrency,
+                    settlementCurrency = settlementCurrency,
+                    parsedExchangeRate = parsedExchangeRate,
+                    convertedAmount = convertedAmount,
+                    parsedPersonalAmount = parsedPersonalAmount.takeIf { pageIsExpense },
+                    personalAmountError = personalAmountError.takeIf { pageIsExpense },
+                    isNumpadVisible = showNumpad,
+                    onAmountClick = {
                         focusManager.clearFocus()
-                        showNumpad = false
+                        showNumpad = true
                     },
-                    onToggleExpandParent = { parentId ->
-                        expandedParentId = parentId
+                    onCurrencyClick = {
                         focusManager.clearFocus()
                         showNumpad = false
-                    }
-                )
-
-                TransactionDetailList(
-                    selectedDateTime = selectedDateTime,
-                    selectedPaymentMethod = selectedPaymentMethod,
-                    projects = projects,
-                    selectedProject = selectedProject,
-                    isExpense = isExpense,
-                    amortizationEnabled = amortizationEnabled,
-                    amortizationMonthCount = amortizationMonthCount,
-                    note = note,
-                    isNoteFocused = isNoteFocused,
-                    onDateClick = {
-                        focusManager.clearFocus()
-                        showNumpad = false
-                        showDateTimeSheet = true
+                        showCurrencySheet = true
                     },
-                    onPaymentMethodClick = {
-                        focusManager.clearFocus()
-                        showNumpad = false
-                        showPaymentMethodSheet = true
-                    },
-                    onProjectClick = {
-                        focusManager.clearFocus()
-                        showNumpad = false
-                        showProjectSheet = true
-                    },
-                    onAmortizationClick = {
+                    onPersonalAmountClick = {
                         if (isExpense) {
                             focusManager.clearFocus()
                             showNumpad = false
-                            showAmortizationDialog = true
-                        }
-                    },
-                    onNoteChange = { note = it },
-                    onNoteFocusChanged = { focused ->
-                        isNoteFocused = focused
-                        if (focused) {
-                            showNumpad = false
+                            showPersonalAmountSheet = true
                         }
                     }
                 )
+
+                // ─── Scrollable Form Content ────────────────────────────
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                        .verticalScroll(if (pageIsExpense) expenseScrollState else incomeScrollState)
+                        .padding(bottom = 16.dp)
+                ) {
+                    CategoryGrid(
+                        parentCategories = parentCategories,
+                        childCategoriesMap = childCategoriesMap,
+                        selectedCategory = pageCategory,
+                        expandedParentId = expandedParentId.takeIf { pageIsExpense == isExpense },
+                        onSelectCategory = { cat ->
+                            selectedCategory = cat
+                            focusManager.clearFocus()
+                            showNumpad = false
+                        },
+                        onToggleExpandParent = { parentId ->
+                            expandedParentId = parentId
+                            focusManager.clearFocus()
+                            showNumpad = false
+                        }
+                    )
+
+                    TransactionDetailList(
+                        selectedDateTime = selectedDateTime,
+                        selectedPaymentMethod = selectedPaymentMethod,
+                        projects = projects,
+                        selectedProject = selectedProject,
+                        isExpense = pageIsExpense,
+                        amortizationEnabled = amortizationEnabled,
+                        amortizationMonthCount = amortizationMonthCount,
+                        note = note,
+                        isNoteFocused = isNoteFocused && pageIsExpense == isExpense,
+                        onDateClick = {
+                            focusManager.clearFocus()
+                            showNumpad = false
+                            showDateTimeSheet = true
+                        },
+                        onPaymentMethodClick = {
+                            focusManager.clearFocus()
+                            showNumpad = false
+                            showPaymentMethodSheet = true
+                        },
+                        onProjectClick = {
+                            focusManager.clearFocus()
+                            showNumpad = false
+                            showProjectSheet = true
+                        },
+                        onAmortizationClick = {
+                            if (isExpense) {
+                                focusManager.clearFocus()
+                                showNumpad = false
+                                showAmortizationDialog = true
+                            }
+                        },
+                        onNoteChange = { note = it },
+                        onNoteFocusChanged = { focused ->
+                            if (pageIsExpense == isExpense) {
+                                isNoteFocused = focused
+                                if (focused) {
+                                    showNumpad = false
+                                }
+                            }
+                        }
+                    )
+                }
             }
         }
     }
