@@ -22,6 +22,7 @@ Write idiomatic Kotlin with four-space indentation and explicit, descriptive nam
 ## Testing Guidelines
 
 Add focused JVM tests for parsers, amount calculations, and other deterministic logic in the matching `com.rton.expensebucket` package. Name test files `SubjectTest.kt` and test methods for the behavior under test, e.g. `parseInvoice_returnsMerchantAndAmount`. Use instrumentation tests only when Android framework, Room integration, or UI/device behavior is essential. Run the relevant test task before submitting changes.
+DO NOT INSTALL APP TO THE REAL PHONE UNLESS USER ASK TO.
 
 ## Commit & Pull Request Guidelines
 
