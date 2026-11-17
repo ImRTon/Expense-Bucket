@@ -93,6 +93,7 @@ import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.Transaction
 import com.rton.expensebucket.ui.components.YearMonthPickerDialog
 import com.rton.expensebucket.ui.components.YearPickerDialog
+import com.rton.expensebucket.ui.components.StatisticsPeriodSelector
 import com.rton.expensebucket.ui.statistics.CategoryStat
 import com.rton.expensebucket.ui.statistics.RankedTransaction
 import com.rton.expensebucket.ui.statistics.StatisticsCalculator
@@ -187,7 +188,7 @@ fun StatisticsScreen(
                         coroutineScope.launch { pagerState.animateScrollToPage(types.indexOf(type)) }
                     }
                 )
-                PeriodSelector(
+                StatisticsPeriodSelector(
                     period = period,
                     onPeriodChange = {
                         period = it
@@ -313,43 +314,6 @@ private fun StatsTypeSwitch(
                     }
                 }
             }
-        }
-    }
-}
-
-@Composable
-private fun PeriodSelector(
-    period: StatsPeriod,
-    onPeriodChange: (StatsPeriod) -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(CircleShape)
-            .background(MaterialTheme.colorScheme.surfaceContainer)
-            .padding(3.dp),
-        horizontalArrangement = Arrangement.spacedBy(2.dp)
-    ) {
-        StatsPeriod.entries.forEach { option ->
-            val selected = option == period
-            val background by animateColorAsState(
-                if (selected) MaterialTheme.colorScheme.primary else Color.Transparent,
-                label = "periodBg"
-            )
-            Text(
-                text = option.label,
-                style = MaterialTheme.typography.labelLarge.copy(
-                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
-                ),
-                color = if (selected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
-                textAlign = TextAlign.Center,
-                modifier = Modifier
-                    .weight(1f)
-                    .clip(CircleShape)
-                    .background(background)
-                    .clickable { onPeriodChange(option) }
-                    .padding(vertical = 7.dp)
-            )
         }
     }
 }
