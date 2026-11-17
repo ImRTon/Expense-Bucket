@@ -106,8 +106,8 @@ fun TransactionDetailList(
                 modifier = Modifier.weight(1f)
             )
             DetailBentoTile(
-                icon = selectedPaymentMethod?.let { PaymentIconMapper.getIcon(it.icon) }
-                    ?: Icons.Filled.CreditCard,
+                icon = Icons.Filled.CreditCard,
+                iconPainter = selectedPaymentMethod?.let { PaymentIconMapper.getPainter(it.icon) },
                 iconTint = selectedPaymentMethod?.let { Color(it.color) }
                     ?: MaterialTheme.colorScheme.primary,
                 label = strings.getString(R.string.payment_methods),
@@ -264,6 +264,7 @@ private fun DetailBentoTile(
     label: String,
     value: String,
     iconTint: Color = MaterialTheme.colorScheme.primary,
+    iconPainter: androidx.compose.ui.graphics.painter.Painter? = null,
     isHighlighted: Boolean = false,
     onClick: () -> Unit,
     modifier: Modifier = Modifier
@@ -297,7 +298,7 @@ private fun DetailBentoTile(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = icon,
+                    painter = iconPainter ?: androidx.compose.ui.graphics.vector.rememberVectorPainter(icon),
                     contentDescription = null,
                     tint = activeTint,
                     modifier = Modifier.size(17.dp)

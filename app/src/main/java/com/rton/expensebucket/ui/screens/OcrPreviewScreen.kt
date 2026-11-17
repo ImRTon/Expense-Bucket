@@ -585,7 +585,7 @@ fun OcrPreviewScreen(
                             label = { Text(strings.localizedLabel(parent.name), style = MaterialTheme.typography.labelMedium) },
                             leadingIcon = {
                                 Icon(
-                                    PaymentIconMapper.getIcon(parent.icon),
+                                    PaymentIconMapper.getPainter(parent.icon),
                                     contentDescription = null,
                                     modifier = Modifier.size(16.dp),
                                     tint = color

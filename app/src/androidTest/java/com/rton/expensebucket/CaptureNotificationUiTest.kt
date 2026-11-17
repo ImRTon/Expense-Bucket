@@ -34,7 +34,7 @@ class CaptureNotificationUiTest {
             )
         }
         val database = Room.databaseBuilder(context, ExpenseBucketDatabase::class.java, "expenses_database")
-            .addMigrations(ExpenseBucketDatabase.MIGRATION_11_12).build()
+            .addMigrations(ExpenseBucketDatabase.MIGRATION_11_12, ExpenseBucketDatabase.MIGRATION_12_13, ExpenseBucketDatabase.MIGRATION_13_14).build()
         val dao = database.transactionDao()
         val first = dao.insertTransaction(Transaction(amount = 1234.5, note = "島通知測試A", source = "notification", isDraft = true))
         val second = dao.insertTransaction(Transaction(amount = 50.0, note = "島通知測試B", source = "notification", isDraft = true))

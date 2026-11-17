@@ -20,7 +20,7 @@ import com.rton.expensebucket.data.model.TransactionItemConverter
 
 @Database(
     entities = [Transaction::class, Category::class, Project::class, PaymentMethod::class, NonPaymentNotification::class, NotificationCapture::class],
-    version = 13,
+    version = 14,
     exportSchema = true
 )
 @TypeConverters(TransactionItemConverter::class)
@@ -32,6 +32,12 @@ abstract class ExpenseBucketDatabase : RoomDatabase() {
     abstract fun nonPaymentNotificationDao(): NonPaymentNotificationDao
 
     companion object {
+        val MIGRATION_13_14 = object : Migration(13, 14) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                PaymentMethodDefaultsMigration.migrate(database)
+            }
+        }
+
         val MIGRATION_12_13 = object : Migration(12, 13) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL("ALTER TABLE `transactions` ADD COLUMN `items` TEXT NOT NULL DEFAULT '[]'")

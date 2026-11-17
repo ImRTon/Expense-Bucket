@@ -359,6 +359,7 @@ class MainViewModel @Inject constructor(
                     for (parent in parents) {
                         val id = repository.insertPaymentMethod(
                         PaymentMethod(
+                            id = parent.id,
                             name = parent.name,
                             icon = parent.icon,
                             color = parent.color,
@@ -377,6 +378,7 @@ class MainViewModel @Inject constructor(
                     val childMethods = children.mapNotNull { child ->
                         val parentId = parentIdMap[child.parentName] ?: return@mapNotNull null
                         PaymentMethod(
+                            id = child.id,
                             name = child.name,
                             icon = child.icon,
                             color = child.color,

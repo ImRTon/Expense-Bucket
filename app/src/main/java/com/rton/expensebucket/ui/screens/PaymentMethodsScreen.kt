@@ -143,7 +143,7 @@ fun PaymentMethodsScreen(
                                     .padding(vertical = 4.dp, horizontal = 4.dp)
                             ) {
                                 Icon(
-                                    imageVector = PaymentIconMapper.getIcon(parent.icon),
+                                    painter = PaymentIconMapper.getPainter(parent.icon),
                                     contentDescription = null,
                                     tint = parentColor,
                                     modifier = Modifier.size(18.dp)
@@ -285,7 +285,7 @@ private fun UnifiedPaymentMethodRow(
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = PaymentIconMapper.getIcon(method.icon),
+                    painter = PaymentIconMapper.getPainter(method.icon),
                     contentDescription = null,
                     tint = color,
                     modifier = Modifier.size(20.dp)
@@ -464,13 +464,7 @@ private fun PaymentMethodEditorSheet(
         BillingLimitType.PROMO to strings.getString(R.string.reward_limit)
     )
     val billingLimitAmount = billingLimitAmountText.toDoubleOrNull()
-    val iconChoices = remember {
-        listOf(
-            "credit_card", "visa", "mastercard", "jcb", "cash",
-            "applepay", "googlepay", "samsungpay", "linepay", "jko",
-            "easycard", "pi", "tpay", "paypal", "bank_transfer", "other"
-        )
-    }
+    val iconChoices = PaymentIconMapper.allKeys
 
     val canSave = name.isNotBlank() && (!billingEnabled || billingDay != null)
 
@@ -541,7 +535,7 @@ private fun PaymentMethodEditorSheet(
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(
-                        imageVector = PaymentIconMapper.getIcon(selectedIcon),
+                        painter = PaymentIconMapper.getPainter(selectedIcon),
                         contentDescription = null,
                         tint = Color(selectedColor),
                         modifier = Modifier.size(24.dp)
@@ -602,11 +596,16 @@ private fun PaymentMethodEditorSheet(
                                         if (isSelected) Color(selectedColor)
                                         else MaterialTheme.colorScheme.surfaceContainerHigh
                                     )
-                                    .clickable { selectedIcon = key },
+                                    .clickable {
+                                        if (selectedIcon != key) {
+                                            selectedIcon = key
+                                            PaymentIconMapper.defaultColor(key)?.let { selectedColor = it }
+                                        }
+                                    },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Icon(
-                                    imageVector = PaymentIconMapper.getIcon(key),
+                                    painter = PaymentIconMapper.getPainter(key),
                                     contentDescription = strings.localizedLabel(PaymentIconMapper.displayName(key)),
                                     tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(20.dp)

@@ -17,7 +17,25 @@ object DefaultPaymentMethods {
         val type: String,
         val isDefault: Boolean = false,
         val sortOrder: Int = 0,
-        val parentName: String? = null // null = parent
+        val parentName: String? = null, // null = parent
+        val id: Long = 0
+    )
+
+    // Keep established generic IDs from the wireless-debugging device. IDs 19..23
+    // belong to personal cards there and are deliberately not assigned to defaults.
+    private val defaultIds = mapOf(
+        "Payments" to 1L, "CreditCard" to 2L, "PhoneIphone" to 3L, "Toll" to 4L,
+        "visa" to 5L, "mastercard" to 6L, "jcb" to 7L, "jko" to 8L,
+        "linepay" to 9L, "easycard" to 10L, "applepay" to 11L, "googlepay" to 12L,
+        "samsungpay" to 13L, "paypal" to 14L, "pi" to 15L, "pay_full" to 16L,
+        "tpay" to 17L, "bank_transfer" to 18L, "icoca" to 24L, "transit_card" to 25L,
+        "ipass_money" to 26L, "icash_pay" to 27L, "taishin_pay" to 28L,
+        "easycard_card" to 29L, "icash" to 30L, "ipass_card" to 31L, "suica" to 32L
+    )
+
+    val addedIconKeys = setOf(
+        "transit_card", "ipass_money", "icash_pay", "taishin_pay",
+        "easycard_card", "icash", "ipass_card", "suica", "icoca"
     )
 
     fun getSeeds(): List<PaymentMethodSeed> = listOf(
@@ -26,6 +44,7 @@ object DefaultPaymentMethods {
         PaymentMethodSeed("信用卡", "CreditCard", 0xFF2196F3, "credit", sortOrder = 1),
         PaymentMethodSeed("電子支付", "PhoneIphone", 0xFFFF9800, "epay", sortOrder = 2),
         PaymentMethodSeed("其他", "Toll", 0xFF9E9E9E, "other", sortOrder = 3),
+        PaymentMethodSeed("電子票證", "transit_card", 0xFF00A99D, "epay", sortOrder = 4),
 
         // ─── Children ─────────────────────────────────────────────
         // Cash (If we want a default child for Cash, but usually standard money isn't subcategorized default, left empty for now)
@@ -36,9 +55,9 @@ object DefaultPaymentMethods {
         PaymentMethodSeed("JCB", "jcb", 0xFF0B4EA2, "credit", sortOrder = 12, parentName = "信用卡"),
 
         // E-Payment
-        PaymentMethodSeed("街口支付", "jko", 0xFFE60912, "epay", sortOrder = 20, parentName = "電子支付"),
+        PaymentMethodSeed("街口支付", "jko", 0xFFC9191D, "epay", sortOrder = 20, parentName = "電子支付"),
         PaymentMethodSeed("LINE Pay", "linepay", 0xFF07B53B, "epay", sortOrder = 21, parentName = "電子支付"),
-        PaymentMethodSeed("悠遊付", "easycard", 0xFF3B82F6, "epay", sortOrder = 22, parentName = "電子支付"),
+        PaymentMethodSeed("悠遊付", "easycard", 0xFF007BC4, "epay", sortOrder = 22, parentName = "電子支付"),
         PaymentMethodSeed("Apple Pay", "applepay", 0xFF000000, "epay", sortOrder = 23, parentName = "電子支付"),
         PaymentMethodSeed("Google Pay", "googlepay", 0xFF4285F4, "epay", sortOrder = 24, parentName = "電子支付"),
         PaymentMethodSeed("Samsung Pay", "samsungpay", 0xFF1428A0, "epay", sortOrder = 25, parentName = "電子支付"),
@@ -46,15 +65,24 @@ object DefaultPaymentMethods {
         PaymentMethodSeed("Pi 拍錢包", "pi", 0xFFEC4899, "epay", sortOrder = 27, parentName = "電子支付"),
         PaymentMethodSeed("全支付", "pay_full", 0xFFFFD100, "epay", sortOrder = 28, parentName = "電子支付"),
         PaymentMethodSeed("臺灣 Pay", "tpay", 0xFFE3007F, "epay", sortOrder = 29, parentName = "電子支付"),
+        PaymentMethodSeed("iPASS MONEY", "ipass_money", 0xFF2FB516, "epay", sortOrder = 30, parentName = "電子支付"),
+        PaymentMethodSeed("icash Pay", "icash_pay", 0xFFEF0010, "epay", sortOrder = 31, parentName = "電子支付"),
+        PaymentMethodSeed("台新 Pay", "taishin_pay", 0xFFE60012, "epay", sortOrder = 32, parentName = "電子支付"),
+        PaymentMethodSeed("悠遊卡", "easycard_card", 0xFF007BC4, "epay", sortOrder = 33, parentName = "電子票證"),
+        PaymentMethodSeed("icash", "icash", 0xFFEF0010, "epay", sortOrder = 34, parentName = "電子票證"),
+        PaymentMethodSeed("一卡通", "ipass_card", 0xFF00A9E9, "epay", sortOrder = 35, parentName = "電子票證"),
+        PaymentMethodSeed("Suica 西瓜卡", "suica", 0xFF5BAE32, "epay", sortOrder = 36, parentName = "電子票證"),
+        PaymentMethodSeed("ICOCA", "icoca", 0xFF0072BC, "epay", sortOrder = 37, parentName = "電子票證"),
 
         // Other
         PaymentMethodSeed("銀行轉帳", "bank_transfer", 0xFF6B7280, "other", sortOrder = 30, parentName = "其他")
-    )
+    ).map { it.copy(id = defaultIds.getValue(it.icon)) }
 
     fun get(): List<PaymentMethod> = getSeeds()
         .filter { it.parentName == null }
         .map { seed ->
             PaymentMethod(
+                id = seed.id,
                 name = seed.name,
                 icon = seed.icon,
                 color = seed.color,

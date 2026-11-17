@@ -57,7 +57,7 @@ class TransactionItemsDatabaseTest {
                 }).build()
         )
         fun open() = Room.databaseBuilder(context, ExpenseBucketDatabase::class.java, name)
-            .addMigrations(ExpenseBucketDatabase.MIGRATION_12_13).build()
+            .addMigrations(ExpenseBucketDatabase.MIGRATION_12_13, ExpenseBucketDatabase.MIGRATION_13_14).build()
         try {
             helper.writableDatabase
             helper.close()

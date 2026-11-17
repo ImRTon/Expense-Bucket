@@ -187,7 +187,7 @@ private fun PaymentMethodGridTile(
             contentAlignment = Alignment.Center
         ) {
             Icon(
-                imageVector = PaymentIconMapper.getIcon(method.icon),
+                painter = PaymentIconMapper.getPainter(method.icon),
                 contentDescription = strings.localizedLabel(method.name),
                 tint = if (isSelected) Color.White else methodColor,
                 modifier = Modifier.size(iconSize)
