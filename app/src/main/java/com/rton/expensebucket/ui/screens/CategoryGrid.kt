@@ -1,5 +1,7 @@
 package com.rton.expensebucket.ui.screens
 
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.ui.util.localizedLabel
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -39,8 +41,7 @@ fun CategoryGrid(
     onSelectCategory: (Category) -> Unit,
     onToggleExpandParent: (Long?) -> Unit,
     modifier: Modifier = Modifier
-) {
-    if (parentCategories.isEmpty()) return
+) {    if (parentCategories.isEmpty()) return
 
     val rows = remember(parentCategories) { parentCategories.chunked(4) }
 
@@ -152,6 +153,7 @@ private fun CategoryGridTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalContext.current.resources
     val categoryColor = Color(category.color)
     val scale by animateFloatAsState(
         targetValue = if (isSelected) 1.06f else 1f,
@@ -184,16 +186,16 @@ private fun CategoryGridTile(
         ) {
             Icon(
                 imageVector = IconMapper.getIcon(category.icon),
-                contentDescription = category.name,
+                contentDescription = strings.localizedLabel(category.name),
                 tint = if (isSelected) Color.White else categoryColor,
                 modifier = Modifier.size(iconSize)
             )
         }
         Text(
             text = when {
-                hasChildren && isExpanded -> "${category.name} ▴"
-                hasChildren -> "${category.name} ▾"
-                else -> category.name
+                hasChildren && isExpanded -> "${strings.localizedLabel(category.name)} ▴"
+                hasChildren -> "${strings.localizedLabel(category.name)} ▾"
+                else -> strings.localizedLabel(category.name)
             },
             style = MaterialTheme.typography.labelMedium.copy(
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium

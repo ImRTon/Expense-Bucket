@@ -42,7 +42,6 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
     companion object {
         private const val TAG = "ExpensesNotifSvc"
         private const val CHANNEL_ID = "expenses_transaction_capture"
-        private const val CHANNEL_NAME = "記帳通知"
 
         /**
          * Package name prefixes of apps we want to intercept.
@@ -214,16 +213,20 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
 
     // ─── Heads-up notification ──────────────────────────────────────
 
+    private val strings: android.content.res.Resources
+        get() = com.rton.expensebucket.data.AppLanguage.wrap(this).resources
+
     private fun showConfirmationNotification(
         transactionId: Long,
         parsed: com.rton.expensebucket.ocr.ParsedTransaction
     ) {
+        createNotificationChannel()
         val notifId = transactionId.toInt()
         val nm = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
 
         val amountText = currencyFormat.format(parsed.amount)
-        val typeText = if (parsed.isExpense) "消費" else "收入"
-        val merchantText = if (parsed.merchant.isNotBlank()) " 於 ${parsed.merchant}" else ""
+        val typeText = if (parsed.isExpense) strings.getString(R.string.purchase) else strings.getString(R.string.income)
+        val merchantText = if (parsed.merchant.isNotBlank()) strings.getString(R.string.merchant_at, parsed.merchant) else ""
 
         // Action 1: Quick confirm (via BroadcastReceiver)
         val confirmIntent = Intent(this, NotificationConfirmReceiver::class.java).apply {
@@ -245,20 +248,20 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
 
         val notification = NotificationCompat.Builder(this, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_expense)
-            .setContentTitle("偵測到${typeText} $amountText")
-            .setContentText("${typeText}${merchantText}，點擊確認記帳")
+            .setContentTitle(strings.getString(R.string.detected_transaction, typeText, amountText))
+            .setContentText(strings.getString(R.string.confirm_notification, typeText, merchantText))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setAutoCancel(true)
             .setContentIntent(editPendingIntent)
             .addAction(
                 android.R.drawable.ic_menu_save,
-                "✓ 確認記帳",
+                strings.getString(R.string.notification_confirm),
                 confirmPendingIntent
             )
             .addAction(
                 android.R.drawable.ic_menu_edit,
-                "📝 編輯",
+                strings.getString(R.string.notification_edit),
                 editPendingIntent
             )
             .build()
@@ -278,10 +281,10 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                CHANNEL_NAME,
+                strings.getString(R.string.notification_channel),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = "攔截支付通知並提醒確認記帳"
+                description = strings.getString(R.string.notification_description)
                 enableLights(true)
                 enableVibration(true)
             }

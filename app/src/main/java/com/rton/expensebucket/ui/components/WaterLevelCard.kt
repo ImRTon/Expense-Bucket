@@ -1,5 +1,8 @@
 package com.rton.expensebucket.ui.components
 
+import com.rton.expensebucket.ui.util.localizedLabel
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.R
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -57,6 +60,8 @@ fun WaterLevelCard(
     onPageChanged: (Int) -> Unit = {},
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalContext.current.resources
+
     val periods = TimePeriod.entries
     val pagerState = rememberPagerState(
         initialPage = selectedPage,
@@ -85,7 +90,7 @@ fun WaterLevelCard(
         compareMode
     }
     val summary = periodData[currentPeriod] ?: PeriodSummary()
-    val currentDisplay = computeDisplayData(effectiveMode, summary, monthlyBudget, currentPeriod)
+    val currentDisplay = computeDisplayData(strings, effectiveMode, summary, monthlyBudget, currentPeriod)
     val currentPageColor by animateColorAsState(
         targetValue = waterLevelColor(currentDisplay.level, appPalette, isDarkTheme),
         label = "currentWaterLevelColor"
@@ -103,7 +108,7 @@ fun WaterLevelCard(
         val pagePeriod = periods[pageIndex]
         val pageMode = if (pagePeriod == TimePeriod.ALL) CompareMode.EXPENSE_INCOME else compareMode
         val pageSummary = periodData[pagePeriod] ?: PeriodSummary()
-        val pageDisplay = computeDisplayData(pageMode, pageSummary, monthlyBudget, pagePeriod)
+        val pageDisplay = computeDisplayData(strings, pageMode, pageSummary, monthlyBudget, pagePeriod)
         val pageWaterColor = waterLevelColor(pageDisplay.level, appPalette, isDarkTheme)
         val pageBalance = when (pageMode) {
             CompareMode.EXPENSE_INCOME -> pageSummary.income - pageSummary.expense
@@ -127,7 +132,10 @@ fun WaterLevelCard(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "${pagePeriod.label}${if (pageMode == CompareMode.EXPENSE_BUDGET) "預算" else ""}餘額",
+                        text = strings.getString(
+                            if (pageMode == CompareMode.EXPENSE_BUDGET) R.string.period_budget_balance else R.string.period_balance,
+                            strings.localizedLabel(pagePeriod.label)
+                        ),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
                         modifier = Modifier.weight(1f)
@@ -151,12 +159,12 @@ fun WaterLevelCard(
                         ) {
                             Icon(
                                 Icons.Filled.SwapHoriz,
-                                contentDescription = "切換模式",
+                                contentDescription = strings.getString(R.string.switch_mode),
                                 modifier = Modifier.size(14.dp)
                             )
                             Spacer(modifier = Modifier.size(4.dp))
                             Text(
-                                text = pageMode.label,
+                                text = strings.localizedLabel(pageMode.label),
                                 style = MaterialTheme.typography.labelSmall,
                                 maxLines = 1
                             )
@@ -166,7 +174,7 @@ fun WaterLevelCard(
 
                 Text(
                     text = if (pageMode == CompareMode.EXPENSE_BUDGET && monthlyBudget <= 0) {
-                        "未設定預算"
+                        strings.getString(R.string.no_budget)
                     } else {
                         currencyFormat.format(pageBalance)
                     },
@@ -242,7 +250,7 @@ private data class DisplayData(
     val secondaryLabel: String
 )
 
-private fun computeDisplayData(
+private fun computeDisplayData(strings: android.content.res.Resources,
     mode: CompareMode,
     summary: PeriodSummary,
     budget: Double,
@@ -261,8 +269,8 @@ private fun computeDisplayData(
                 level = level,
                 primaryValue = summary.expense,
                 secondaryValue = summary.income,
-                primaryLabel = "支出",
-                secondaryLabel = "收入"
+                primaryLabel = strings.getString(R.string.expense),
+                secondaryLabel = strings.getString(R.string.income)
             )
         }
         CompareMode.EXPENSE_BUDGET -> {
@@ -283,8 +291,8 @@ private fun computeDisplayData(
                 level = level,
                 primaryValue = expense,
                 secondaryValue = periodBudget,
-                primaryLabel = "支出",
-                secondaryLabel = "預算"
+                primaryLabel = strings.getString(R.string.expense),
+                secondaryLabel = strings.getString(R.string.budget)
             )
         }
     }

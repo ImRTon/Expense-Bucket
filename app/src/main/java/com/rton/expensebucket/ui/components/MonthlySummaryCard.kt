@@ -1,5 +1,7 @@
 package com.rton.expensebucket.ui.components
 
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.R
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
@@ -27,6 +29,8 @@ fun MonthlySummaryCard(
     income: Double,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalContext.current.resources
+
     val currencyFormat = remember { NumberFormat.getCurrencyInstance(Locale("zh", "TW")) }
     val balance = income - expense
 
@@ -54,7 +58,7 @@ fun MonthlySummaryCard(
         ) {
             Column {
                 Text(
-                    text = "本月餘額",
+                    text = strings.getString(R.string.monthly_balance),
                     style = MaterialTheme.typography.labelLarge,
                     color = Color.White.copy(alpha = 0.8f)
                 )
@@ -75,12 +79,12 @@ fun MonthlySummaryCard(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     SummaryItem(
-                        label = "收入",
+                        label = strings.getString(R.string.income),
                         amount = currencyFormat.format(income),
                         indicatorColor = Color(0xFF4ADE80)
                     )
                     SummaryItem(
-                        label = "支出",
+                        label = strings.getString(R.string.expense),
                         amount = currencyFormat.format(expense),
                         indicatorColor = Color(0xFFFB7185)
                     )

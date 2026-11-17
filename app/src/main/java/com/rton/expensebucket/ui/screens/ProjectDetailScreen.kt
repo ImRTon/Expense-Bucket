@@ -1,5 +1,8 @@
 package com.rton.expensebucket.ui.screens
 
+import com.rton.expensebucket.ui.util.localizedLabel
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.R
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -92,6 +95,8 @@ fun ProjectDetailScreen(
     onInvoiceOcrClick: () -> Unit,
     onTransactionClick: (Transaction) -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     val settlementCurrency = project?.defaultCurrency ?: "TWD"
     val categoryMap = remember(categories) { categories.associateBy { it.id } }
     val paymentMethodMap = remember(paymentMethods) { paymentMethods.associateBy { it.id } }
@@ -116,7 +121,7 @@ fun ProjectDetailScreen(
             }.timeInMillis
         }
     }
-    
+
     var showEditDialog by remember { mutableStateOf(false) }
     var showDeleteConfirmDialog by remember { mutableStateOf(false) }
 
@@ -126,7 +131,7 @@ fun ProjectDetailScreen(
             TopAppBar(
                 title = {
                     Text(
-                        project?.name ?: "專案明細",
+                        project?.name ?: strings.getString(R.string.project_details),
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.SemiBold
                         )
@@ -134,16 +139,16 @@ fun ProjectDetailScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.getString(R.string.back))
                     }
                 },
                 actions = {
                     if (project != null) {
                         IconButton(onClick = { showEditDialog = true }) {
-                            Icon(Icons.Filled.Edit, contentDescription = "編輯專案")
+                            Icon(Icons.Filled.Edit, contentDescription = strings.getString(R.string.edit_project))
                         }
                         IconButton(onClick = { showDeleteConfirmDialog = true }) {
-                            Icon(Icons.Filled.Delete, contentDescription = "刪除專案", tint = MaterialTheme.colorScheme.error)
+                            Icon(Icons.Filled.Delete, contentDescription = strings.getString(R.string.delete_project), tint = MaterialTheme.colorScheme.error)
                         }
                     }
                 },
@@ -197,9 +202,9 @@ fun ProjectDetailScreen(
                 val statusLabel = if (remainingAmount == null) {
                     null
                 } else if (remainingAmount >= 0) {
-                    "剩餘"
+                    strings.getString(R.string.remaining)
                 } else {
-                    "超支"
+                    strings.getString(R.string.over_budget)
                 }
                 val statusPercent = if (remainingAmount == null) {
                     null
@@ -229,7 +234,7 @@ fun ProjectDetailScreen(
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(
-                                "累計支出",
+                                strings.getString(R.string.cumulative_expenses),
                                 style = MaterialTheme.typography.labelLarge,
                                 color = secondaryTextColor
                             )
@@ -250,16 +255,16 @@ fun ProjectDetailScreen(
                                     modifier = Modifier.padding(end = 104.dp)
                                 ) {
                                     Text(
-                                        "預算 ${CurrencyFormats.formatCompactAmount(currency, budget, settlementCurrency)}",
+                                        strings.getString(R.string.project_budget_amount, CurrencyFormats.formatCompactAmount(currency, budget, settlementCurrency)),
                                         style = MaterialTheme.typography.labelMedium,
                                         color = tertiaryTextColor
                                     )
                                     Spacer(modifier = Modifier.height(6.dp))
                                     Text(
                                         if (displayedRemainingAmount >= 0)
-                                            "剩餘 ${CurrencyFormats.formatCompactAmount(currency, displayedRemainingAmount, settlementCurrency)}"
+                                            strings.getString(R.string.project_remaining_amount, CurrencyFormats.formatCompactAmount(currency, displayedRemainingAmount, settlementCurrency))
                                         else
-                                            "超支 ${CurrencyFormats.formatCompactAmount(currency, -displayedRemainingAmount, settlementCurrency)}",
+                                            strings.getString(R.string.project_over_budget_amount, CurrencyFormats.formatCompactAmount(currency, -displayedRemainingAmount, settlementCurrency)),
                                         style = MaterialTheme.typography.bodySmall.copy(
                                             fontWeight = FontWeight.Medium
                                         ),
@@ -280,7 +285,7 @@ fun ProjectDetailScreen(
                             }
 
                             Text(
-                                "${transactions.size} 筆交易",
+                                strings.getQuantityString(R.plurals.transaction_count, transactions.size, transactions.size),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = tertiaryTextColor
                             )
@@ -316,7 +321,7 @@ fun ProjectDetailScreen(
                 item {
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text(
-                            "類別統計",
+                            strings.getString(R.string.category_statistics),
                             style = MaterialTheme.typography.titleMedium.copy(
                                 fontWeight = FontWeight.SemiBold
                             )
@@ -344,7 +349,7 @@ fun ProjectDetailScreen(
             // ─── Grouped Day Transaction Cards (Unified with HomeScreen) ───
             item {
                 Text(
-                    "交易明細",
+                    strings.getString(R.string.transaction_details),
                     style = MaterialTheme.typography.titleMedium.copy(
                         fontWeight = FontWeight.SemiBold
                     )
@@ -359,7 +364,7 @@ fun ProjectDetailScreen(
                         color = MaterialTheme.colorScheme.surfaceContainerLow
                     ) {
                         Text(
-                            text = "這個專案還沒有交易",
+                            text = strings.getString(R.string.project_no_transactions),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 20.dp, vertical = 24.dp)
@@ -388,7 +393,7 @@ fun ProjectDetailScreen(
                                 horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Text(
-                                    text = formatHomeDateHeader(dateMillis),
+                                    text = formatHomeDateHeader(strings, dateMillis),
                                     style = MaterialTheme.typography.titleSmall.copy(
                                         fontWeight = FontWeight.Bold
                                     ),
@@ -396,10 +401,10 @@ fun ProjectDetailScreen(
                                 )
                                 val summaryText = buildList {
                                     if (dailyExpense > 0) {
-                                        add("支出 ${CurrencyFormats.formatCompactAmount(settlementCurrency, dailyExpense, settlementCurrency)}")
+                                        add(strings.getString(R.string.project_daily_expense, CurrencyFormats.formatCompactAmount(settlementCurrency, dailyExpense, settlementCurrency)))
                                     }
                                     if (dailyIncome > 0) {
-                                        add("收入 ${CurrencyFormats.formatCompactAmount(settlementCurrency, dailyIncome, settlementCurrency)}")
+                                        add(strings.getString(R.string.project_daily_income, CurrencyFormats.formatCompactAmount(settlementCurrency, dailyIncome, settlementCurrency)))
                                     }
                                 }.joinToString(" · ")
 
@@ -459,8 +464,8 @@ fun ProjectDetailScreen(
     if (showDeleteConfirmDialog && project != null) {
         AlertDialog(
             onDismissRequest = { showDeleteConfirmDialog = false },
-            title = { Text("刪除專案") },
-            text = { Text("確定要刪除「${project.name}」嗎？這將會刪除該專案的所有設定，但專案內的交易紀錄會被保留且變回未分類。") },
+            title = { Text(strings.getString(R.string.delete_project)) },
+            text = { Text(strings.getString(R.string.delete_project_message, project.name)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -469,12 +474,12 @@ fun ProjectDetailScreen(
                         onBack()
                     }
                 ) {
-                    Text("刪除", color = MaterialTheme.colorScheme.error)
+                    Text(strings.getString(R.string.delete), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteConfirmDialog = false }) {
-                    Text("取消")
+                    Text(strings.getString(R.string.cancel))
                 }
             }
         )
@@ -488,6 +493,8 @@ private fun CategoryStatRow(
     totalAmount: Double,
     totalExpense: Double
 ) {
+    val strings = LocalContext.current.resources
+
     val ratio = if (totalExpense > 0) (totalAmount / totalExpense).toFloat() else 0f
     val categoryColor = category?.color?.let(::Color) ?: MaterialTheme.colorScheme.primary
 
@@ -501,7 +508,7 @@ private fun CategoryStatRow(
             ) {
                 Icon(
                     imageVector = IconMapper.getIcon(category?.icon ?: "MoreHoriz"),
-                    contentDescription = category?.name ?: "類別",
+                    contentDescription = category?.name?.let { strings.localizedLabel(it) } ?: strings.getString(R.string.category_type),
                     tint = categoryColor,
                     modifier = Modifier.size(20.dp)
                 )
@@ -509,7 +516,7 @@ private fun CategoryStatRow(
         },
         headlineContent = {
             Text(
-                text = category?.name ?: "未知類別",
+                text = category?.name?.let { strings.localizedLabel(it) } ?: strings.getString(R.string.unknown_category),
                 style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium)
             )
         },

@@ -1,5 +1,8 @@
 package com.rton.expensebucket.ui.screens
 
+import com.rton.expensebucket.ui.util.localizedLabel
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.R
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ExperimentalFoundationApi
@@ -61,12 +64,14 @@ fun TransactionDetailList(
     onNoteFocusChanged: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val paymentMethodLabel = selectedPaymentMethod?.name ?: "未選擇"
+    val strings = LocalContext.current.resources
+
+    val paymentMethodLabel = selectedPaymentMethod?.name?.let { strings.localizedLabel(it) } ?: strings.getString(R.string.not_selected)
     val showProjectTile = projects.isNotEmpty() || selectedProject != null
     val amortizationLabel = if (amortizationEnabled && amortizationMonthCount >= 2) {
-        "分 ${amortizationMonthCount} 期"
+        strings.getString(R.string.amortization_installments, amortizationMonthCount)
     } else {
-        "不攤提"
+        strings.getString(R.string.no_amortization)
     }
 
     val focusRequester = remember { FocusRequester() }
@@ -95,8 +100,8 @@ fun TransactionDetailList(
         ) {
             DetailBentoTile(
                 icon = Icons.Filled.CalendarToday,
-                label = "日期",
-                value = formatFriendlyDateTime(selectedDateTime),
+                label = strings.getString(R.string.date),
+                value = formatFriendlyDateTime(strings, selectedDateTime),
                 onClick = onDateClick,
                 modifier = Modifier.weight(1f)
             )
@@ -105,7 +110,7 @@ fun TransactionDetailList(
                     ?: Icons.Filled.CreditCard,
                 iconTint = selectedPaymentMethod?.let { Color(it.color) }
                     ?: MaterialTheme.colorScheme.primary,
-                label = "支付工具",
+                label = strings.getString(R.string.payment_methods),
                 value = paymentMethodLabel,
                 onClick = onPaymentMethodClick,
                 modifier = Modifier.weight(1f)
@@ -121,8 +126,8 @@ fun TransactionDetailList(
                 if (showProjectTile) {
                     DetailBentoTile(
                         icon = Icons.Filled.Luggage,
-                        label = "專案",
-                        value = selectedProject?.name ?: "日常帳",
+                        label = strings.getString(R.string.project),
+                        value = selectedProject?.name ?: strings.getString(R.string.everyday),
                         isHighlighted = selectedProject != null,
                         onClick = onProjectClick,
                         modifier = Modifier.weight(1f)
@@ -131,7 +136,7 @@ fun TransactionDetailList(
                 if (isExpense) {
                     DetailBentoTile(
                         icon = Icons.Filled.DateRange,
-                        label = "攤提",
+                        label = strings.getString(R.string.amortization),
                         value = amortizationLabel,
                         isHighlighted = amortizationEnabled,
                         onClick = onAmortizationClick,
@@ -206,7 +211,7 @@ fun TransactionDetailList(
                     ) {
                         if (note.isEmpty()) {
                             Text(
-                                text = if (isNoteFocused) "輸入備註內容…" else "新增備註…",
+                                text = if (isNoteFocused) strings.getString(R.string.enter_note) else strings.getString(R.string.add_note),
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.55f)
                             )
@@ -239,7 +244,7 @@ fun TransactionDetailList(
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "完成",
+                                text = strings.getString(R.string.done),
                                 style = MaterialTheme.typography.labelSmall.copy(
                                     fontWeight = FontWeight.Bold
                                 ),

@@ -1,5 +1,7 @@
 package com.rton.expensebucket.ui.components
 
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.R
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -46,15 +48,17 @@ fun ProjectFormDialog(
     onDismiss: () -> Unit,
     onConfirm: (Project) -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     var name by remember(initialProject) { mutableStateOf(initialProject?.name ?: "") }
     var description by remember(initialProject) { mutableStateOf(initialProject?.description ?: "") }
     var currency by remember(initialProject) { mutableStateOf(initialProject?.defaultCurrency ?: "JPY") }
-    
+
     val initialBudgetStr = initialProject?.budget?.let {
         if (it == it.toLong().toDouble()) it.toLong().toString() else it.toString()
     } ?: ""
     var budgetText by remember(initialProject) { mutableStateOf(initialBudgetStr) }
-    
+
     val iconChoices = listOf(
         "✈️", "🧳", "🏝️", "🏙️",
         "🏔️", "🚄", "🚗", "⛩️",
@@ -76,7 +80,7 @@ fun ProjectFormDialog(
     var icon by remember(initialProject) { mutableStateOf(initialProject?.icon ?: iconChoices.first()) }
     var color by remember(initialProject) { mutableStateOf(initialProject?.color ?: colorChoices.first()) }
     var showEmojiPicker by remember { mutableStateOf(false) }
-    
+
     val currencies = CurrencyFormats.supportedCurrencies
 
     // Date states
@@ -91,7 +95,7 @@ fun ProjectFormDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(if (isEditMode) "編輯旅行專案" else "新增旅行專案") },
+        title = { Text(if (isEditMode) strings.getString(R.string.edit_trip_project) else strings.getString(R.string.add_trip_project)) },
         text = {
             Column(
                 modifier = Modifier
@@ -103,8 +107,8 @@ fun ProjectFormDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("專案名稱") },
-                    placeholder = { Text("例如：東京之旅 2026") },
+                    label = { Text(strings.getString(R.string.project_name)) },
+                    placeholder = { Text(strings.getString(R.string.project_example)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
@@ -112,14 +116,14 @@ fun ProjectFormDialog(
                 OutlinedTextField(
                     value = description,
                     onValueChange = { description = it },
-                    label = { Text("描述 (選填)") },
+                    label = { Text(strings.getString(R.string.optional_description)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
 
                 Text(
-                    "外觀",
+                    strings.getString(R.string.appearance),
                     style = MaterialTheme.typography.labelLarge
                 )
                 Surface(
@@ -147,11 +151,11 @@ fun ProjectFormDialog(
                         }
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                if (name.isBlank()) "專案預覽" else name,
+                                if (name.isBlank()) strings.getString(R.string.project_preview) else name,
                                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
                             )
                             Text(
-                                "時間軸與專案卡片會使用這組 icon 與色彩",
+                                strings.getString(R.string.project_style_hint),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -165,7 +169,7 @@ fun ProjectFormDialog(
                 }
 
                 Text(
-                    "圖示",
+                    strings.getString(R.string.icon),
                     style = MaterialTheme.typography.labelLarge
                 )
                 val iconRows = remember(iconChoices) { iconChoices.chunked(4) }
@@ -230,7 +234,7 @@ fun ProjectFormDialog(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                "更多 Emoji",
+                                strings.getString(R.string.more_emoji),
                                 style = MaterialTheme.typography.labelLarge
                             )
                         }
@@ -238,7 +242,7 @@ fun ProjectFormDialog(
                 }
 
                 Text(
-                    "色彩",
+                    strings.getString(R.string.color),
                     style = MaterialTheme.typography.labelLarge
                 )
                 val colorRows = remember(colorChoices) { colorChoices.chunked(5) }
@@ -282,7 +286,7 @@ fun ProjectFormDialog(
                 }
 
                 Text(
-                    "預設幣別",
+                    strings.getString(R.string.default_currency),
                     style = MaterialTheme.typography.labelLarge
                 )
                 SingleChoiceSegmentedButtonRow(
@@ -318,7 +322,7 @@ fun ProjectFormDialog(
 
                 // ─── Date Range ──────────────────────────
                 Text(
-                    "旅行期間 (選填)",
+                    strings.getString(R.string.optional_trip_dates),
                     style = MaterialTheme.typography.labelLarge
                 )
                 Row(
@@ -342,7 +346,7 @@ fun ProjectFormDialog(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                startDate?.let { dateFormat.format(Date(it)) } ?: "開始日期",
+                                startDate?.let { dateFormat.format(Date(it)) } ?: strings.getString(R.string.start_date),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (startDate != null) MaterialTheme.colorScheme.onSurface
                                 else MaterialTheme.colorScheme.onSurfaceVariant
@@ -366,7 +370,7 @@ fun ProjectFormDialog(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Text(
-                                endDate?.let { dateFormat.format(Date(it)) } ?: "結束日期",
+                                endDate?.let { dateFormat.format(Date(it)) } ?: strings.getString(R.string.end_date),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (endDate != null) MaterialTheme.colorScheme.onSurface
                                 else MaterialTheme.colorScheme.onSurfaceVariant
@@ -383,8 +387,8 @@ fun ProjectFormDialog(
                             budgetText = newValue
                         }
                     },
-                    label = { Text("預算金額 (選填)") },
-                    placeholder = { Text("例如：50000") },
+                    label = { Text(strings.getString(R.string.optional_budget)) },
+                    placeholder = { Text(strings.getString(R.string.budget_example)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp),
@@ -422,12 +426,12 @@ fun ProjectFormDialog(
                 },
                 enabled = name.isNotBlank()
             ) {
-                Text(if (isEditMode) "儲存" else "建立")
+                Text(if (isEditMode) strings.getString(R.string.save) else strings.getString(R.string.create))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消")
+                Text(strings.getString(R.string.cancel))
             }
         }
     )
@@ -441,10 +445,10 @@ fun ProjectFormDialog(
                 TextButton(onClick = {
                     pickerState.selectedDateMillis?.let { startDate = it }
                     showStartDatePicker = false
-                }) { Text("確定") }
+                }) { Text(strings.getString(R.string.ok)) }
             },
             dismissButton = {
-                TextButton(onClick = { showStartDatePicker = false }) { Text("取消") }
+                TextButton(onClick = { showStartDatePicker = false }) { Text(strings.getString(R.string.cancel)) }
             }
         ) {
             DatePicker(state = pickerState)
@@ -460,10 +464,10 @@ fun ProjectFormDialog(
                 TextButton(onClick = {
                     pickerState.selectedDateMillis?.let { endDate = it }
                     showEndDatePicker = false
-                }) { Text("確定") }
+                }) { Text(strings.getString(R.string.ok)) }
             },
             dismissButton = {
-                TextButton(onClick = { showEndDatePicker = false }) { Text("取消") }
+                TextButton(onClick = { showEndDatePicker = false }) { Text(strings.getString(R.string.cancel)) }
             }
         ) {
             DatePicker(state = pickerState)
@@ -473,7 +477,7 @@ fun ProjectFormDialog(
     if (showEmojiPicker) {
         AlertDialog(
             onDismissRequest = { showEmojiPicker = false },
-            title = { Text("選擇 Emoji") },
+            title = { Text(strings.getString(R.string.choose_emoji)) },
             text = {
                 AndroidView(
                     factory = { context ->
@@ -491,7 +495,7 @@ fun ProjectFormDialog(
             },
             confirmButton = {
                 TextButton(onClick = { showEmojiPicker = false }) {
-                    Text("關閉")
+                    Text(strings.getString(R.string.close))
                 }
             }
         )

@@ -1,5 +1,8 @@
 package com.rton.expensebucket.ui.screens
 
+import com.rton.expensebucket.ui.util.localizedLabel
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.R
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -44,6 +47,8 @@ fun DraftsScreen(
     onClearNonPaymentNotifications: () -> Unit,
     onBack: () -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     val dateFormat = remember { SimpleDateFormat("MM/dd HH:mm", Locale.getDefault()) }
     val categoryMap = remember(categories) { categories.associateBy { it.id } }
     var showNonPaymentInbox by remember { mutableStateOf(false) }
@@ -55,7 +60,7 @@ fun DraftsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "待確認記帳",
+                        strings.getString(R.string.pending_transactions),
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.SemiBold
                         )
@@ -63,13 +68,13 @@ fun DraftsScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.getString(R.string.back))
                     }
                 },
                 actions = {
                     if (drafts.isNotEmpty()) {
                         TextButton(onClick = { showClearDraftsDialog = true }) {
-                            Text("清空", color = MaterialTheme.colorScheme.error)
+                            Text(strings.getString(R.string.clear_all), color = MaterialTheme.colorScheme.error)
                         }
                     }
                     BadgedBox(
@@ -80,7 +85,7 @@ fun DraftsScreen(
                         }
                     ) {
                         IconButton(onClick = { showNonPaymentInbox = true }) {
-                            Icon(Icons.Filled.Delete, contentDescription = "非支付通知")
+                            Icon(Icons.Filled.Delete, contentDescription = strings.getString(R.string.non_payment_notifications))
                         }
                     }
                 },
@@ -107,7 +112,7 @@ fun DraftsScreen(
                     )
                     Spacer(modifier = Modifier.height(12.dp))
                     Text(
-                        "沒有待確認的紀錄",
+                        strings.getString(R.string.no_pending_transactions),
                         style = MaterialTheme.typography.bodyLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
                         textAlign = TextAlign.Center
@@ -124,7 +129,7 @@ fun DraftsScreen(
             ) {
                 item {
                     Text(
-                        "以下記錄來自通知或 OCR 擷取，請確認或刪除：",
+                        strings.getString(R.string.review_captured_transactions),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(bottom = 8.dp)
@@ -148,8 +153,8 @@ fun DraftsScreen(
     if (showClearDraftsDialog) {
         AlertDialog(
             onDismissRequest = { showClearDraftsDialog = false },
-            title = { Text("清空待確認記帳") },
-            text = { Text("確定要清空全部 ${drafts.size} 筆待確認紀錄嗎？") },
+            title = { Text(strings.getString(R.string.clear_pending_title)) },
+            text = { Text(strings.getString(R.string.clear_pending_message, drafts.size)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -157,12 +162,12 @@ fun DraftsScreen(
                         showClearDraftsDialog = false
                     }
                 ) {
-                    Text("清空", color = MaterialTheme.colorScheme.error)
+                    Text(strings.getString(R.string.clear_all), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showClearDraftsDialog = false }) {
-                    Text("取消")
+                    Text(strings.getString(R.string.cancel))
                 }
             }
         )
@@ -185,13 +190,15 @@ private fun NonPaymentNotificationInboxDialog(
     onClear: () -> Unit,
     onDismiss: () -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("非支付通知") },
+        title = { Text(strings.getString(R.string.non_payment_notifications)) },
         text = {
             if (notifications.isEmpty()) {
                 Text(
-                    "目前沒有紀錄",
+                    strings.getString(R.string.no_records),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -219,12 +226,12 @@ private fun NonPaymentNotificationInboxDialog(
                     onDismiss()
                 }
             ) {
-                Text("清空紀錄")
+                Text(strings.getString(R.string.clear_records))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("關閉")
+                Text(strings.getString(R.string.close))
             }
         }
     )
@@ -267,6 +274,8 @@ private fun DraftItem(
     onDelete: () -> Unit,
     onEdit: () -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     Card(
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(
@@ -289,19 +298,19 @@ private fun DraftItem(
                 )
                 if (draft.personalAmount != null && draft.personalAmount != draft.amount) {
                     Text(
-                        text = "支出總額 ${CurrencyFormats.formatAmount(draft.currency, draft.amount)}",
+                        text = strings.getString(R.string.draft_expense_total, CurrencyFormats.formatAmount(draft.currency, draft.amount)),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
                 }
                 Text(
-                    text = "${category?.name ?: "未分類"} · 來源: ${
+                    text = strings.getString(R.string.draft_source, category?.name?.let { strings.localizedLabel(it) } ?: strings.getString(R.string.uncategorized),
                         when (draft.source) {
-                            "ocr" -> "截圖辨識"
-                            "notification" -> "通知攔截"
-                            else -> "手動"
+                            "ocr" -> strings.getString(R.string.screenshot_ocr)
+                            "notification" -> strings.getString(R.string.source_notification)
+                            else -> strings.getString(R.string.source_manual)
                         }
-                    }",
+                    ),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -323,21 +332,21 @@ private fun DraftItem(
             IconButton(onClick = onEdit) {
                 Icon(
                     Icons.Filled.Edit,
-                    contentDescription = "編輯",
+                    contentDescription = strings.getString(R.string.edit),
                     tint = MaterialTheme.colorScheme.primary
                 )
             }
             IconButton(onClick = onConfirm) {
                 Icon(
                     Icons.Filled.Check,
-                    contentDescription = "確認",
+                    contentDescription = strings.getString(R.string.confirm),
                     tint = Color(0xFF10B981)
                 )
             }
             IconButton(onClick = onDelete) {
                 Icon(
                     Icons.Filled.Close,
-                    contentDescription = "刪除",
+                    contentDescription = strings.getString(R.string.delete),
                     tint = MaterialTheme.colorScheme.error
                 )
             }

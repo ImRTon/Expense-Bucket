@@ -1,5 +1,7 @@
 package com.rton.expensebucket.ui.components
 
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.R
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -37,6 +39,8 @@ fun TransactionItemSheet(
     onSaveItem: (TransactionItem) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     var name by rememberSaveable { mutableStateOf(initialItem?.name.orEmpty()) }
     val initialAmountText = initialItem?.amount?.let {
         if (it == it.toLong().toDouble()) it.toLong().toString() else it.toString()
@@ -109,24 +113,24 @@ fun TransactionItemSheet(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text(
-                            if (initialItem == null) "快速新增項目" else "編輯項目",
+                            if (initialItem == null) strings.getString(R.string.quick_add_item) else strings.getString(R.string.edit_item),
                             style = MaterialTheme.typography.titleLarge,
                             fontWeight = FontWeight.Bold
                         )
                         if (initialItem == null) {
                             Text(
-                                "第 ${itemCount + 1} 個項目 · $currency",
+                                strings.getString(R.string.item_number_currency, itemCount + 1, currency),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                         }
                     }
-                    TextButton(onClick = ::requestDismiss) { Text("關閉") }
+                    TextButton(onClick = ::requestDismiss) { Text(strings.getString(R.string.close)) }
                 }
 
                 if (lastSavedName.isNotEmpty()) {
                     Text(
-                        "✓ 已新增 $lastSavedName",
+                        strings.getString(R.string.item_added, lastSavedName),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.primary
                     )
@@ -134,8 +138,8 @@ fun TransactionItemSheet(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("項目名稱") },
-                    placeholder = { Text("例如：豆腐") },
+                    label = { Text(strings.getString(R.string.item_name)) },
+                    placeholder = { Text(strings.getString(R.string.item_example)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next),
                     keyboardActions = KeyboardActions(onNext = { startAmountEntry() }),
@@ -152,7 +156,7 @@ fun TransactionItemSheet(
                     border = if (amountStep) BorderStroke(1.5.dp, MaterialTheme.colorScheme.primary) else null
                 ) {
                     Column(Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
-                        Text("項目金額", style = MaterialTheme.typography.labelMedium,
+                        Text(strings.getString(R.string.item_amount), style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Text(currency, style = MaterialTheme.typography.bodyMedium,
@@ -176,7 +180,7 @@ fun TransactionItemSheet(
                         onClick = ::startAmountEntry,
                         enabled = name.isNotBlank(),
                         modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)
-                    ) { Text("下一步：輸入金額") }
+                    ) { Text(strings.getString(R.string.next_enter_amount)) }
                 } else {
                     Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                         if (initialItem == null) {
@@ -184,7 +188,7 @@ fun TransactionItemSheet(
                                 onClick = { save(another = true) },
                                 enabled = item != null,
                                 modifier = Modifier.weight(1f).heightIn(min = 48.dp)
-                            ) { Text("下一個項目") }
+                            ) { Text(strings.getString(R.string.next_item)) }
                         }
                         Button(
                             onClick = { save(another = false) },
@@ -193,7 +197,7 @@ fun TransactionItemSheet(
                         ) {
                             Icon(Icons.Default.Check, null, Modifier.size(18.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text(if (initialItem == null) "完成" else "儲存變更")
+                            Text(if (initialItem == null) strings.getString(R.string.done) else strings.getString(R.string.save_changes))
                         }
                     }
                 }
@@ -216,10 +220,10 @@ fun TransactionItemSheet(
     if (showDiscardDialog) {
         AlertDialog(
             onDismissRequest = { showDiscardDialog = false },
-            title = { Text("捨棄這個項目？") },
-            text = { Text("目前輸入的內容尚未套用，已新增的其他項目會保留。") },
-            confirmButton = { TextButton(onClick = onDismiss) { Text("捨棄") } },
-            dismissButton = { TextButton(onClick = { showDiscardDialog = false }) { Text("繼續輸入") } }
+            title = { Text(strings.getString(R.string.discard_item_title)) },
+            text = { Text(strings.getString(R.string.discard_item_message)) },
+            confirmButton = { TextButton(onClick = onDismiss) { Text(strings.getString(R.string.discard)) } },
+            dismissButton = { TextButton(onClick = { showDiscardDialog = false }) { Text(strings.getString(R.string.keep_entering)) } }
         )
     }
 }

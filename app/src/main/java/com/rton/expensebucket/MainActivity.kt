@@ -52,6 +52,10 @@ import java.io.File
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
 
+    override fun attachBaseContext(newBase: android.content.Context) {
+        super.attachBaseContext(com.rton.expensebucket.data.AppLanguage.wrap(newBase))
+    }
+
     @Inject lateinit var ocrEngine: OcrEngine
     @Inject lateinit var receiptOcrEngine: ReceiptOcrEngine
 
@@ -186,17 +190,17 @@ class MainActivity : ComponentActivity() {
  * Bottom navigation tab definitions.
  */
 data class BottomNavItem(
-    val label: String,
+    @param:androidx.annotation.StringRes val label: Int,
     val icon: ImageVector,
     val route: String
 )
 
 val bottomNavItems = listOf(
-    BottomNavItem("首頁",     Icons.Filled.Home,       Screen.Home.route),
-    BottomNavItem("統計",     Icons.Filled.PieChart,   Screen.Statistics.route),
-    BottomNavItem("支付工具", Icons.Filled.CreditCard, Screen.PaymentMethods.route),
-    BottomNavItem("專案管理", Icons.Filled.Luggage,    Screen.Projects.route),
-    BottomNavItem("設定",     Icons.Filled.Settings,   Screen.Settings.route)
+    BottomNavItem(R.string.home, Icons.Filled.Home, Screen.Home.route),
+    BottomNavItem(R.string.statistics, Icons.Filled.PieChart, Screen.Statistics.route),
+    BottomNavItem(R.string.nav_payments, Icons.Filled.CreditCard, Screen.PaymentMethods.route),
+    BottomNavItem(R.string.project_management, Icons.Filled.Luggage, Screen.Projects.route),
+    BottomNavItem(R.string.settings, Icons.Filled.Settings, Screen.Settings.route)
 )
 
 /** Routes that show the bottom bar (top-level tabs only). */
@@ -214,6 +218,8 @@ fun ExpensesApp(
 ) {
     val navController = rememberNavController()
     val viewModel: MainViewModel = hiltViewModel()
+    val displayLocale = androidx.compose.ui.platform.LocalConfiguration.current.locales[0]
+    LaunchedEffect(displayLocale) { viewModel.setDisplayLocale(displayLocale) }
     var transactionPrefill by remember { mutableStateOf<TransactionPrefill?>(null) }
     var addTransactionProjectId by rememberSaveable { mutableStateOf<Long?>(null) }
     var navGraphReady by remember { mutableStateOf(false) }
@@ -317,9 +323,15 @@ fun ExpensesApp(
                                 }
                             },
                             icon = {
-                                Icon(item.icon, contentDescription = item.label)
+                                Icon(item.icon, contentDescription = androidx.compose.ui.res.stringResource(item.label))
                             },
-                            label = { Text(item.label) },
+                            label = {
+                                Text(
+                                    androidx.compose.ui.res.stringResource(item.label),
+                                    maxLines = 1,
+                                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                                )
+                            },
                             colors = bottomBarItemColors
                         )
                     }

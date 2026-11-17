@@ -1,5 +1,7 @@
 package com.rton.expensebucket.ui.components
 
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.R
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -31,6 +33,8 @@ fun TransactionItemsCard(
     onRemove: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalContext.current.resources
+
     val total = TransactionItemLogic.total(items)
     val palette = listOf(
         MaterialTheme.colorScheme.primary,
@@ -51,10 +55,10 @@ fun TransactionItemsCard(
                 Icon(Icons.AutoMirrored.Filled.ReceiptLong, null, Modifier.size(20.dp), tint = MaterialTheme.colorScheme.primary)
                 Spacer(Modifier.width(10.dp))
                 Column(Modifier.weight(1f)) {
-                    Text("品項明細", style = MaterialTheme.typography.titleSmall)
+                    Text(strings.getString(R.string.item_details), style = MaterialTheme.typography.titleSmall)
                     if (items.isNotEmpty()) {
                         Text(
-                            "${items.size} 個項目",
+                            strings.getQuantityString(R.plurals.item_count, items.size, items.size),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -63,7 +67,7 @@ fun TransactionItemsCard(
                 FilledTonalButton(onClick = onAdd, contentPadding = PaddingValues(horizontal = 12.dp)) {
                     Icon(Icons.Default.Add, null, Modifier.size(18.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text("項目")
+                    Text(strings.getString(R.string.item))
                 }
             }
 
@@ -99,7 +103,7 @@ fun TransactionItemsCard(
                                             fontWeight = FontWeight.SemiBold
                                         )
                                         Spacer(Modifier.width(6.dp))
-                                        Icon(Icons.Default.Edit, "編輯${item.name}", Modifier.size(14.dp), tint = tint)
+                                        Icon(Icons.Default.Edit, strings.getString(R.string.edit_named_item, item.name), Modifier.size(14.dp), tint = tint)
                                     }
                                     LinearProgressIndicator(
                                         progress = { if (total > 0) (item.amount / total).toFloat() else 0f },
@@ -112,7 +116,7 @@ fun TransactionItemsCard(
                                 }
                                 IconButton(onClick = { onRemove(index) }) {
                                     Icon(
-                                        Icons.Default.DeleteOutline, "刪除${item.name}",
+                                        Icons.Default.DeleteOutline, strings.getString(R.string.delete_named_item, item.name),
                                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                                         modifier = Modifier.size(20.dp)
                                     )
@@ -122,7 +126,7 @@ fun TransactionItemsCard(
                     }
                     HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f))
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text("品項合計", Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
+                        Text(strings.getString(R.string.items_total), Modifier.weight(1f), style = MaterialTheme.typography.labelLarge)
                         Text(
                             CurrencyFormats.formatAmount(currency, total),
                             style = MaterialTheme.typography.titleMedium,

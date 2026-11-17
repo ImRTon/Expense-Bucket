@@ -1,5 +1,6 @@
 package com.rton.expensebucket.util
 
+import com.rton.expensebucket.R
 import android.content.Context
 import android.net.Uri
 import android.util.Log
@@ -30,22 +31,23 @@ data class ImportSummary(
     val paymentMethodsSkipped: Int = 0,
     val projectsSkipped: Int = 0
 ) {
-    fun toUserMessage(): String {
+    fun toUserMessage(context: Context): String {
+        val strings = context.resources
         val parts = mutableListOf<String>()
-        parts += "交易 $transactionsImported 筆"
+        parts += strings.getString(R.string.imported_transactions, transactionsImported)
         if (categoriesImported > 0 || categoriesSkipped > 0) {
-            parts += "分類新增 $categoriesImported 筆"
-            if (categoriesSkipped > 0) parts += "分類略過重複 $categoriesSkipped 筆"
+            parts += strings.getString(R.string.imported_categories, categoriesImported)
+            if (categoriesSkipped > 0) parts += strings.getString(R.string.skipped_categories, categoriesSkipped)
         }
         if (paymentMethodsImported > 0 || paymentMethodsSkipped > 0) {
-            parts += "支付工具新增 $paymentMethodsImported 筆"
-            if (paymentMethodsSkipped > 0) parts += "支付工具略過重複 $paymentMethodsSkipped 筆"
+            parts += strings.getString(R.string.imported_payment_methods, paymentMethodsImported)
+            if (paymentMethodsSkipped > 0) parts += strings.getString(R.string.skipped_payment_methods, paymentMethodsSkipped)
         }
         if (projectsImported > 0 || projectsSkipped > 0) {
-            parts += "專案新增 $projectsImported 筆"
-            if (projectsSkipped > 0) parts += "專案略過重複 $projectsSkipped 筆"
+            parts += strings.getString(R.string.imported_projects, projectsImported)
+            if (projectsSkipped > 0) parts += strings.getString(R.string.skipped_projects, projectsSkipped)
         }
-        return "成功匯入 ${parts.joinToString("，")}"
+        return strings.getString(R.string.import_summary, parts.joinToString("，"))
     }
 }
 
@@ -260,7 +262,7 @@ class DataExportImportManager @Inject constructor(
                         )
                     }
                 }
-            } ?: return@withContext Result.failure(Exception("無法開啟匯出檔案"))
+            } ?: return@withContext Result.failure(Exception(context.getString(R.string.export_open_failed)))
 
             Result.success(Unit)
         } catch (e: Exception) {
@@ -283,7 +285,7 @@ class DataExportImportManager @Inject constructor(
                     }
                     return@withContext Result.success(summary)
                 }
-            } ?: Result.failure(Exception("無法開啟匯入檔案"))
+            } ?: Result.failure(Exception(context.getString(R.string.import_open_failed)))
         } catch (e: Exception) {
             Log.e("DataExportImport", "Failed to import data", e)
             Result.failure(e)

@@ -1,5 +1,8 @@
 package com.rton.expensebucket.ui.screens
 
+import com.rton.expensebucket.ui.util.localizedLabel
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.R
 import android.view.HapticFeedbackConstants
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.*
@@ -70,6 +73,8 @@ fun AddTransactionScreen(
     onSave: (Transaction) -> Unit,
     onBack: () -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     val isEditMode = existingTransaction != null
     val initialProjectSelectionId = existingTransaction?.projectId ?: initialProjectId
     val initialAmount = existingTransaction?.amount ?: prefill?.amount
@@ -290,7 +295,7 @@ fun AddTransactionScreen(
             exchangeRateText = CurrencyFormats.formatRate(fetchedRate)
         }.onFailure {
             exchangeRateText = ""
-            exchangeRateError = "匯率取得失敗，請手動輸入"
+            exchangeRateError = strings.getString(R.string.exchange_rate_failed)
         }
         isFetchingExchangeRate = false
     }
@@ -366,7 +371,7 @@ fun AddTransactionScreen(
             coroutineScope.launch {
                 snackbarHostState.currentSnackbarData?.dismiss()
                 snackbarHostState.showSnackbar(
-                    message = "已儲存",
+                    message = strings.getString(R.string.saved),
                     duration = SnackbarDuration.Short
                 )
             }
@@ -409,7 +414,7 @@ fun AddTransactionScreen(
                             }
                         }
                     ) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.getString(R.string.back))
                     }
                 },
                 title = {
@@ -446,7 +451,7 @@ fun AddTransactionScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "支出",
+                                    text = strings.getString(R.string.expense),
                                     style = MaterialTheme.typography.labelLarge.copy(
                                         fontWeight = if (expenseSelected) FontWeight.Bold else FontWeight.Medium
                                     ),
@@ -465,7 +470,7 @@ fun AddTransactionScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "收入",
+                                    text = strings.getString(R.string.income),
                                     style = MaterialTheme.typography.labelLarge.copy(
                                         fontWeight = if (incomeSelected) FontWeight.Bold else FontWeight.Medium
                                     ),
@@ -571,7 +576,7 @@ fun AddTransactionScreen(
                                     )
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Text(
-                                        text = if (isEditMode) "更新" else "儲存",
+                                        text = if (isEditMode) strings.getString(R.string.update) else strings.getString(R.string.save),
                                         style = MaterialTheme.typography.titleMedium.copy(
                                             fontWeight = FontWeight.SemiBold
                                         ),
@@ -801,12 +806,12 @@ fun AddTransactionScreen(
                 verticalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 Text(
-                    text = "選擇專案",
+                    text = strings.getString(R.string.choose_project),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 8.dp)
                 )
                 ListItem(
-                    headlineContent = { Text("日常帳 (無專案)") },
+                    headlineContent = { Text(strings.getString(R.string.everyday_no_project)) },
                     leadingContent = {
                         Icon(Icons.Filled.Close, contentDescription = null)
                     },
@@ -836,7 +841,7 @@ fun AddTransactionScreen(
                     val isSelected = selectedProjectId == project.id
                     ListItem(
                         headlineContent = { Text(project.name) },
-                        supportingContent = { Text("結算幣別：${project.defaultCurrency}") },
+                        supportingContent = { Text(strings.getString(R.string.project_settlement_currency, project.defaultCurrency)) },
                         leadingContent = {
                             Icon(
                                 Icons.Filled.Luggage,
@@ -891,12 +896,12 @@ fun AddTransactionScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "記帳幣別",
+                        text = strings.getString(R.string.transaction_currency),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                         modifier = Modifier.padding(horizontal = 4.dp)
                     )
                     Text(
-                        text = "結算幣別：$settlementCurrency",
+                        text = strings.getString(R.string.settlement_currency, settlementCurrency),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -951,7 +956,7 @@ fun AddTransactionScreen(
                                     exchangeRateText = newValue
                                 }
                             },
-                            label = { Text("匯率 (1 $selectedCurrency = ? $settlementCurrency)") },
+                            label = { Text(strings.getString(R.string.exchange_rate_label, selectedCurrency, settlementCurrency)) },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
                             shape = MaterialTheme.shapes.small,
@@ -959,10 +964,10 @@ fun AddTransactionScreen(
                             supportingText = {
                                 if (isFetchingExchangeRate || exchangeRateError != null) {
                                     Text(
-                                        text = if (isFetchingExchangeRate) "正在取得歷史匯率…" else exchangeRateError.orEmpty()
+                                        text = if (isFetchingExchangeRate) strings.getString(R.string.loading_historical_rate) else exchangeRateError.orEmpty()
                                     )
                                 } else if (convertedAmount != null) {
-                                    Text("換算後約 ${CurrencyFormats.formatAmount(settlementCurrency, convertedAmount)}")
+                                    Text(strings.getString(R.string.converted_approx, CurrencyFormats.formatAmount(settlementCurrency, convertedAmount)))
                                 }
                             }
                         )
@@ -971,7 +976,7 @@ fun AddTransactionScreen(
                             modifier = Modifier.fillMaxWidth(),
                             shape = MaterialTheme.shapes.medium
                         ) {
-                            Text("確定")
+                            Text(strings.getString(R.string.ok))
                         }
                     }
                 }
@@ -1018,8 +1023,8 @@ fun AddTransactionScreen(
     if (showDiscardDialog) {
         AlertDialog(
             onDismissRequest = { showDiscardDialog = false },
-            title = { Text("捨棄變更？") },
-            text = { Text("尚未儲存目前已輸入的記帳內容，確定要離開嗎？") },
+            title = { Text(strings.getString(R.string.discard_changes_title)) },
+            text = { Text(strings.getString(R.string.discard_changes_message)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -1027,12 +1032,12 @@ fun AddTransactionScreen(
                         onBack()
                     }
                 ) {
-                    Text("捨棄", color = MaterialTheme.colorScheme.error)
+                    Text(strings.getString(R.string.discard), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDiscardDialog = false }) {
-                    Text("繼續編輯")
+                    Text(strings.getString(R.string.keep_editing))
                 }
             }
         )
@@ -1048,6 +1053,8 @@ private fun PersonalAmountSheet(
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var tempValue by remember(initialValue) { mutableStateOf(initialValue) }
     val parsedValue = AddTransactionFormLogic.resolveAmount(tempValue)
@@ -1076,7 +1083,7 @@ private fun PersonalAmountSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = "分攤 · 我的花費",
+                    text = strings.getString(R.string.split_my_share),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -1085,7 +1092,7 @@ private fun PersonalAmountSheet(
                         onClick = { onConfirm("") },
                         contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp)
                     ) {
-                        Text("重設為全額")
+                        Text(strings.getString(R.string.reset_full_amount))
                     }
                 }
             }
@@ -1111,8 +1118,8 @@ private fun PersonalAmountSheet(
                     ) {
                         Text(
                             text = totalAmount?.let {
-                                "支出總額 ${CurrencyFormats.formatAmount(currency, it)}"
-                            } ?: "個人實際負擔金額",
+                                strings.getString(R.string.expense_total_amount, CurrencyFormats.formatAmount(currency, it))
+                            } ?: strings.getString(R.string.personal_amount_hint),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1128,7 +1135,7 @@ private fun PersonalAmountSheet(
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(
-                                    text = "帶入總額",
+                                    text = strings.getString(R.string.use_total),
                                     style = MaterialTheme.typography.labelSmall.copy(
                                         fontWeight = FontWeight.SemiBold
                                     ),
@@ -1149,7 +1156,7 @@ private fun PersonalAmountSheet(
                             modifier = Modifier.alignByBaseline()
                         )
                         Text(
-                            text = if (tempValue.isBlank()) "全額算自己" else tempValue,
+                            text = if (tempValue.isBlank()) strings.getString(R.string.pay_full_amount) else tempValue,
                             style = if (tempValue.isBlank()) {
                                 MaterialTheme.typography.titleMedium
                             } else {
@@ -1181,7 +1188,7 @@ private fun PersonalAmountSheet(
 
                     if (errorText != null) {
                         Text(
-                            text = errorText,
+                            text = strings.localizedLabel(errorText),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.error,
                             textAlign = TextAlign.End,
@@ -1230,6 +1237,8 @@ private fun AmortizationDialog(
     onApply: (startYearMonth: Int, monthCount: Int) -> Unit,
     onRemove: () -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     var startYearMonth by remember(initialStartYearMonth) { mutableIntStateOf(initialStartYearMonth) }
     var monthCountText by remember(initialMonthCount) { mutableStateOf(initialMonthCount.toString()) }
     var showMonthPicker by remember { mutableStateOf(false) }
@@ -1237,18 +1246,19 @@ private fun AmortizationDialog(
     val isValid = monthCount != null && monthCount >= 2
     val summary = if (isValid && monthCount != null) {
         AddTransactionFormLogic.formatAmortizationSummary(
+            resources = strings,
             currency = currency,
             amount = budgetAmount,
             startYearMonth = startYearMonth,
             monthCount = monthCount
         )
     } else {
-        "攤提月數需至少 2 個月"
+        strings.getString(R.string.amortization_minimum)
     }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("設定攤提") },
+        title = { Text(strings.getString(R.string.set_amortization)) },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedCard(
@@ -1271,7 +1281,7 @@ private fun AmortizationDialog(
                         Spacer(modifier = Modifier.width(10.dp))
                         Column(modifier = Modifier.weight(1f)) {
                             Text(
-                                "起始月份",
+                                strings.getString(R.string.start_month),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1295,7 +1305,7 @@ private fun AmortizationDialog(
                             monthCountText = value
                         }
                     },
-                    label = { Text("攤提月數") },
+                    label = { Text(strings.getString(R.string.amortization_months)) },
                     singleLine = true,
                     isError = monthCountText.isNotBlank() && !isValid,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -1311,7 +1321,7 @@ private fun AmortizationDialog(
                         FilterChip(
                             selected = monthCount == quickMonthCount,
                             onClick = { monthCountText = quickMonthCount.toString() },
-                            label = { Text("${quickMonthCount}期") }
+                            label = { Text(strings.getString(R.string.installment_count, quickMonthCount)) }
                         )
                     }
                 }
@@ -1339,18 +1349,18 @@ private fun AmortizationDialog(
                 onClick = { monthCount?.let { onApply(startYearMonth, it) } },
                 enabled = isValid
             ) {
-                Text("套用")
+                Text(strings.getString(R.string.apply))
             }
         },
         dismissButton = {
             Row {
                 if (canRemove) {
                     TextButton(onClick = onRemove) {
-                        Text("移除")
+                        Text(strings.getString(R.string.remove))
                     }
                 }
                 TextButton(onClick = onDismiss) {
-                    Text("取消")
+                    Text(strings.getString(R.string.cancel))
                 }
             }
         }

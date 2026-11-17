@@ -1,5 +1,7 @@
 package com.rton.expensebucket.ui.components
 
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.R
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.material.icons.Icons
@@ -19,6 +21,8 @@ fun YearMonthPickerDialog(
     onDateSelected: (Long) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     var selectedYear by remember {
         mutableIntStateOf(Calendar.getInstance().apply { timeInMillis = initialTimeMillis }.get(Calendar.YEAR))
     }
@@ -35,14 +39,14 @@ fun YearMonthPickerDialog(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IconButton(onClick = { selectedYear-- }) {
-                    Icon(Icons.Filled.ChevronLeft, contentDescription = "上一年")
+                    Icon(Icons.Filled.ChevronLeft, contentDescription = strings.getString(R.string.previous_year))
                 }
                 Text(
-                    text = "${selectedYear}年",
+                    text = strings.getString(R.string.year_number, selectedYear),
                     style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                 )
                 IconButton(onClick = { selectedYear++ }) {
-                    Icon(Icons.Filled.ChevronRight, contentDescription = "下一年")
+                    Icon(Icons.Filled.ChevronRight, contentDescription = strings.getString(R.string.next_year))
                 }
             }
         },
@@ -69,7 +73,7 @@ fun YearMonthPickerDialog(
                                     contentColor = MaterialTheme.colorScheme.onSurface
                                 )
                             ) {
-                                Text("${month + 1}月", style = MaterialTheme.typography.bodyLarge)
+                                Text(strings.getString(R.string.month_number_alt, month + 1), style = MaterialTheme.typography.bodyLarge)
                             }
                         }
                     }
@@ -86,12 +90,12 @@ fun YearMonthPickerDialog(
                     onDateSelected(cal.timeInMillis)
                 }
             ) {
-                Text("確定")
+                Text(strings.getString(R.string.ok))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消")
+                Text(strings.getString(R.string.cancel))
             }
         }
     )
@@ -103,15 +107,17 @@ fun YearPickerDialog(
     onDateSelected: (Long) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     val initialYear = remember { Calendar.getInstance().apply { timeInMillis = initialTimeMillis }.get(Calendar.YEAR) }
     var selectedYear by remember { mutableIntStateOf(initialYear) }
-    
+
     // Range of years ± 10
     val years = remember { (initialYear - 10)..(initialYear + 10) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("選擇年份") },
+        title = { Text(strings.getString(R.string.choose_year)) },
         text = {
             LazyColumn(
                 modifier = Modifier
@@ -134,7 +140,7 @@ fun YearPickerDialog(
                             contentColor = MaterialTheme.colorScheme.onSurface
                         )
                     ) {
-                        Text("${year}年", style = MaterialTheme.typography.titleMedium)
+                        Text(strings.getString(R.string.year_number_alt, year), style = MaterialTheme.typography.titleMedium)
                     }
                 }
             }
@@ -148,12 +154,12 @@ fun YearPickerDialog(
                     onDateSelected(cal.timeInMillis)
                 }
             ) {
-                Text("確定")
+                Text(strings.getString(R.string.ok))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消")
+                Text(strings.getString(R.string.cancel))
             }
         }
     )

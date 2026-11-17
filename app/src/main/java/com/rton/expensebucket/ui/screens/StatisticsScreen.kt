@@ -1,5 +1,8 @@
 package com.rton.expensebucket.ui.screens
 
+import com.rton.expensebucket.ui.util.localizedLabel
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.R
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
@@ -127,6 +130,8 @@ fun StatisticsScreen(
     firstDayOfWeek: Int = Calendar.MONDAY,
     onTransactionClick: (Transaction) -> Unit = {}
 ) {
+    val strings = LocalContext.current.resources
+
     val types = remember { StatsType.entries }
     val pagerState = rememberPagerState(initialPage = 0) { types.size }
     val coroutineScope = rememberCoroutineScope()
@@ -139,8 +144,8 @@ fun StatisticsScreen(
     val summary = remember(transactions, categories, period, offset, firstDayOfWeek, now) {
         StatisticsCalculator.compute(transactions, categories, period, offset, now, firstDayOfWeek)
     }
-    val periodLabel = remember(summary, firstDayOfWeek) {
-        StatisticsCalculator.periodLabel(period, summary.window, firstDayOfWeek, now)
+    val periodLabel = remember(summary, firstDayOfWeek, strings.configuration.locales[0]) {
+        StatisticsCalculator.periodLabel(period, summary.window, firstDayOfWeek, now, strings.configuration.locales[0])
     }
     val categoryMap = remember(categories) { categories.associateBy { it.id } }
 
@@ -150,7 +155,7 @@ fun StatisticsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "統計",
+                        strings.getString(R.string.statistics),
                         style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
                     )
                 },
@@ -248,6 +253,8 @@ private fun StatsTypeSwitch(
     incomeTotal: Double,
     onSelect: (StatsType) -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     val semantic = MaterialTheme.semanticColors
     val indicatorColor = lerp(semantic.expense, semantic.income, position)
 
@@ -298,12 +305,12 @@ private fun StatsTypeSwitch(
                         Spacer(modifier = Modifier.width(6.dp))
                         Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
-                                type.label,
+                                strings.localizedLabel(type.label),
                                 style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
                                 color = contentColor
                             )
                             Text(
-                                formatCompact(if (type == StatsType.EXPENSE) expenseTotal else incomeTotal),
+                                formatCompact(strings, if (type == StatsType.EXPENSE) expenseTotal else incomeTotal),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = contentColor.copy(alpha = 0.8f),
                                 maxLines = 1
@@ -327,12 +334,14 @@ private fun PeriodNavigator(
     onLabelClick: () -> Unit,
     onResetToCurrent: () -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     Row(verticalAlignment = Alignment.CenterVertically) {
         AnimatedVisibility(visible = period != StatsPeriod.ALL && !isCurrent) {
             IconButton(onClick = onResetToCurrent, modifier = Modifier.size(32.dp)) {
                 Icon(
                     Icons.Filled.Today,
-                    contentDescription = "回到本期",
+                    contentDescription = strings.getString(R.string.current_period),
                     modifier = Modifier.size(18.dp),
                     tint = MaterialTheme.colorScheme.primary
                 )
@@ -340,7 +349,7 @@ private fun PeriodNavigator(
         }
         if (period != StatsPeriod.ALL) {
             IconButton(onClick = { onStep(-1) }, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Filled.ChevronLeft, contentDescription = "上一期", modifier = Modifier.size(20.dp))
+                Icon(Icons.Filled.ChevronLeft, contentDescription = strings.getString(R.string.previous_period), modifier = Modifier.size(20.dp))
             }
         }
         Row(
@@ -359,7 +368,7 @@ private fun PeriodNavigator(
             if (period != StatsPeriod.ALL) {
                 Icon(
                     Icons.Filled.ArrowDropDown,
-                    contentDescription = "選擇期間",
+                    contentDescription = strings.getString(R.string.choose_period),
                     modifier = Modifier.size(18.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -367,7 +376,7 @@ private fun PeriodNavigator(
         }
         if (period != StatsPeriod.ALL) {
             IconButton(onClick = { onStep(1) }, modifier = Modifier.size(32.dp)) {
-                Icon(Icons.Filled.ChevronRight, contentDescription = "下一期", modifier = Modifier.size(20.dp))
+                Icon(Icons.Filled.ChevronRight, contentDescription = strings.getString(R.string.next_period), modifier = Modifier.size(20.dp))
             }
         } else {
             Spacer(Modifier.width(8.dp))
@@ -382,6 +391,8 @@ private fun WeekPickerDialog(
     onDateSelected: (Long) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     val initialUtc = remember(initialTimeMillis) {
         val local = Calendar.getInstance().apply { timeInMillis = initialTimeMillis }
         Calendar.getInstance(TimeZone.getTimeZone("UTC")).apply {
@@ -405,11 +416,11 @@ private fun WeekPickerDialog(
                     }
                     onDateSelected(local.timeInMillis)
                 }
-            }) { Text("確定") }
+            }) { Text(strings.getString(R.string.ok)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("取消") } }
+        dismissButton = { TextButton(onClick = onDismiss) { Text(strings.getString(R.string.cancel)) } }
     ) {
-        DatePicker(state = state, title = { Text("選擇週次中的任一天", modifier = Modifier.padding(start = 24.dp, top = 16.dp)) })
+        DatePicker(state = state, title = { Text(strings.getString(R.string.choose_day_in_week), modifier = Modifier.padding(start = 24.dp, top = 16.dp)) })
     }
 }
 
@@ -508,6 +519,8 @@ private fun CardTitle(title: String, trailing: (@Composable () -> Unit)? = null)
 
 @Composable
 private fun HeroCard(summary: StatisticsSummary, breakdown: TypeBreakdown, accent: Color) {
+    val strings = LocalContext.current.resources
+
     val countUp = remember { Animatable(0f) }
     LaunchedEffect(breakdown.total) {
         countUp.snapTo(0f)
@@ -531,7 +544,7 @@ private fun HeroCard(summary: StatisticsSummary, breakdown: TypeBreakdown, accen
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "${periodPrefix(summary.period)}${breakdown.type.label}總額",
+                    strings.getString(R.string.period_total, periodPrefix(strings, summary.period), strings.localizedLabel(breakdown.type.label)),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f)
@@ -548,17 +561,17 @@ private fun HeroCard(summary: StatisticsSummary, breakdown: TypeBreakdown, accen
             Spacer(modifier = Modifier.height(18.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 HeroMetric(
-                    label = "日均",
+                    label = strings.getString(R.string.daily_average),
                     value = formatMoney(breakdown.dailyAverage),
                     modifier = Modifier.weight(1f)
                 )
                 HeroMetric(
-                    label = "筆數",
-                    value = "${breakdown.count} 筆",
+                    label = strings.getString(R.string.record_count),
+                    value = strings.getQuantityString(R.plurals.records_count, breakdown.count, breakdown.count),
                     modifier = Modifier.weight(1f)
                 )
                 HeroMetric(
-                    label = if (breakdown.type == StatsType.EXPENSE) "佔收入" else "儲蓄率",
+                    label = if (breakdown.type == StatsType.EXPENSE) strings.getString(R.string.share_of_income) else strings.getString(R.string.savings_rate),
                     value = when (breakdown.type) {
                         StatsType.EXPENSE ->
                             if (summary.income.total > 0) formatPercent(summary.expense.total / summary.income.total) else "—"
@@ -593,6 +606,8 @@ private fun HeroMetric(label: String, value: String, modifier: Modifier = Modifi
 
 @Composable
 private fun ChangeBadge(period: StatsPeriod, breakdown: TypeBreakdown) {
+    val strings = LocalContext.current.resources
+
     val ratio = breakdown.changeRatio ?: return
     val semantic = MaterialTheme.semanticColors
     val increased = ratio >= 0
@@ -606,7 +621,7 @@ private fun ChangeBadge(period: StatsPeriod, breakdown: TypeBreakdown) {
         verticalAlignment = Alignment.CenterVertically
     ) {
         Text(
-            "${previousPeriodLabel(period)} ${if (increased) "▲" else "▼"} ${formatPercent(abs(ratio))}",
+            "${previousPeriodLabel(strings, period)} ${if (increased) "▲" else "▼"} ${formatPercent(abs(ratio))}",
             style = MaterialTheme.typography.labelMedium.copy(fontWeight = FontWeight.SemiBold),
             color = color
         )
@@ -617,6 +632,8 @@ private fun ChangeBadge(period: StatsPeriod, breakdown: TypeBreakdown) {
 
 @Composable
 private fun BalanceCard(summary: StatisticsSummary) {
+    val strings = LocalContext.current.resources
+
     val semantic = MaterialTheme.semanticColors
     val income = summary.income.total
     val expense = summary.expense.total
@@ -632,7 +649,7 @@ private fun BalanceCard(summary: StatisticsSummary) {
         Column {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    "收支結餘",
+                    strings.getString(R.string.balance),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.weight(1f)
@@ -678,8 +695,8 @@ private fun BalanceCard(summary: StatisticsSummary) {
             }
             Spacer(modifier = Modifier.height(10.dp))
             Row {
-                LegendAmount("收入", income, semantic.income, Modifier.weight(1f))
-                LegendAmount("支出", expense, semantic.expense, Modifier.weight(1f), alignEnd = true)
+                LegendAmount(strings.getString(R.string.income), income, semantic.income, Modifier.weight(1f))
+                LegendAmount(strings.getString(R.string.expense), expense, semantic.expense, Modifier.weight(1f), alignEnd = true)
             }
         }
     }
@@ -715,6 +732,8 @@ private fun LegendAmount(
 
 @Composable
 private fun TrendCard(summary: StatisticsSummary, breakdown: TypeBreakdown, accent: Color, now: Long) {
+    val strings = LocalContext.current.resources
+
     val buckets = breakdown.trend
     var selectedIndex by remember(buckets) { mutableStateOf<Int?>(null) }
     val elapsedBuckets = remember(buckets, now) { buckets.count { it.start <= now }.coerceAtLeast(1) }
@@ -723,20 +742,20 @@ private fun TrendCard(summary: StatisticsSummary, breakdown: TypeBreakdown, acce
         buckets.indices.maxByOrNull { buckets[it].amount }?.takeIf { buckets[it].amount > 0 }
     }
     val unit = when (summary.period) {
-        StatsPeriod.WEEK, StatsPeriod.MONTH -> "日"
-        StatsPeriod.YEAR -> "月"
-        StatsPeriod.ALL -> "年"
+        StatsPeriod.WEEK, StatsPeriod.MONTH -> strings.getString(R.string.day_unit)
+        StatsPeriod.YEAR -> strings.getString(R.string.month_unit)
+        StatsPeriod.ALL -> strings.getString(R.string.year_unit)
     }
 
     StatsCard {
         Column {
-            CardTitle("${breakdown.type.label}趨勢")
+            CardTitle(strings.getString(R.string.type_trend, localizedStatType(strings, breakdown.type)))
             Spacer(Modifier.height(4.dp))
             val focus = selectedIndex?.let(buckets::getOrNull)
             if (focus != null) {
                 Row(verticalAlignment = Alignment.Bottom) {
                     Text(
-                        bucketTitle(summary.period, focus),
+                        bucketTitle(strings, summary.period, focus),
                         style = MaterialTheme.typography.labelLarge,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -746,8 +765,8 @@ private fun TrendCard(summary: StatisticsSummary, breakdown: TypeBreakdown, acce
             } else {
                 Text(
                     buildString {
-                        append("平均每$unit ${formatMoney(average)}")
-                        peakIndex?.let { append("・最高 ${bucketTitle(summary.period, buckets[it])}") }
+                        append(strings.getString(R.string.average_per_unit, unit, formatMoney(average)))
+                        peakIndex?.let { append(strings.getString(R.string.peak_bucket, bucketTitle(strings, summary.period, buckets[it]))) }
                     },
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -779,6 +798,8 @@ private fun TrendBarChart(
     onSelect: (Int?) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalContext.current.resources
+
     if (buckets.isEmpty()) return
     val textMeasurer = rememberTextMeasurer()
     val labelStyle = MaterialTheme.typography.labelSmall.copy(color = MaterialTheme.colorScheme.onSurfaceVariant)
@@ -830,7 +851,7 @@ private fun TrendBarChart(
             }
             if (showLabel) {
                 val layout = textMeasurer.measure(
-                    bucket.label,
+                    localizedBucketLabel(strings, period, bucket),
                     if (index == selectedIndex) selectedLabelStyle else labelStyle
                 )
                 val x = (slot * index + slot / 2f - layout.size.width / 2f)
@@ -860,14 +881,16 @@ private fun CompositionCard(
     selectedIndex: Int?,
     onSelect: (Int?) -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     val categories = breakdown.categories
     val selected = selectedIndex?.let(categories::getOrNull)
 
     StatsCard {
         Column {
-            CardTitle("分類佔比") {
+            CardTitle(strings.getString(R.string.category_share)) {
                 Text(
-                    "${categories.size} 個分類",
+                    strings.getQuantityString(R.plurals.categories_count, categories.size, categories.size),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -886,7 +909,7 @@ private fun CompositionCard(
                         modifier = Modifier.width(92.dp)
                     ) {
                         Text(
-                            selected?.name ?: "總計",
+                            selected?.name?.let { localizedCategoryName(strings, it) } ?: strings.getString(R.string.total),
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1,
@@ -894,7 +917,7 @@ private fun CompositionCard(
                             textAlign = TextAlign.Center
                         )
                         Text(
-                            selected?.let { formatPercent(it.share.toDouble()) } ?: formatCompact(breakdown.total),
+                            selected?.let { formatPercent(it.share.toDouble()) } ?: formatCompact(strings, breakdown.total),
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold),
                             color = selected?.let { Color(it.color) } ?: MaterialTheme.colorScheme.onSurface,
                             maxLines = 1
@@ -936,7 +959,7 @@ private fun CompositionCard(
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                stat.name,
+                                localizedCategoryName(strings, stat.name),
                                 style = MaterialTheme.typography.labelMedium,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
@@ -952,7 +975,7 @@ private fun CompositionCard(
                     if (categories.size > visible.size) {
                         val rest = categories.drop(visible.size)
                         Text(
-                            "其他 ${rest.size} 類・${formatPercent(rest.sumOf { it.share.toDouble() })}",
+                            strings.getString(R.string.other_categories, rest.size, formatPercent(rest.sumOf { it.share.toDouble() })),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
@@ -1041,11 +1064,13 @@ private fun CategoryRankingCard(
     selectedIndex: Int?,
     onSelect: (Int) -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     var expanded by remember(breakdown) { mutableStateOf(setOf<Int>()) }
     StatsCard(contentPadding = 8.dp) {
         Column {
             Box(Modifier.padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 4.dp)) {
-                CardTitle("分類排行")
+                CardTitle(strings.getString(R.string.category_ranking))
             }
             breakdown.categories.forEachIndexed { index, stat ->
                 if (index > 0) {
@@ -1102,6 +1127,8 @@ private fun CategoryRankRow(
     expanded: Boolean,
     onClick: () -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     val color = Color(stat.color)
     val animatedShare by animateFloatAsState(stat.share, tween(800), label = "share")
     val chevronRotation by animateFloatAsState(if (expanded) 180f else 0f, label = "chevron")
@@ -1141,7 +1168,7 @@ private fun CategoryRankRow(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        stat.name,
+                        localizedCategoryName(strings, stat.name),
                         style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold),
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -1149,7 +1176,7 @@ private fun CategoryRankRow(
                     )
                     Spacer(Modifier.width(6.dp))
                     Text(
-                        "${stat.count} 筆",
+                        strings.getQuantityString(R.plurals.category_record_count, stat.count, stat.count),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1
@@ -1158,7 +1185,7 @@ private fun CategoryRankRow(
                         Spacer(Modifier.width(2.dp))
                         Icon(
                             Icons.Filled.ExpandMore,
-                            contentDescription = if (expanded) "收合子分類" else "展開子分類",
+                            contentDescription = if (expanded) strings.getString(R.string.collapse_subcategories) else strings.getString(R.string.expand_subcategories),
                             tint = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier
                                 .size(18.dp)
@@ -1201,6 +1228,8 @@ private fun CategoryRankRow(
 
 @Composable
 private fun SubCategoryRow(stat: CategoryStat) {
+    val strings = LocalContext.current.resources
+
     val color = Color(stat.color)
     Row(
         modifier = Modifier
@@ -1220,7 +1249,7 @@ private fun SubCategoryRow(stat: CategoryStat) {
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
-                stat.name,
+                localizedCategoryName(strings, stat.name),
                 style = MaterialTheme.typography.bodySmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -1228,7 +1257,7 @@ private fun SubCategoryRow(stat: CategoryStat) {
             )
             Spacer(Modifier.width(6.dp))
             Text(
-                "${stat.count} 筆",
+                strings.getQuantityString(R.plurals.category_record_count, stat.count, stat.count),
                 style = MaterialTheme.typography.labelSmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 maxLines = 1
@@ -1255,10 +1284,12 @@ private fun TopTransactionsCard(
     categoryMap: Map<Long, Category>,
     onTransactionClick: (Transaction) -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     StatsCard(contentPadding = 8.dp) {
         Column {
             Box(Modifier.padding(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 4.dp)) {
-                CardTitle("最大筆${type.label}")
+                CardTitle(strings.getString(R.string.largest_transaction, localizedStatType(strings, type)))
             }
             entries.forEachIndexed { index, entry ->
                 val tx = entry.transaction
@@ -1295,13 +1326,13 @@ private fun TopTransactionsCard(
                     Spacer(Modifier.width(12.dp))
                     Column(Modifier.weight(1f)) {
                         Text(
-                            tx.note.ifBlank { category?.name ?: "未分類" },
+                            tx.note.ifBlank { category?.name?.let { strings.localizedLabel(it) } ?: strings.getString(R.string.uncategorized) },
                             style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
                         Text(
-                            "${formatShortDate(entry.displayDate)}・${category?.name ?: "未分類"}",
+                            strings.getString(R.string.dated_category, formatShortDate(entry.displayDate), category?.name?.let { strings.localizedLabel(it) } ?: strings.getString(R.string.uncategorized)),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             maxLines = 1
@@ -1322,6 +1353,8 @@ private fun TopTransactionsCard(
 
 @Composable
 private fun EmptyStatsCard(type: StatsType) {
+    val strings = LocalContext.current.resources
+
     StatsCard(contentPadding = 32.dp) {
         Column(
             modifier = Modifier.fillMaxWidth(),
@@ -1330,12 +1363,12 @@ private fun EmptyStatsCard(type: StatsType) {
             EmptyIcon(Icons.Filled.Insights)
             Spacer(Modifier.height(14.dp))
             Text(
-                "這段期間沒有${type.label}紀錄",
+                strings.getString(R.string.no_type_records, localizedStatType(strings, type)),
                 style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
             )
             Spacer(Modifier.height(4.dp))
             Text(
-                "切換期間或左右滑動查看${if (type == StatsType.EXPENSE) "收入" else "支出"}統計",
+                strings.getString(R.string.switch_stats_hint, if (type == StatsType.EXPENSE) strings.getString(R.string.income) else strings.getString(R.string.expense)),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                 textAlign = TextAlign.Center
@@ -1365,9 +1398,13 @@ private val moneyFormat: NumberFormat = NumberFormat.getNumberInstance(Locale.TA
 
 private fun formatMoney(amount: Double): String = "$" + moneyFormat.format(amount)
 
-private fun formatCompact(amount: Double): String = when {
-    amount >= 100_000_000 -> String.format(Locale.US, "$%.1f億", amount / 100_000_000)
-    amount >= 10_000 -> String.format(Locale.US, "$%.1f萬", amount / 10_000)
+private fun formatCompact(strings: android.content.res.Resources, amount: Double): String = when {
+    strings.configuration.locales[0].language == "en" && amount >= 1_000_000_000 -> String.format(Locale.US, "$%.1fB", amount / 1_000_000_000)
+    strings.configuration.locales[0].language == "en" && amount >= 1_000_000 -> String.format(Locale.US, "$%.1fM", amount / 1_000_000)
+    strings.configuration.locales[0].language == "en" && amount >= 1_000 -> String.format(Locale.US, "$%.1fK", amount / 1_000)
+    strings.configuration.locales[0].language == "en" -> formatMoney(amount)
+    amount >= 100_000_000 -> String.format(Locale.US, strings.getString(R.string.compact_hundred_million), amount / 100_000_000)
+    amount >= 10_000 -> String.format(Locale.US, strings.getString(R.string.compact_ten_thousand), amount / 10_000)
     else -> formatMoney(amount)
 }
 
@@ -1385,26 +1422,45 @@ private fun formatShortDate(time: Long): String {
     return "${cal.get(Calendar.MONTH) + 1}/${cal.get(Calendar.DAY_OF_MONTH)}"
 }
 
-private fun periodPrefix(period: StatsPeriod): String = when (period) {
-    StatsPeriod.WEEK -> "週"
-    StatsPeriod.MONTH -> "月"
-    StatsPeriod.YEAR -> "年"
-    StatsPeriod.ALL -> "累計"
+private fun periodPrefix(strings: android.content.res.Resources, period: StatsPeriod): String = when (period) {
+    StatsPeriod.WEEK -> strings.getString(R.string.week_unit)
+    StatsPeriod.MONTH -> strings.getString(R.string.month_unit)
+    StatsPeriod.YEAR -> strings.getString(R.string.year_unit)
+    StatsPeriod.ALL -> strings.getString(R.string.cumulative)
 }
 
-private fun previousPeriodLabel(period: StatsPeriod): String = when (period) {
-    StatsPeriod.WEEK -> "較上週"
-    StatsPeriod.MONTH -> "較上月"
-    StatsPeriod.YEAR -> "較去年"
+private fun previousPeriodLabel(strings: android.content.res.Resources, period: StatsPeriod): String = when (period) {
+    StatsPeriod.WEEK -> strings.getString(R.string.versus_last_week)
+    StatsPeriod.MONTH -> strings.getString(R.string.versus_last_month)
+    StatsPeriod.YEAR -> strings.getString(R.string.versus_last_year)
     StatsPeriod.ALL -> ""
 }
 
-private fun bucketTitle(period: StatsPeriod, bucket: TrendBucket): String {
+private fun bucketTitle(strings: android.content.res.Resources, period: StatsPeriod, bucket: TrendBucket): String {
     val cal = Calendar.getInstance().apply { timeInMillis = bucket.start }
     return when (period) {
-        StatsPeriod.WEEK -> "${cal.get(Calendar.MONTH) + 1}/${cal.get(Calendar.DAY_OF_MONTH)}（${bucket.label}）"
-        StatsPeriod.MONTH -> "${cal.get(Calendar.MONTH) + 1}月${cal.get(Calendar.DAY_OF_MONTH)}日"
-        StatsPeriod.YEAR -> "${cal.get(Calendar.YEAR)}年${cal.get(Calendar.MONTH) + 1}月"
-        StatsPeriod.ALL -> "${cal.get(Calendar.YEAR)}年"
+        StatsPeriod.WEEK -> "${cal.get(Calendar.MONTH) + 1}/${cal.get(Calendar.DAY_OF_MONTH)} (${localizedBucketLabel(strings, period, bucket)})"
+        StatsPeriod.MONTH -> strings.getString(R.string.month_day, cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH))
+        StatsPeriod.YEAR -> strings.getString(R.string.year_month, cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1)
+        StatsPeriod.ALL -> strings.getString(R.string.calendar_year, cal.get(Calendar.YEAR))
     }
 }
+
+private fun localizedBucketLabel(strings: android.content.res.Resources, period: StatsPeriod, bucket: TrendBucket): String {
+    val calendar = Calendar.getInstance().apply { timeInMillis = bucket.start }
+    return when (period) {
+        StatsPeriod.WEEK -> java.text.SimpleDateFormat("E", strings.configuration.locales[0]).format(calendar.time)
+        StatsPeriod.YEAR -> strings.getString(R.string.trend_month, calendar.get(Calendar.MONTH) + 1)
+        else -> bucket.label
+    }
+}
+
+private fun localizedCategoryName(strings: android.content.res.Resources, name: String): String {
+    val suffix = "（未細分）"
+    return if (name.endsWith(suffix)) {
+        strings.getString(R.string.category_unspecified, strings.localizedLabel(name.removeSuffix(suffix)))
+    } else strings.localizedLabel(name)
+}
+
+private fun localizedStatType(strings: android.content.res.Resources, type: StatsType): String =
+    strings.getString(if (type == StatsType.EXPENSE) R.string.expense_noun else R.string.income_noun)

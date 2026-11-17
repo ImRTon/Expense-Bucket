@@ -9,10 +9,18 @@ object HyperOsIslandPayload {
     const val ACTION_COLOR = "#B7F34A"
     const val ISLAND_TIMEOUT_SECONDS = 120
 
-    fun build(amountText: String, typeText: String, merchant: String): String {
+    data class Labels(
+        val record: String = "記帳",
+        val pendingType: (String) -> String = { "待確認$it" },
+        val pendingRecord: (String, String) -> String = { type, amount -> "$type $amount · 待記帳" },
+        val tapToEdit: String = "點擊後可編輯",
+        val pending: String = "待確認"
+    )
+
+    fun build(amountText: String, typeText: String, merchant: String, labels: Labels = Labels()): String {
         val openAction = mapOf(
             "action" to OPEN_ACTION,
-            "actionTitle" to "記帳",
+            "actionTitle" to labels.record,
             "actionIcon" to EDIT_ICON,
             "actionBgColor" to ACTION_COLOR,
             "actionBgColorDark" to ACTION_COLOR,
@@ -20,7 +28,7 @@ object HyperOsIslandPayload {
             "actionTitleColorDark" to "#172104",
             "clickWithCollapse" to true
         )
-        val details = merchant.ifBlank { "待確認$typeText" }.take(80)
+        val details = merchant.ifBlank { labels.pendingType(typeText) }.take(80)
         val parameters = mapOf(
             "protocol" to 1,
             "business" to "expense_capture",
@@ -29,7 +37,7 @@ object HyperOsIslandPayload {
             "updatable" to false,
             "filterWhenNoPermission" to false,
             "ticker" to "$typeText $amountText",
-            "aodTitle" to "$typeText $amountText · 待記帳",
+            "aodTitle" to labels.pendingRecord(typeText, amountText),
             "param_island" to mapOf(
                 "islandProperty" to 2,
                 "highlightColor" to ACTION_COLOR,
@@ -42,7 +50,7 @@ object HyperOsIslandPayload {
                     "imageTextInfoRight" to mapOf(
                         "type" to 2,
                         "picInfo" to mapOf("type" to 1, "pic" to EDIT_ICON),
-                        "textInfo" to mapOf("title" to "記帳", "showHighlightColor" to true)
+                        "textInfo" to mapOf("title" to labels.record, "showHighlightColor" to true)
                     )
                 ),
                 "smallIslandArea" to mapOf("picInfo" to mapOf("type" to 1, "pic" to EDIT_ICON))
@@ -51,8 +59,8 @@ object HyperOsIslandPayload {
             "picInfo" to mapOf("type" to 1),
             "hintInfo" to mapOf(
                 "type" to 1,
-                "title" to "點擊後可編輯",
-                "content" to "待確認",
+                "title" to labels.tapToEdit,
+                "content" to labels.pending,
                 "actionInfo" to openAction
             )
         )

@@ -26,11 +26,19 @@ object HyperOsIslandNotification {
         if (Settings.System.getInt(context.contentResolver, "notification_focus_protocol", 0) < 3) return false
         if (!hasFocusPermission(context)) return false
 
+        val strings = com.rton.expensebucket.data.AppLanguage.wrap(context).resources
+        val labels = HyperOsIslandPayload.Labels(
+            record = strings.getString(R.string.record_transaction),
+            pendingType = { strings.getString(R.string.pending_type, it) },
+            pendingRecord = { type, amount -> strings.getString(R.string.pending_record, type, amount) },
+            tapToEdit = strings.getString(R.string.tap_to_edit),
+            pending = strings.getString(R.string.pending_confirmation)
+        )
         val actions = Bundle().apply {
             putParcelable(
                 HyperOsIslandPayload.OPEN_ACTION,
                 Notification.Action.Builder(
-                    Icon.createWithResource(context, R.drawable.ic_island_edit), "記帳", editIntent
+                    Icon.createWithResource(context, R.drawable.ic_island_edit), labels.record, editIntent
                 ).build()
             )
         }
@@ -40,7 +48,7 @@ object HyperOsIslandNotification {
         }
         notification.extras.putBundle("miui.focus.actions", actions)
         notification.extras.putBundle("miui.focus.pics", pictures)
-        notification.extras.putString("miui.focus.param", HyperOsIslandPayload.build(amountText, typeText, merchant))
+        notification.extras.putString("miui.focus.param", HyperOsIslandPayload.build(amountText, typeText, merchant, labels))
         return true
     }
 

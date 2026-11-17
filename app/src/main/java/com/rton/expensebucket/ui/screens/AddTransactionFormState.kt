@@ -237,6 +237,7 @@ object AddTransactionFormLogic {
     }
 
     fun formatAmortizationSummary(
+        resources: android.content.res.Resources? = null,
         currency: String,
         amount: Double?,
         startYearMonth: Int,
@@ -245,9 +246,12 @@ object AddTransactionFormLogic {
         val endYearMonth = amortizationEndYearMonth(startYearMonth, monthCount)
         val periodText = "${formatYearMonth(startYearMonth)} - ${formatYearMonth(endYearMonth)}"
         val amountText = amount?.let {
-            " · 每月 ${CurrencyFormats.formatAmount(currency, amortizedShare(it, monthCount, 0))}"
+            val formatted = CurrencyFormats.formatAmount(currency, amortizedShare(it, monthCount, 0))
+            resources?.getString(com.rton.expensebucket.R.string.monthly_amortized_amount, formatted)
+                ?: " · 每月 $formatted"
         } ?: ""
-        return "${periodText} (${monthCount}期)$amountText"
+        return resources?.getString(com.rton.expensebucket.R.string.amortization_summary, periodText, monthCount, amountText)
+            ?: "${periodText} (${monthCount}期)$amountText"
     }
 
     fun formatYearMonth(yearMonth: Int): String =

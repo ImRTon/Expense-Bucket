@@ -1,5 +1,8 @@
 package com.rton.expensebucket.ui.components
 
+import com.rton.expensebucket.ui.util.localizedLabel
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.R
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -54,6 +57,8 @@ fun TransactionListItem(
     showDivider: Boolean = false,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalContext.current.resources
+
     val currentOnDelete by rememberUpdatedState(onDelete)
     val itemKey = "${transaction.id}_${budgetTransaction?.displayDate ?: transaction.date}"
 
@@ -136,7 +141,7 @@ fun TransactionListItem(
             ) {
                 Icon(
                     Icons.Filled.Delete,
-                    contentDescription = "刪除",
+                    contentDescription = strings.getString(R.string.delete),
                     tint = iconColor
                 )
             }
@@ -215,6 +220,8 @@ private fun TransactionListRowContent(
     originalAmountText: String,
     convertedAmountText: String
 ) {
+    val strings = LocalContext.current.resources
+
     val categoryColor = Color(category?.color ?: 0xFF6B7280)
     val semanticColors = MaterialTheme.semanticColors
 
@@ -242,7 +249,7 @@ private fun TransactionListRowContent(
         ) {
             Icon(
                 IconMapper.getIcon(category?.icon ?: "MoreHoriz"),
-                contentDescription = category?.name ?: "其他",
+                contentDescription = category?.name?.let { strings.localizedLabel(it) } ?: strings.getString(R.string.other),
                 tint = categoryColor,
                 modifier = Modifier.size(20.dp)
             )
@@ -259,7 +266,7 @@ private fun TransactionListRowContent(
                 horizontalArrangement = Arrangement.spacedBy(6.dp)
             ) {
                 Text(
-                    text = category?.name ?: "未分類",
+                    text = category?.name?.let { strings.localizedLabel(it) } ?: strings.getString(R.string.uncategorized),
                     style = MaterialTheme.typography.titleSmall.copy(
                         fontWeight = FontWeight.SemiBold
                     ),
@@ -274,7 +281,7 @@ private fun TransactionListRowContent(
                             .padding(horizontal = 6.dp, vertical = 1.dp)
                     ) {
                         Text(
-                            text = "${budgetTransaction.amortizationIndex}/${budgetTransaction.amortizationTotalMonths}期",
+                            text = strings.getString(R.string.installment_progress, budgetTransaction.amortizationIndex, budgetTransaction.amortizationTotalMonths),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
                         )
@@ -287,7 +294,7 @@ private fun TransactionListRowContent(
                             .padding(horizontal = 6.dp, vertical = 1.dp)
                     ) {
                         Text(
-                            text = "分攤",
+                            text = strings.getString(R.string.split),
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -306,7 +313,7 @@ private fun TransactionListRowContent(
             }
             if (transaction.items.isNotEmpty()) {
                 Text(
-                    "${transaction.items.size} 項 · " + transaction.items.joinToString("、") { it.name },
+                    strings.getQuantityString(R.plurals.item_prefix, transaction.items.size, transaction.items.size) + transaction.items.joinToString("、") { it.name },
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.primary,
                     maxLines = 1,

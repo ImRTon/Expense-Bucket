@@ -1,5 +1,7 @@
 package com.rton.expensebucket.ui.screens
 
+import androidx.compose.ui.res.stringResource
+import com.rton.expensebucket.R
 import android.app.Activity
 import android.content.IntentSender
 import android.net.Uri
@@ -78,18 +80,19 @@ import java.util.Locale
 @Composable
 fun ReceiptOcrScreen(
     receiptOcrEngine: ReceiptOcrEngine,
-    title: String = "收據 OCR",
-    emptyStateTitle: String = "拍一張收據或從相簿選圖",
-    emptyStateSubtitle: String = "會自動抓總額與細項備註",
+    title: String = stringResource(R.string.receipt_ocr),
+    emptyStateTitle: String = stringResource(R.string.receipt_empty_title),
+    emptyStateSubtitle: String = stringResource(R.string.receipt_empty_subtitle),
     onApplyPrefill: (TransactionPrefill) -> Unit,
     onBack: () -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     val context = LocalContext.current
-    val appLanguageTag = remember {
-        context.resources.configuration.locales[0]?.toLanguageTag() ?: Locale.getDefault().toLanguageTag()
-    }
+    val appLocale = strings.configuration.locales[0]
+    val appLanguageTag = appLocale.toLanguageTag()
     val appLanguageLabel = remember(appLanguageTag) {
-        Locale.forLanguageTag(appLanguageTag).displayLanguage.ifBlank { "app 語言" }
+        appLocale.getDisplayLanguage(appLocale).ifBlank { strings.getString(R.string.app_language) }
     }
 
     var imageUri by remember { mutableStateOf<Uri?>(null) }
@@ -122,9 +125,9 @@ fun ReceiptOcrScreen(
         if (result.resultCode == Activity.RESULT_OK) {
             val scanResult = GmsDocumentScanningResult.fromActivityResultIntent(result.data)
             imageUri = scanResult?.pages?.firstOrNull()?.imageUri
-            errorMessage = if (imageUri == null) "掃描完成，但沒有取得收據圖片" else null
+            errorMessage = if (imageUri == null) strings.getString(R.string.receipt_scan_no_image) else null
         } else if (result.resultCode != Activity.RESULT_CANCELED) {
-            errorMessage = "收據掃描未完成"
+            errorMessage = strings.getString(R.string.receipt_scan_incomplete)
         }
     }
 
@@ -140,7 +143,7 @@ fun ReceiptOcrScreen(
     fun launchCamera() {
         val activity = context.findActivity()
         if (activity == null) {
-            errorMessage = "目前無法啟動掃描器"
+            errorMessage = strings.getString(R.string.scanner_unavailable)
             return
         }
 
@@ -153,8 +156,8 @@ fun ReceiptOcrScreen(
             }
             .addOnFailureListener { throwable ->
                 errorMessage = when ((throwable as? MlKitException)?.errorCode) {
-                    MlKitException.UNSUPPORTED -> "此裝置不支援文件掃描器"
-                    else -> throwable.localizedMessage ?: "無法啟動收據掃描"
+                    MlKitException.UNSUPPORTED -> strings.getString(R.string.scanner_unsupported)
+                    else -> throwable.localizedMessage ?: strings.getString(R.string.receipt_scan_start_failed)
                 }
             }
     }
@@ -184,7 +187,7 @@ fun ReceiptOcrScreen(
             rawReceiptResult = result
             applyAnalysis(result)
         }.onFailure { throwable ->
-            errorMessage = throwable.localizedMessage ?: "收據辨識失敗"
+            errorMessage = throwable.localizedMessage ?: strings.getString(R.string.receipt_recognition_failed)
         }
         isProcessing = false
     }
@@ -218,7 +221,7 @@ fun ReceiptOcrScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.getString(R.string.back))
                     }
                 },
                 windowInsets = WindowInsets(0),
@@ -245,14 +248,14 @@ fun ReceiptOcrScreen(
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(Icons.Filled.CameraAlt, contentDescription = null)
-                    Text("掃描收據", modifier = Modifier.padding(start = 8.dp))
+                    Text(strings.getString(R.string.scan_receipt), modifier = Modifier.padding(start = 8.dp))
                 }
                 FilledTonalButton(
                     onClick = { pickImageLauncher.launch("image/*") },
                     modifier = Modifier.weight(1f)
                 ) {
                     Icon(Icons.Filled.Collections, contentDescription = null)
-                    Text("選取圖片", modifier = Modifier.padding(start = 8.dp))
+                    Text(strings.getString(R.string.choose_image), modifier = Modifier.padding(start = 8.dp))
                 }
             }
 
@@ -265,7 +268,7 @@ fun ReceiptOcrScreen(
                 ) {
                     Image(
                         painter = rememberAsyncImagePainter(model = imageUri),
-                        contentDescription = "收據",
+                        contentDescription = strings.getString(R.string.receipt),
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(max = 280.dp)
@@ -318,7 +321,7 @@ fun ReceiptOcrScreen(
                             strokeWidth = 2.dp
                         )
                         Text(
-                            if (isTranslating) "正在翻譯文字..." else "正在辨識收據...",
+                            if (isTranslating) strings.getString(R.string.translating_text) else strings.getString(R.string.recognizing_receipt),
                             modifier = Modifier.padding(start = 12.dp)
                         )
                     }
@@ -350,7 +353,7 @@ fun ReceiptOcrScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Filled.Translate, contentDescription = null)
-                        Text("翻譯成 $appLanguageLabel", modifier = Modifier.padding(start = 8.dp))
+                        Text(strings.getString(R.string.translate_to, appLanguageLabel), modifier = Modifier.padding(start = 8.dp))
                     }
                 }
 
@@ -364,7 +367,7 @@ fun ReceiptOcrScreen(
                     )
 
                     if (translated.isNullOrBlank()) {
-                        errorMessage = "翻譯失敗，請直接使用原文辨識結果"
+                        errorMessage = strings.getString(R.string.translation_failed)
                     } else {
                         val translatedResult = receiptOcrEngine.applyTranslation(
                             rawText = result.rawText,
@@ -394,7 +397,7 @@ fun ReceiptOcrScreen(
                         ) {
                             Icon(Icons.Filled.Translate, contentDescription = null)
                             Text(
-                                if (showTranslatedResult) "目前顯示翻譯結果" else "目前顯示原文結果",
+                                if (showTranslatedResult) strings.getString(R.string.showing_translation) else strings.getString(R.string.showing_original),
                                 modifier = Modifier.padding(start = 8.dp)
                             )
                             Spacer(modifier = Modifier.weight(1f))
@@ -410,7 +413,7 @@ fun ReceiptOcrScreen(
                                     )
                                 }
                             ) {
-                                Text(if (showTranslatedResult) "切回原文" else "查看翻譯")
+                                Text(if (showTranslatedResult) strings.getString(R.string.switch_to_original) else strings.getString(R.string.view_translation))
                             }
                         }
                     }
@@ -432,13 +435,13 @@ fun ReceiptOcrScreen(
                         Row(verticalAlignment = Alignment.CenterVertically) {
                             Icon(Icons.Filled.AutoAwesome, contentDescription = null)
                             Text(
-                                "收據辨識結果",
+                                strings.getString(R.string.receipt_result),
                                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                                 modifier = Modifier.padding(start = 8.dp)
                             )
                         }
                         Text(
-                            "總額：${result.totalAmount?.let { formatEditableAmount(it) } ?: "未辨識"}",
+                            strings.getString(R.string.recognized_total, result.totalAmount?.let { formatEditableAmount(it) } ?: strings.getString(R.string.not_recognized)),
                             style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.Bold)
                         )
                         if (result.lineItems.isNotEmpty()) {
@@ -458,7 +461,7 @@ fun ReceiptOcrScreen(
                             amountText = newValue
                         }
                     },
-                    label = { Text("收據總額") },
+                    label = { Text(strings.getString(R.string.receipt_total)) },
                     singleLine = true,
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                     modifier = Modifier.fillMaxWidth(),
@@ -468,7 +471,7 @@ fun ReceiptOcrScreen(
                 OutlinedTextField(
                     value = note,
                     onValueChange = { note = it },
-                    label = { Text("細項 / 備註") },
+                    label = { Text(strings.getString(R.string.items_note)) },
                     singleLine = false,
                     minLines = 4,
                     maxLines = 8,
@@ -494,7 +497,7 @@ fun ReceiptOcrScreen(
                     enabled = canContinue,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("帶入記帳編輯")
+                    Text(strings.getString(R.string.open_transaction_editor))
                 }
 
                 HorizontalDivider()
@@ -508,7 +511,7 @@ fun ReceiptOcrScreen(
                     } else {
                         Icon(Icons.Filled.ExpandMore, contentDescription = null)
                     }
-                    Text("查看 OCR 文字", modifier = Modifier.padding(start = 6.dp))
+                    Text(strings.getString(R.string.view_ocr_text), modifier = Modifier.padding(start = 6.dp))
                 }
 
                 AnimatedVisibility(visible = showRawText) {
@@ -522,15 +525,15 @@ fun ReceiptOcrScreen(
                                 verticalArrangement = Arrangement.spacedBy(10.dp)
                             ) {
                                 Text(
-                                    "原始文字",
+                                    strings.getString(R.string.original_text),
                                     style = MaterialTheme.typography.labelLarge,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                Text(result.rawText.ifBlank { "(空白)" })
+                                Text(result.rawText.ifBlank { strings.getString(R.string.empty_text) })
                                 result.translatedText?.let { translated ->
                                     HorizontalDivider()
                                     Text(
-                                        "翻譯後文字",
+                                        strings.getString(R.string.translated_text),
                                         style = MaterialTheme.typography.labelLarge,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )

@@ -1,5 +1,8 @@
 package com.rton.expensebucket.ui.screens
 
+import com.rton.expensebucket.ui.util.localizedLabel
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.R
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.background
@@ -47,6 +50,8 @@ fun PaymentMethodsScreen(
     onSetDefault: (Long) -> Unit,
     onBack: (() -> Unit)? = null
 ) {
+    val strings = LocalContext.current.resources
+
     var showEditorSheet by remember { mutableStateOf(false) }
     var selectedParentIdForAdd by remember { mutableStateOf<Long?>(null) }
     var methodToEdit by remember { mutableStateOf<PaymentMethod?>(null) }
@@ -64,7 +69,7 @@ fun PaymentMethodsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "支付工具",
+                        strings.getString(R.string.payment_methods),
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.SemiBold
                         )
@@ -73,7 +78,7 @@ fun PaymentMethodsScreen(
                 navigationIcon = {
                     if (onBack != null) {
                         IconButton(onClick = onBack) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.getString(R.string.back))
                         }
                     }
                 },
@@ -91,7 +96,7 @@ fun PaymentMethodsScreen(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(4.dp))
-                        Text("新增分類")
+                        Text(strings.getString(R.string.add_category))
                     }
                 },
                 windowInsets = WindowInsets(0),
@@ -144,7 +149,7 @@ fun PaymentMethodsScreen(
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Text(
-                                    text = parent.name,
+                                    text = strings.localizedLabel(parent.name),
                                     style = MaterialTheme.typography.titleSmall.copy(
                                         fontWeight = FontWeight.Bold
                                     ),
@@ -169,12 +174,12 @@ fun PaymentMethodsScreen(
                                 ) {
                                     Icon(
                                         imageVector = Icons.Filled.Add,
-                                        contentDescription = "新增子項目",
+                                        contentDescription = strings.getString(R.string.add_child_item),
                                         tint = MaterialTheme.colorScheme.primary,
                                         modifier = Modifier.size(14.dp)
                                     )
                                     Text(
-                                        text = "新增",
+                                        text = strings.getString(R.string.add),
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontWeight = FontWeight.SemiBold
                                         ),
@@ -250,6 +255,8 @@ private fun UnifiedPaymentMethodRow(
     billingSummary: PaymentMethodBillingSummary?,
     onClick: () -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     val color = Color(method.color)
     val billingLimit = method.billingLimitAmount?.takeIf { it > 0.0 }
     val progress = if (billingSummary != null && billingLimit != null) {
@@ -296,7 +303,7 @@ private fun UnifiedPaymentMethodRow(
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     Text(
-                        text = method.name,
+                        text = strings.localizedLabel(method.name),
                         style = MaterialTheme.typography.titleSmall.copy(
                             fontWeight = FontWeight.SemiBold
                         ),
@@ -311,7 +318,7 @@ private fun UnifiedPaymentMethodRow(
                                 .padding(horizontal = 6.dp, vertical = 1.dp)
                         ) {
                             Text(
-                                text = "預設",
+                                text = strings.getString(R.string.default_label),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
@@ -321,13 +328,13 @@ private fun UnifiedPaymentMethodRow(
 
                 if (billingSummary != null) {
                     Text(
-                        text = "${billingSummary.periodLabel} · ${billingSummary.cycleDescription}",
+                        text = "${billingSummary.periodLabel} · ${strings.getString(R.string.billing_day, method.billingCycleDay ?: "-")}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
                 } else {
                     Text(
-                        text = "未設定結帳日",
+                        text = strings.getString(R.string.no_billing_day),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     )
@@ -342,7 +349,7 @@ private fun UnifiedPaymentMethodRow(
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        text = "當期帳單",
+                        text = strings.getString(R.string.current_statement),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.65f)
                     )
@@ -385,13 +392,13 @@ private fun UnifiedPaymentMethodRow(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "${billingLimitLabel(method)} ${CurrencyFormats.formatCompactAmount("TWD", billingLimit)}",
+                        text = "${billingLimitLabel(strings, method)} ${CurrencyFormats.formatCompactAmount("TWD", billingLimit)}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
                     val remaining = (billingLimit - billingSummary.totalAmount).coerceAtLeast(0.0)
                     Text(
-                        text = "剩餘 ${CurrencyFormats.formatCompactAmount("TWD", remaining)}",
+                        text = strings.getString(R.string.remaining_amount, CurrencyFormats.formatCompactAmount("TWD", remaining)),
                         style = MaterialTheme.typography.amountSmall.copy(
                             fontSize = MaterialTheme.typography.labelSmall.fontSize
                         ),
@@ -413,6 +420,8 @@ private fun PaymentMethodEditorSheet(
     onDelete: (PaymentMethod) -> Unit,
     onSetDefault: (Long) -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var name by remember(initialMethod) { mutableStateOf(initialMethod?.name ?: "") }
     var selectedType by remember(initialMethod) { mutableStateOf(initialMethod?.type ?: "credit") }
@@ -448,11 +457,11 @@ private fun PaymentMethodEditorSheet(
         mutableLongStateOf(initialMethod?.color ?: presetColors.first())
     }
 
-    val types = listOf("credit" to "信用卡", "epay" to "電子支付", "cash" to "現金", "other" to "其他")
+    val types = listOf("credit" to strings.getString(R.string.credit_card), "epay" to strings.getString(R.string.electronic_payment), "cash" to strings.getString(R.string.cash), "other" to strings.getString(R.string.other))
     val billingDay = billingDayText.toIntOrNull()?.takeIf { it in 1..31 }
     val billingLimitChoices = listOf(
-        BillingLimitType.CREDIT to "信用額度",
-        BillingLimitType.PROMO to "回饋上限"
+        BillingLimitType.CREDIT to strings.getString(R.string.credit_limit),
+        BillingLimitType.PROMO to strings.getString(R.string.reward_limit)
     )
     val billingLimitAmount = billingLimitAmountText.toDoubleOrNull()
     val iconChoices = remember {
@@ -485,7 +494,7 @@ private fun PaymentMethodEditorSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Text(
-                    text = if (initialMethod != null) "編輯支付工具" else "新增支付工具",
+                    text = if (initialMethod != null) strings.getString(R.string.edit_payment_method) else strings.getString(R.string.add_payment_method),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
                 )
                 if (initialMethod != null) {
@@ -497,7 +506,7 @@ private fun PaymentMethodEditorSheet(
                             FilterChip(
                                 selected = false,
                                 onClick = { onSetDefault(initialMethod.id) },
-                                label = { Text("設為預設") },
+                                label = { Text(strings.getString(R.string.set_default)) },
                                 leadingIcon = {
                                     Icon(
                                         Icons.Filled.StarOutline,
@@ -510,7 +519,7 @@ private fun PaymentMethodEditorSheet(
                         IconButton(onClick = { onDelete(initialMethod) }) {
                             Icon(
                                 Icons.Filled.DeleteOutline,
-                                contentDescription = "刪除",
+                                contentDescription = strings.getString(R.string.delete),
                                 tint = MaterialTheme.colorScheme.error
                             )
                         }
@@ -541,8 +550,8 @@ private fun PaymentMethodEditorSheet(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("名稱") },
-                    placeholder = { Text(if (parentId != null) "例如：Richart JCB" else "例如：信用卡") },
+                    label = { Text(strings.getString(R.string.name)) },
+                    placeholder = { Text(if (parentId != null) strings.getString(R.string.card_name_example) else strings.getString(R.string.payment_name_example)) },
                     singleLine = true,
                     modifier = Modifier.weight(1f),
                     shape = MaterialTheme.shapes.medium
@@ -573,7 +582,7 @@ private fun PaymentMethodEditorSheet(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        text = "圖示與顏色",
+                        text = strings.getString(R.string.icon_and_color),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -598,9 +607,8 @@ private fun PaymentMethodEditorSheet(
                             ) {
                                 Icon(
                                     imageVector = PaymentIconMapper.getIcon(key),
-                                    contentDescription = key,
-                                    tint = if (isSelected) Color.White
-                                    else MaterialTheme.colorScheme.onSurfaceVariant,
+                                    contentDescription = strings.localizedLabel(PaymentIconMapper.displayName(key)),
+                                    tint = if (isSelected) Color.White else MaterialTheme.colorScheme.onSurfaceVariant,
                                     modifier = Modifier.size(20.dp)
                                 )
                             }
@@ -660,7 +668,7 @@ private fun PaymentMethodEditorSheet(
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
                         Text(
-                            text = "帳單結帳日與額度",
+                            text = strings.getString(R.string.billing_and_limit),
                             style = MaterialTheme.typography.titleSmall.copy(fontWeight = FontWeight.SemiBold)
                         )
                         Switch(
@@ -687,7 +695,7 @@ private fun PaymentMethodEditorSheet(
                                     onValueChange = { value ->
                                         billingDayText = value.filter(Char::isDigit).take(2)
                                     },
-                                    label = { Text("結帳日 (1-31)") },
+                                    label = { Text(strings.getString(R.string.billing_day_input)) },
                                     singleLine = true,
                                     isError = billingDay == null && billingDayText.isNotEmpty(),
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
@@ -701,7 +709,7 @@ private fun PaymentMethodEditorSheet(
                                             .filter { it.isDigit() || it == '.' }
                                             .let { sanitizeDecimalInput(it) }
                                     },
-                                    label = { Text("額度金額 (選填)") },
+                                    label = { Text(strings.getString(R.string.optional_limit)) },
                                     singleLine = true,
                                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
                                     modifier = Modifier.weight(1.3f),
@@ -754,16 +762,16 @@ private fun PaymentMethodEditorSheet(
                     .height(50.dp),
                 shape = MaterialTheme.shapes.large
             ) {
-                Text(if (initialMethod != null) "儲存變更" else "新增支付工具")
+                Text(if (initialMethod != null) strings.getString(R.string.save_changes) else strings.getString(R.string.add_payment_method))
             }
         }
     }
 }
 
-private fun billingLimitLabel(method: PaymentMethod): String =
+private fun billingLimitLabel(strings: android.content.res.Resources, method: PaymentMethod): String =
     when (BillingLimitType.fromValue(method.billingLimitType)) {
-        BillingLimitType.CREDIT -> "信用額度"
-        BillingLimitType.PROMO -> "回饋上限"
+        BillingLimitType.CREDIT -> strings.getString(R.string.credit_limit)
+        BillingLimitType.PROMO -> strings.getString(R.string.reward_limit)
     }
 
 private fun formatEditableAmount(amount: Double): String =

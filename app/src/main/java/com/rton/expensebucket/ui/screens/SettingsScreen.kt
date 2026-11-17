@@ -1,5 +1,7 @@
 package com.rton.expensebucket.ui.screens
 
+import com.rton.expensebucket.ui.util.localizedLabel
+import com.rton.expensebucket.R
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
@@ -62,6 +64,45 @@ fun SettingsScreen(
     onExportData: (Context, Uri, (Boolean, String?) -> Unit) -> Unit = { _, _, _ -> },
     onImportData: (Context, Uri, (Boolean, String?) -> Unit) -> Unit = { _, _, _ -> }
 ) {
+    val strings = LocalContext.current.resources
+    val languageContext = LocalContext.current
+    var showLanguageDialog by remember { mutableStateOf(false) }
+    val currentLanguage = com.rton.expensebucket.data.AppLanguage.current(languageContext)
+
+    if (showLanguageDialog) {
+        AlertDialog(
+            onDismissRequest = { showLanguageDialog = false },
+            title = { Text(strings.getString(R.string.choose_language)) },
+            text = {
+                Column {
+                    com.rton.expensebucket.data.AppLanguage.entries.forEach { language ->
+                        val selectLanguage = {
+                            showLanguageDialog = false
+                            com.rton.expensebucket.data.AppLanguage.set(languageContext, language)
+                        }
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth().clickable(onClick = selectLanguage)
+                                .padding(vertical = 8.dp)
+                        ) {
+                            RadioButton(selected = currentLanguage == language, onClick = selectLanguage)
+                            Spacer(Modifier.width(8.dp))
+                            Text(if (language == com.rton.expensebucket.data.AppLanguage.SYSTEM) {
+                                strings.getString(R.string.language_system)
+                            } else language.nativeName)
+                        }
+                    }
+                }
+            },
+            confirmButton = {},
+            dismissButton = {
+                TextButton(onClick = { showLanguageDialog = false }) {
+                    Text(strings.getString(R.string.cancel))
+                }
+            }
+        )
+    }
+
     var showBudgetDialog by remember { mutableStateOf(false) }
     var showThemeDialog by remember { mutableStateOf(false) }
     var showPaletteDialog by remember { mutableStateOf(false) }
@@ -73,7 +114,7 @@ fun SettingsScreen(
             onDismissRequest = { showThemeDialog = false },
             title = {
                 Text(
-                    "選擇主題",
+                    strings.getString(R.string.choose_theme),
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.SemiBold
                     )
@@ -101,7 +142,7 @@ fun SettingsScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = themeOption.displayName,
+                                text = strings.localizedLabel(themeOption.displayName),
                                 style = MaterialTheme.typography.bodyLarge
                             )
                         }
@@ -111,7 +152,7 @@ fun SettingsScreen(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showThemeDialog = false }) {
-                    Text("取消")
+                    Text(strings.getString(R.string.cancel))
                 }
             }
         )
@@ -123,7 +164,7 @@ fun SettingsScreen(
             onDismissRequest = { showPaletteDialog = false },
             title = {
                 Text(
-                    "選擇主題色彩",
+                    strings.getString(R.string.choose_palette),
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.SemiBold
                     )
@@ -152,7 +193,7 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.width(8.dp))
                             Column(modifier = Modifier.weight(1f)) {
                                 Text(
-                                    text = paletteOption.displayName,
+                                    text = strings.localizedLabel(paletteOption.displayName),
                                     style = MaterialTheme.typography.bodyLarge
                                 )
                                 Spacer(modifier = Modifier.height(4.dp))
@@ -165,7 +206,7 @@ fun SettingsScreen(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showPaletteDialog = false }) {
-                    Text("取消")
+                    Text(strings.getString(R.string.cancel))
                 }
             }
         )
@@ -177,7 +218,7 @@ fun SettingsScreen(
             onDismissRequest = { showFirstDayDialog = false },
             title = {
                 Text(
-                    "每週起始日",
+                    strings.getString(R.string.first_day_of_week),
                     style = MaterialTheme.typography.titleLarge.copy(
                         fontWeight = FontWeight.SemiBold
                     )
@@ -185,7 +226,7 @@ fun SettingsScreen(
             },
             text = {
                 Column {
-                    val days = listOf(java.util.Calendar.SUNDAY to "星期日", java.util.Calendar.MONDAY to "星期一")
+                    val days = listOf(java.util.Calendar.SUNDAY to strings.getString(R.string.sunday), java.util.Calendar.MONDAY to strings.getString(R.string.monday))
                     days.forEach { (value, label) ->
                         Row(
                             verticalAlignment = Alignment.CenterVertically,
@@ -216,7 +257,7 @@ fun SettingsScreen(
             confirmButton = {},
             dismissButton = {
                 TextButton(onClick = { showFirstDayDialog = false }) {
-                    Text("取消")
+                    Text(strings.getString(R.string.cancel))
                 }
             }
         )
@@ -230,11 +271,11 @@ fun SettingsScreen(
 
         AlertDialog(
             onDismissRequest = { showBudgetDialog = false },
-            title = { Text("設定月預算") },
+            title = { Text(strings.getString(R.string.set_monthly_budget)) },
             text = {
                 Column {
                     Text(
-                        "設定每月預算金額，用於「支出/預算」水位顯示",
+                        strings.getString(R.string.monthly_budget_hint),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -246,7 +287,7 @@ fun SettingsScreen(
                                 budgetText = newValue
                             }
                         },
-                        label = { Text("月預算金額") },
+                        label = { Text(strings.getString(R.string.monthly_budget_amount)) },
                         prefix = { Text("NT$ ") },
                         singleLine = true,
                         modifier = Modifier.fillMaxWidth()
@@ -259,12 +300,12 @@ fun SettingsScreen(
                     onSetMonthlyBudget(amount)
                     showBudgetDialog = false
                 }) {
-                    Text("確定")
+                    Text(strings.getString(R.string.ok))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showBudgetDialog = false }) {
-                    Text("取消")
+                    Text(strings.getString(R.string.cancel))
                 }
             }
         )
@@ -278,9 +319,9 @@ fun SettingsScreen(
         if (uri != null) {
             onExportData(context, uri) { success, errorMsg ->
                 if (success) {
-                    Toast.makeText(context, "匯出成功", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, strings.getString(R.string.export_success), Toast.LENGTH_SHORT).show()
                 } else {
-                    Toast.makeText(context, "匯出失敗: ${errorMsg ?: "未知錯誤"}", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, strings.getString(R.string.export_failed, errorMsg ?: strings.getString(R.string.unknown_error)), Toast.LENGTH_SHORT).show()
                 }
             }
         }
@@ -292,9 +333,9 @@ fun SettingsScreen(
         if (uri != null) {
             onImportData(context, uri) { success, errorMsg ->
                 if (success) {
-                    Toast.makeText(context, errorMsg ?: "匯入成功", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, errorMsg ?: strings.getString(R.string.import_success), Toast.LENGTH_LONG).show()
                 } else {
-                    Toast.makeText(context, "匯入失敗: ${errorMsg ?: "未知錯誤"}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, strings.getString(R.string.import_failed, errorMsg ?: strings.getString(R.string.unknown_error)), Toast.LENGTH_LONG).show()
                 }
             }
         }
@@ -306,7 +347,7 @@ fun SettingsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "設定",
+                        strings.getString(R.string.settings),
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.SemiBold
                         )
@@ -329,7 +370,7 @@ fun SettingsScreen(
         ) {
             // ─── General ────────────────────────────────────────
             Text(
-                "一般",
+                strings.getString(R.string.general),
                 style = MaterialTheme.typography.labelLarge.copy(
                     fontWeight = FontWeight.SemiBold
                 ),
@@ -339,46 +380,49 @@ fun SettingsScreen(
 
             SettingsItem(
                 icon = Icons.Filled.Palette,
-                title = "主題色彩",
-                subtitle = currentPalette.displayName,
+                title = strings.getString(R.string.theme_colors),
+                subtitle = strings.localizedLabel(currentPalette.displayName),
                 onClick = { showPaletteDialog = true }
             )
             SettingsItem(
                 icon = Icons.Filled.BrightnessMedium,
-                title = "深淺模式",
-                subtitle = currentTheme.displayName,
+                title = strings.getString(R.string.theme_mode),
+                subtitle = strings.localizedLabel(currentTheme.displayName),
                 onClick = { showThemeDialog = true }
             )
             SettingsItem(
                 icon = Icons.Filled.Language,
-                title = "語言",
-                subtitle = "繁體中文"
+                title = strings.getString(R.string.language),
+                subtitle = if (currentLanguage == com.rton.expensebucket.data.AppLanguage.SYSTEM) {
+                    strings.getString(R.string.language_system)
+                } else currentLanguage.nativeName,
+                onClick = { showLanguageDialog = true }
             )
             SettingsItem(
                 icon = Icons.Filled.AttachMoney,
-                title = "預設幣別",
+                title = strings.getString(R.string.default_currency),
                 subtitle = "TWD"
             )
             SettingsItem(
                 icon = Icons.Filled.CalendarToday,
-                title = "每週起始日",
-                subtitle = if (firstDayOfWeek == java.util.Calendar.SUNDAY) "星期日" else "星期一",
+                title = strings.getString(R.string.first_day_of_week),
+                subtitle = if (firstDayOfWeek == java.util.Calendar.SUNDAY) strings.getString(R.string.sunday) else strings.getString(R.string.monday),
                 onClick = { showFirstDayDialog = true }
             )
             SettingsItem(
                 icon = Icons.Filled.AccountBalanceWallet,
-                title = "月預算",
+                title = strings.getString(R.string.monthly_budget),
                 subtitle = if (monthlyBudget > 0) {
                     "NT$ ${NumberFormat.getNumberInstance().apply { maximumFractionDigits = 0 }.format(monthlyBudget)}"
                 } else {
-                    "未設定"
+                    strings.getString(R.string.not_set)
                 },
                 onClick = { showBudgetDialog = true }
             )
             SettingsItem(
                 icon = Icons.Filled.Category,
-                title = "分類管理",
-                subtitle = "新增、編輯子母分類",
+                title = strings.getString(R.string.category_management),
+                subtitle = strings.getString(R.string.manage_categories_hint),
                 onClick = onNavigateToCategories
             )
 
@@ -386,7 +430,7 @@ fun SettingsScreen(
 
             // ─── Notifications ──────────────────────────────────
             Text(
-                "智慧記帳",
+                strings.getString(R.string.smart_capture),
                 style = MaterialTheme.typography.labelLarge.copy(
                     fontWeight = FontWeight.SemiBold
                 ),
@@ -414,9 +458,9 @@ fun SettingsScreen(
             }
             SettingsToggleItem(
                 icon = Icons.Filled.Notifications,
-                title = "通知欄攔截",
-                subtitle = if (notificationEnabled.value) "已啟用 - 自動攔截刷卡通知"
-                           else "點擊前往系統設定開啟權限",
+                title = strings.getString(R.string.notification_capture),
+                subtitle = if (notificationEnabled.value) strings.getString(R.string.notification_capture_enabled)
+                           else strings.getString(R.string.enable_in_system_settings),
                 checked = notificationEnabled.value,
                 onCheckedChange = {
                     // Open system notification listener settings
@@ -430,8 +474,8 @@ fun SettingsScreen(
             var ocrEnabled by remember { mutableStateOf(true) }
             SettingsToggleItem(
                 icon = Icons.Filled.DocumentScanner,
-                title = "OCR 截圖辨識",
-                subtitle = "透過分享截圖自動記帳",
+                title = strings.getString(R.string.screenshot_recognition),
+                subtitle = strings.getString(R.string.screenshot_share_hint),
                 checked = ocrEnabled,
                 onCheckedChange = { ocrEnabled = it }
             )
@@ -440,7 +484,7 @@ fun SettingsScreen(
 
             // ─── Data ───────────────────────────────────────────
             Text(
-                "資料",
+                strings.getString(R.string.data),
                 style = MaterialTheme.typography.labelLarge.copy(
                     fontWeight = FontWeight.SemiBold
                 ),
@@ -450,16 +494,16 @@ fun SettingsScreen(
 
             SettingsItem(
                 icon = Icons.Filled.FileUpload,
-                title = "匯出資料",
-                subtitle = "匯出為 CSV 檔案",
+                title = strings.getString(R.string.export_data),
+                subtitle = strings.getString(R.string.export_csv),
                 onClick = {
                     exportLauncher.launch("ExpenseBucket_Export.csv")
                 }
             )
             SettingsItem(
                 icon = Icons.Filled.FileDownload,
-                title = "匯入資料",
-                subtitle = "從 CSV 檔案匯入",
+                title = strings.getString(R.string.import_data),
+                subtitle = strings.getString(R.string.import_csv),
                 onClick = {
                     importLauncher.launch(arrayOf("text/csv", "text/comma-separated-values", "application/csv", "*/*"))
                 }
@@ -469,7 +513,7 @@ fun SettingsScreen(
 
             // ─── About ──────────────────────────────────────────
             Text(
-                "關於",
+                strings.getString(R.string.about),
                 style = MaterialTheme.typography.labelLarge.copy(
                     fontWeight = FontWeight.SemiBold
                 ),
@@ -479,7 +523,7 @@ fun SettingsScreen(
 
             SettingsItem(
                 icon = Icons.Filled.Info,
-                title = "版本",
+                title = strings.getString(R.string.version),
                 subtitle = "1.1.0"
             )
         }
@@ -579,7 +623,7 @@ private fun SettingsToggleItem(
         } else {
             Modifier.fillMaxWidth()
         }
-        
+
         Row(
             modifier = modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically

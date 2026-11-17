@@ -1,5 +1,7 @@
 package com.rton.expensebucket.ui.screens
 
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.R
 import android.view.HapticFeedbackConstants
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
@@ -25,6 +27,8 @@ fun DateTimeSheet(
     onDismiss: () -> Unit,
     onConfirm: (Long) -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val view = LocalView.current
 
@@ -75,8 +79,8 @@ fun DateTimeSheet(
         datePickerState.selectedDateMillis = localMillisToUtcMidnight(targetCal.timeInMillis)
     }
 
-    val dateFormat = remember { SimpleDateFormat("yyyy/MM/dd", Locale.TAIWAN) }
-    val timeFormat = remember { SimpleDateFormat("HH:mm", Locale.TAIWAN) }
+    val dateFormat = remember { SimpleDateFormat("yyyy/MM/dd", strings.configuration.locales[0]) }
+    val timeFormat = remember { SimpleDateFormat("HH:mm", strings.configuration.locales[0]) }
     val activeDayOffset = remember(workingMillis) { getDayOffsetFromToday(workingMillis) }
 
     ModalBottomSheet(
@@ -98,7 +102,7 @@ fun DateTimeSheet(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    listOf(0 to "今天", -1 to "昨天", -2 to "前天").forEach { (offset, label) ->
+                    listOf(0 to strings.getString(R.string.today), -1 to strings.getString(R.string.yesterday), -2 to strings.getString(R.string.day_before_yesterday)).forEach { (offset, label) ->
                         FilterChip(
                             selected = activeDayOffset == offset,
                             onClick = { selectQuickDayOffset(offset) },
@@ -118,7 +122,7 @@ fun DateTimeSheet(
                     shape = MaterialTheme.shapes.medium,
                     contentPadding = PaddingValues(horizontal = 16.dp, vertical = 8.dp)
                 ) {
-                    Text("確定")
+                    Text(strings.getString(R.string.ok))
                 }
             }
 
@@ -205,12 +209,12 @@ internal fun getDayOffsetFromToday(targetMillis: Long, nowMillis: Long = System.
     return if (diffDays in -2..0) diffDays else null
 }
 
-internal fun formatFriendlyDateTime(targetMillis: Long, nowMillis: Long = System.currentTimeMillis()): String {
-    val timeStr = SimpleDateFormat("HH:mm", Locale.TAIWAN).format(Date(targetMillis))
+internal fun formatFriendlyDateTime(strings: android.content.res.Resources, targetMillis: Long, nowMillis: Long = System.currentTimeMillis()): String {
+    val timeStr = SimpleDateFormat("HH:mm", strings.configuration.locales[0]).format(Date(targetMillis))
     return when (getDayOffsetFromToday(targetMillis, nowMillis)) {
-        0 -> "今天 $timeStr"
-        -1 -> "昨天 $timeStr"
-        -2 -> "前天 $timeStr"
+        0 -> strings.getString(R.string.today_time, timeStr)
+        -1 -> strings.getString(R.string.yesterday_time, timeStr)
+        -2 -> strings.getString(R.string.day_before_yesterday_time, timeStr)
         else -> {
             val nowCal = Calendar.getInstance().apply { timeInMillis = nowMillis }
             val targetCal = Calendar.getInstance().apply { timeInMillis = targetMillis }
@@ -219,7 +223,7 @@ internal fun formatFriendlyDateTime(targetMillis: Long, nowMillis: Long = System
             } else {
                 "yyyy/MM/dd HH:mm"
             }
-            SimpleDateFormat(pattern, Locale.TAIWAN).format(Date(targetMillis))
+            SimpleDateFormat(pattern, strings.configuration.locales[0]).format(Date(targetMillis))
         }
     }
 }

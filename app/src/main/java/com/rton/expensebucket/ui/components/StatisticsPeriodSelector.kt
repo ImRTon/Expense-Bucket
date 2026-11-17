@@ -32,6 +32,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.Role
@@ -39,6 +40,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.rton.expensebucket.ui.statistics.StatsPeriod
+import com.rton.expensebucket.ui.util.localizedLabel
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -48,6 +50,7 @@ internal fun StatisticsPeriodSelector(
     onPeriodChange: (StatsPeriod) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalContext.current.resources
     val periods = StatsPeriod.entries
     val selectedIndex = periods.indexOf(period)
     val currentOnPeriodChange by rememberUpdatedState(onPeriodChange)
@@ -122,7 +125,7 @@ internal fun StatisticsPeriodSelector(
                     contentAlignment = Alignment.Center
                 ) {
                     Text(
-                        text = option.label,
+                        text = strings.localizedLabel(option.label),
                         style = MaterialTheme.typography.labelLarge,
                         fontWeight = if (selectedness >= 0.5f) FontWeight.SemiBold else FontWeight.Normal,
                         color = lerp(

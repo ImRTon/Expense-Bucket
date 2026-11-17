@@ -117,7 +117,7 @@ class MainViewModel @Inject constructor(
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
         }
-        
+
         val now = Calendar.getInstance()
 
         val newOffset = when (_selectedPeriod.value) {
@@ -173,10 +173,16 @@ class MainViewModel @Inject constructor(
             .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), Calendar.MONDAY)
 
     /** Human-readable label for the current period+offset, e.g. "2026年3月", "3/1~3/7" */
+    private val displayLocale = MutableStateFlow(Locale.getDefault())
+
+    fun setDisplayLocale(locale: Locale) {
+        displayLocale.value = locale
+    }
+
     val currentPeriodLabel: StateFlow<String> = combine(
-        _selectedPeriod, _periodOffset, firstDayOfWeek
-    ) { period, offset, firstDay ->
-        formatPeriodLabel(period, offset, firstDay)
+        _selectedPeriod, _periodOffset, firstDayOfWeek, displayLocale
+    ) { period, offset, firstDay, locale ->
+        formatPeriodLabel(period, offset, firstDay, locale)
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), "")
 
     /** Transactions filtered by selected period + offset, projected for budget amortization. */
@@ -502,7 +508,7 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch {
             val result = dataExportImportManager.importFromCsv(context, uri)
             if (result.isSuccess) {
-                onResult(true, result.getOrNull()?.toUserMessage())
+                onResult(true, result.getOrNull()?.toUserMessage(context))
             } else {
                 onResult(false, result.exceptionOrNull()?.message)
             }
@@ -581,12 +587,12 @@ class MainViewModel @Inject constructor(
     }
 
     /** Formats a human-readable label for the given period + offset. */
-    private fun formatPeriodLabel(period: TimePeriod, offset: Int, firstDay: Int): String {
+    private fun formatPeriodLabel(period: TimePeriod, offset: Int, firstDay: Int, locale: Locale): String {
         val cal = Calendar.getInstance()
         return when (period) {
             TimePeriod.TODAY -> {
                 cal.add(Calendar.DAY_OF_YEAR, offset)
-                SimpleDateFormat("M/d (E)", Locale.TAIWAN).format(cal.time)
+                SimpleDateFormat("M/d (E)", locale).format(cal.time)
             }
             TimePeriod.WEEK -> {
                 cal.add(Calendar.WEEK_OF_YEAR, offset)
@@ -599,11 +605,11 @@ class MainViewModel @Inject constructor(
             }
             TimePeriod.MONTH -> {
                 cal.add(Calendar.MONTH, offset)
-                SimpleDateFormat("yyyy年M月", Locale.TAIWAN).format(cal.time)
+                SimpleDateFormat(if (locale.language == "en") "yyyy/MM" else "yyyy年M月", locale).format(cal.time)
             }
             TimePeriod.YEAR -> {
                 cal.add(Calendar.YEAR, offset)
-                SimpleDateFormat("yyyy年", Locale.TAIWAN).format(cal.time)
+                SimpleDateFormat(if (locale.language == "en") "yyyy" else "yyyy年", locale).format(cal.time)
             }
             TimePeriod.ALL -> "全部"
         }

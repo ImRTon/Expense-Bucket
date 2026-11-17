@@ -1,5 +1,7 @@
 package com.rton.expensebucket.ui.components
 
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.R
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.spring
@@ -49,6 +51,8 @@ fun QuickAddFab(
     onReceiptOcrClick: () -> Unit,
     onInvoiceOcrClick: () -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     var menuExpanded by remember { mutableStateOf(false) }
     var highlightedOptionId by remember { mutableStateOf<String?>(null) }
     val density = LocalDensity.current
@@ -65,7 +69,7 @@ fun QuickAddFab(
         val fanOptions = remember(onReceiptOcrClick, onInvoiceOcrClick, density, fanMenuSize) {
             val menuSizePx = with(density) { fanMenuSize.toPx() }
             val fabRadiusPx = with(density) { mainFabRadius.toPx() }
-            buildFanOptions(
+            buildFanOptions(strings,
                 density = density,
                 centerX = menuSizePx - fabRadiusPx,
                 centerY = menuSizePx - fabRadiusPx,
@@ -129,7 +133,7 @@ fun QuickAddFab(
                         menuExpanded = true
                         var currentOption: FanOptionLayout? = null
 
-                        val gestureOptions = buildFanOptions(
+                        val gestureOptions = buildFanOptions(strings,
                             density = density,
                             centerX = centerX,
                             centerY = centerY,
@@ -175,7 +179,7 @@ fun QuickAddFab(
                 Box(contentAlignment = Alignment.Center) {
                     Icon(
                         Icons.Filled.Add,
-                        contentDescription = "新增記帳",
+                        contentDescription = strings.getString(R.string.add_transaction),
                         tint = MaterialTheme.colorScheme.onPrimary,
                         modifier = Modifier.size(28.dp)
                     )
@@ -295,7 +299,7 @@ private data class FanPolarSpec(
     val angleDegrees: Float
 )
 
-private fun buildFanOptions(
+private fun buildFanOptions(strings: android.content.res.Resources,
     density: Density,
     centerX: Float,
     centerY: Float,
@@ -316,7 +320,7 @@ private fun buildFanOptions(
     )
 
     return specs.map { (id, polar, onSelected) ->
-        val label = if (id == "receipt") "收據 OCR" else "發票辨識"
+        val label = if (id == "receipt") strings.getString(R.string.receipt_ocr) else strings.getString(R.string.invoice_scan)
         val icon = if (id == "receipt") Icons.Filled.CameraAlt else Icons.Filled.Receipt
         val angleRadians = Math.toRadians(polar.angleDegrees.toDouble())
         val radiusPx = with(density) { polar.radiusDp.dp.toPx() }

@@ -1,5 +1,7 @@
 package com.rton.expensebucket.ui.screens
 
+import com.rton.expensebucket.ui.util.localizedLabel
+import com.rton.expensebucket.R
 import android.net.Uri
 import androidx.compose.animation.*
 import androidx.compose.foundation.clickable
@@ -55,6 +57,8 @@ fun OcrPreviewScreen(
     onSave: (Transaction) -> Unit,
     onBack: () -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     val context = LocalContext.current
     var ocrResult by remember { mutableStateOf<OcrResult?>(null) }
     var isProcessing by remember { mutableStateOf(true) }
@@ -81,7 +85,7 @@ fun OcrPreviewScreen(
     // Run OCR when screen opens
     LaunchedEffect(imageUri) {
         if (imageUri == null) {
-            errorMessage = "沒有收到圖片"
+            errorMessage = strings.getString(R.string.image_missing)
             isProcessing = false
             return@LaunchedEffect
         }
@@ -105,7 +109,7 @@ fun OcrPreviewScreen(
                 }
             }
         } catch (e: Throwable) {
-            errorMessage = "OCR 辨識失敗: ${e.localizedMessage}"
+            errorMessage = strings.getString(R.string.ocr_failed, e.localizedMessage)
         }
         isProcessing = false
     }
@@ -116,7 +120,7 @@ fun OcrPreviewScreen(
             selectedPaymentMethodId = paymentMethods.firstOrNull { it.isDefault }?.id
                 ?: paymentMethods.first().id
         }
-        
+
         // Resolve selected payment method parent for UI initialization
         if (selectedPaymentMethodId != null && expandedPaymentParentId == null) {
             val selectedMethod = paymentMethods.find { it.id == selectedPaymentMethodId }
@@ -150,10 +154,10 @@ fun OcrPreviewScreen(
         null
     }
     val personalAmountError = when {
-        parsedPersonalAmount == null && personalAmountText.isNotBlank() -> "請輸入正確金額"
-        parsedPersonalAmount != null && parsedPersonalAmount <= 0 -> "我的花費需大於 0"
+        parsedPersonalAmount == null && personalAmountText.isNotBlank() -> strings.getString(R.string.invalid_amount)
+        parsedPersonalAmount != null && parsedPersonalAmount <= 0 -> strings.getString(R.string.personal_amount_positive)
         parsedPersonalAmount != null && parsedAmount != null && parsedPersonalAmount > parsedAmount ->
-            "我的花費不能大於支出總額"
+            strings.getString(R.string.personal_amount_exceeds_total)
         else -> null
     }
 
@@ -190,7 +194,7 @@ fun OcrPreviewScreen(
             exchangeRateText = CurrencyFormats.formatRate(fetchedRate)
         }.onFailure {
             exchangeRateText = ""
-            exchangeRateError = "歷史現鈔匯率抓取失敗，可手動修正"
+            exchangeRateError = strings.getString(R.string.historical_cash_rate_failed)
         }
         isFetchingExchangeRate = false
     }
@@ -201,7 +205,7 @@ fun OcrPreviewScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "截圖辨識",
+                        strings.getString(R.string.screenshot_ocr),
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.SemiBold
                         )
@@ -209,7 +213,7 @@ fun OcrPreviewScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.getString(R.string.back))
                     }
                 },
                 windowInsets = WindowInsets(0),
@@ -237,7 +241,7 @@ fun OcrPreviewScreen(
                 ) {
                     Image(
                         painter = rememberAsyncImagePainter(model = imageUri),
-                        contentDescription = "截圖",
+                        contentDescription = strings.getString(R.string.screenshot),
                         modifier = Modifier
                             .fillMaxWidth()
                             .heightIn(max = 200.dp)
@@ -267,7 +271,7 @@ fun OcrPreviewScreen(
                             strokeWidth = 2.dp
                         )
                         Spacer(modifier = Modifier.width(12.dp))
-                        Text("正在辨識文字...")
+                        Text(strings.getString(R.string.recognizing_text))
                     }
                 }
                 return@Column
@@ -329,7 +333,7 @@ fun OcrPreviewScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                "辨識信心度: $confidence%",
+                                strings.getString(R.string.recognition_confidence, confidence),
                                 style = MaterialTheme.typography.labelLarge,
                                 color = confColor
                             )
@@ -353,7 +357,7 @@ fun OcrPreviewScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                "原始辨識文字",
+                                strings.getString(R.string.original_ocr_text),
                                 style = MaterialTheme.typography.labelLarge,
                                 modifier = Modifier.weight(1f)
                             )
@@ -365,7 +369,7 @@ fun OcrPreviewScreen(
                         }
                         AnimatedVisibility(visible = showRawText) {
                             Text(
-                                result.rawText.ifBlank { "(未辨識到文字)" },
+                                result.rawText.ifBlank { strings.getString(R.string.no_text_recognized) },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 modifier = Modifier.padding(top = 8.dp)
@@ -379,7 +383,7 @@ fun OcrPreviewScreen(
 
             // ─── Editable fields ────────────────────────────────
             Text(
-                "確認交易資料",
+                strings.getString(R.string.confirm_transaction_data),
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
             )
 
@@ -399,7 +403,7 @@ fun OcrPreviewScreen(
                         )
                     }
                     Text(
-                        if (isExpense) "支出總額" else "收入金額",
+                        if (isExpense) strings.getString(R.string.expense_total) else strings.getString(R.string.income_amount),
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -408,7 +412,7 @@ fun OcrPreviewScreen(
                 OutlinedTextField(
                     value = amount,
                     onValueChange = { amount = it },
-                    label = { Text("總額") },
+                    label = { Text(strings.getString(R.string.total_amount)) },
                     leadingIcon = { Text("$", style = MaterialTheme.typography.titleMedium) },
                     singleLine = true,
                     isError = isExpense && personalAmountError != null,
@@ -416,9 +420,9 @@ fun OcrPreviewScreen(
                     shape = RoundedCornerShape(12.dp),
                     supportingText = {
                         if (isExpense && parsedPersonalAmount != null) {
-                            Text("我的花費 ${CurrencyFormats.formatAmount(selectedCurrency, parsedPersonalAmount)}")
+                            Text(strings.getString(R.string.ocr_my_share_amount, CurrencyFormats.formatAmount(selectedCurrency, parsedPersonalAmount)))
                         } else if (isExpense) {
-                            Text("可設定實際由你負擔的金額；預算與一般統計會優先使用它")
+                            Text(strings.getString(R.string.personal_amount_explanation))
                         }
                     },
                     keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal)
@@ -437,7 +441,7 @@ fun OcrPreviewScreen(
             OutlinedTextField(
                 value = note,
                 onValueChange = { note = it },
-                label = { Text("商家 / 備註") },
+                label = { Text(strings.getString(R.string.merchant_note)) },
                 leadingIcon = {
                     Icon(Icons.Filled.Store, contentDescription = null)
                 },
@@ -454,20 +458,20 @@ fun OcrPreviewScreen(
                     selected = isExpense,
                     onClick = { isExpense = true },
                     shape = SegmentedButtonDefaults.itemShape(0, 2),
-                    label = { Text("支出") }
+                    label = { Text(strings.getString(R.string.expense)) }
                 )
                 SegmentedButton(
                     selected = !isExpense,
                     onClick = { isExpense = false },
                     shape = SegmentedButtonDefaults.itemShape(1, 2),
-                    label = { Text("收入") }
+                    label = { Text(strings.getString(R.string.income)) }
                 )
             }
 
             // Category selector (Two-level)
             if (parentCategories.isNotEmpty()) {
                 Text(
-                    "分類",
+                    strings.getString(R.string.category),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -494,7 +498,7 @@ fun OcrPreviewScreen(
                                     expandedParentId = if (expandedParentId == parent.id) null else parent.id
                                 }
                             },
-                            label = { Text(parent.name) }
+                            label = { Text(strings.localizedLabel(parent.name)) }
                         )
                     }
                 }
@@ -514,7 +518,7 @@ fun OcrPreviewScreen(
                                 val isSelected = selectedCategory?.id == child.id
                                 AssistChip(
                                     onClick = { selectedCategory = child },
-                                    label = { Text(child.name, style = MaterialTheme.typography.labelSmall) },
+                                    label = { Text(strings.localizedLabel(child.name), style = MaterialTheme.typography.labelSmall) },
                                     colors = AssistChipDefaults.assistChipColors(
                                         containerColor = if (isSelected) chipColor.copy(alpha = 0.2f)
                                         else MaterialTheme.colorScheme.surface,
@@ -531,15 +535,15 @@ fun OcrPreviewScreen(
                         }
                     }
                 }
-                
+
                 // Selected category label
                 selectedCategory?.let { cat ->
                     val parentName = if (cat.parentId != null) {
                         parentCategories.find { it.id == cat.parentId }?.name ?: ""
                     } else ""
-                    val label = if (parentName.isNotBlank()) "$parentName > ${cat.name}" else cat.name
+                    val label = if (parentName.isNotBlank()) "${strings.localizedLabel(parentName)} > ${strings.localizedLabel(cat.name)}" else strings.localizedLabel(cat.name)
                     Text(
-                        "已選: $label",
+                        strings.getString(R.string.selected_label, label),
                         style = MaterialTheme.typography.labelSmall,
                         color = Color(cat.color),
                         modifier = Modifier.padding(top = 4.dp)
@@ -550,7 +554,7 @@ fun OcrPreviewScreen(
             // Payment method selector
             if (parentPaymentMethods.isNotEmpty()) {
                 Text(
-                    "支付工具",
+                    strings.getString(R.string.payment_methods),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -566,10 +570,10 @@ fun OcrPreviewScreen(
                             (selectedPaymentMethodId != null && paymentMethods.find { it.id == selectedPaymentMethodId }?.parentId == parent.id) ||
                             selectedPaymentMethodId == parent.id
                         val color = Color(parent.color)
-                        
+
                         FilterChip(
                             selected = isParentSelected,
-                            onClick = { 
+                            onClick = {
                                 val children = childPaymentMethodsMap[parent.id]
                                 if (children.isNullOrEmpty()) {
                                     selectedPaymentMethodId = parent.id
@@ -578,7 +582,7 @@ fun OcrPreviewScreen(
                                     expandedPaymentParentId = if (expandedPaymentParentId == parent.id) null else parent.id
                                 }
                             },
-                            label = { Text(parent.name, style = MaterialTheme.typography.labelMedium) },
+                            label = { Text(strings.localizedLabel(parent.name), style = MaterialTheme.typography.labelMedium) },
                             leadingIcon = {
                                 Icon(
                                     PaymentIconMapper.getIcon(parent.icon),
@@ -590,7 +594,7 @@ fun OcrPreviewScreen(
                         )
                     }
                 }
-                
+
                 // Child methods
                 AnimatedVisibility(visible = expandedPaymentParentId != null) {
                     val children = childPaymentMethodsMap[expandedPaymentParentId] ?: emptyList()
@@ -606,7 +610,7 @@ fun OcrPreviewScreen(
                                 val isSelected = selectedPaymentMethodId == child.id
                                 AssistChip(
                                     onClick = { selectedPaymentMethodId = child.id },
-                                    label = { Text(child.name, style = MaterialTheme.typography.labelSmall) },
+                                    label = { Text(strings.localizedLabel(child.name), style = MaterialTheme.typography.labelSmall) },
                                     colors = AssistChipDefaults.assistChipColors(
                                         containerColor = if (isSelected) chipColor.copy(alpha = 0.2f)
                                         else MaterialTheme.colorScheme.surface,
@@ -631,9 +635,9 @@ fun OcrPreviewScreen(
                         val parentName = if (m.parentId != null) {
                             parentPaymentMethods.find { it.id == m.parentId }?.name ?: ""
                         } else ""
-                        val label = if (parentName.isNotBlank()) "$parentName > ${m.name}" else m.name
+                        val label = if (parentName.isNotBlank()) "${strings.localizedLabel(parentName)} > ${strings.localizedLabel(m.name)}" else strings.localizedLabel(m.name)
                         Text(
-                            "已選: $label",
+                            strings.getString(R.string.selected_label, label),
                             style = MaterialTheme.typography.labelSmall,
                             color = Color(m.color),
                             modifier = Modifier.padding(top = 4.dp)
@@ -667,7 +671,7 @@ fun OcrPreviewScreen(
                             )
                             Column {
                                 Text(
-                                    "記帳幣別",
+                                    strings.getString(R.string.transaction_currency),
                                     style = MaterialTheme.typography.labelSmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
@@ -723,7 +727,7 @@ fun OcrPreviewScreen(
                                     exchangeRateText = newValue
                                 }
                             },
-                            label = { Text("現鈔匯率") },
+                            label = { Text(strings.getString(R.string.cash_exchange_rate)) },
                             placeholder = { Text("1 $selectedCurrency = ? TWD") },
                             singleLine = true,
                             modifier = Modifier.fillMaxWidth(),
@@ -734,9 +738,9 @@ fun OcrPreviewScreen(
                             supportingText = {
                                 Text(
                                     when {
-                                        isFetchingExchangeRate -> "正在抓取歷史現鈔匯率..."
+                                        isFetchingExchangeRate -> strings.getString(R.string.fetching_cash_rate)
                                         exchangeRateError != null -> exchangeRateError!!
-                                        else -> "已依日期自動帶入歷史現鈔匯率，會用這個匯率換算回 TWD。"
+                                        else -> strings.getString(R.string.cash_rate_explanation)
                                     }
                                 )
                             }
@@ -744,7 +748,7 @@ fun OcrPreviewScreen(
 
                         convertedAmount?.let {
                             Text(
-                                "換算後約 ${CurrencyFormats.formatAmount("TWD", it)}",
+                                strings.getString(R.string.converted_twd, CurrencyFormats.formatAmount("TWD", it)),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.primary
                             )
@@ -787,7 +791,7 @@ fun OcrPreviewScreen(
             ) {
                 Icon(Icons.Filled.Check, contentDescription = null)
                 Spacer(modifier = Modifier.width(8.dp))
-                Text("確認記帳", style = MaterialTheme.typography.titleSmall)
+                Text(strings.getString(R.string.confirm_record), style = MaterialTheme.typography.titleSmall)
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -814,6 +818,8 @@ private fun PersonalAmountHandle(
     onTrigger: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalContext.current.resources
+
     val thresholdPx = with(LocalDensity.current) { 28.dp.toPx() }
     var dragDistance by remember { mutableStateOf(0f) }
     val contentColor = if (isActive) {
@@ -845,12 +851,12 @@ private fun PersonalAmountHandle(
     ) {
         Icon(
             imageVector = if (isActive) Icons.Filled.People else Icons.Filled.Person,
-            contentDescription = "設定我的花費",
+            contentDescription = strings.getString(R.string.set_my_share),
             tint = contentColor,
             modifier = Modifier.size(16.dp)
         )
         Text(
-            text = if (isActive) "分攤" else "我的花費",
+            text = if (isActive) strings.getString(R.string.split) else strings.getString(R.string.my_share),
             style = MaterialTheme.typography.labelSmall,
             color = contentColor,
             textDecoration = if (isActive) null else TextDecoration.Underline
@@ -866,13 +872,15 @@ private fun PersonalAmountDialog(
     onDismiss: () -> Unit,
     onConfirm: (String) -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     var tempValue by remember(initialValue) { mutableStateOf(initialValue) }
     val parsedValue = evaluatePersonalAmountInput(tempValue)
     val errorText = when {
         tempValue.isBlank() -> null
-        parsedValue == null -> "請輸入正確金額"
-        parsedValue <= 0 -> "我的花費需大於 0"
-        totalAmount != null && parsedValue > totalAmount -> "我的花費不能大於支出總額"
+        parsedValue == null -> strings.getString(R.string.invalid_amount)
+        parsedValue <= 0 -> strings.getString(R.string.personal_amount_positive)
+        totalAmount != null && parsedValue > totalAmount -> strings.getString(R.string.personal_amount_exceeds_total)
         else -> null
     }
     val density = LocalDensity.current
@@ -930,12 +938,12 @@ private fun PersonalAmountDialog(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        "設定我的花費",
+                        strings.getString(R.string.set_my_share),
                         style = MaterialTheme.typography.headlineSmall,
                         color = MaterialTheme.colorScheme.onSurface
                     )
                     Text(
-                        "支出總額會用於支付工具額度統計；這裡填的金額則會用於預算與一般統計。",
+                        strings.getString(R.string.personal_amount_usage),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -946,14 +954,14 @@ private fun PersonalAmountDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                "支出總額 ${CurrencyFormats.formatAmount(currency, it)}",
+                                strings.getString(R.string.expense_total_amount, CurrencyFormats.formatAmount(currency, it)),
                                 style = MaterialTheme.typography.labelLarge,
                                 color = MaterialTheme.colorScheme.primary
                             )
                             TextButton(
                                 onClick = { tempValue = formatEditableOcrAmount(it) }
                             ) {
-                                Text("導入總額")
+                                Text(strings.getString(R.string.import_total))
                             }
                         }
                     }
@@ -967,13 +975,13 @@ private fun PersonalAmountDialog(
                             verticalAlignment = Alignment.CenterVertically
                         ) {
                             Text(
-                                "我的花費",
+                                strings.getString(R.string.my_share),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
                             Spacer(modifier = Modifier.width(12.dp))
                             Text(
-                                if (tempValue.isBlank()) "留空代表全額都算在自己" else tempValue,
+                                if (tempValue.isBlank()) strings.getString(R.string.personal_amount_empty_hint) else tempValue,
                                 style = MaterialTheme.typography.headlineSmall,
                                 color = if (tempValue.isBlank()) {
                                     MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
@@ -988,7 +996,7 @@ private fun PersonalAmountDialog(
                         }
                     }
                     Text(
-                        errorText ?: "例如聚餐刷卡 1200，可先導入總額再按 ÷ 人數",
+                        errorText ?: strings.getString(R.string.personal_amount_example),
                         style = MaterialTheme.typography.bodySmall,
                         color = if (errorText != null) {
                             MaterialTheme.colorScheme.error
@@ -1001,16 +1009,16 @@ private fun PersonalAmountDialog(
                         horizontalArrangement = Arrangement.End
                     ) {
                         TextButton(onClick = { onConfirm("") }) {
-                            Text("清除")
+                            Text(strings.getString(R.string.clear))
                         }
                         TextButton(onClick = onDismiss) {
-                            Text("取消")
+                            Text(strings.getString(R.string.cancel))
                         }
                         TextButton(
                             onClick = { onConfirm(formatPersonalAmountInputForSave(tempValue)) },
                             enabled = errorText == null
                         ) {
-                            Text("確定")
+                            Text(strings.getString(R.string.ok))
                         }
                     }
                 }

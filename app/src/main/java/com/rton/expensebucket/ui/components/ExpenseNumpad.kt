@@ -1,5 +1,7 @@
 package com.rton.expensebucket.ui.components
 
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.R
 import android.view.HapticFeedbackConstants
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
@@ -206,6 +208,8 @@ private fun NumpadKey(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalContext.current.resources
+
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
     val scale by animateFloatAsState(
@@ -231,7 +235,7 @@ private fun NumpadKey(
             isBackspace -> {
                 Icon(
                     Icons.AutoMirrored.Filled.Backspace,
-                    contentDescription = "刪除",
+                    contentDescription = strings.getString(R.string.delete),
                     tint = contentColor,
                     modifier = Modifier.size(22.dp)
                 )
@@ -239,7 +243,7 @@ private fun NumpadKey(
             isConfirm -> {
                 Icon(
                     Icons.Filled.Check,
-                    contentDescription = "完成金額",
+                    contentDescription = strings.getString(R.string.finish_amount),
                     tint = contentColor,
                     modifier = Modifier.size(26.dp)
                 )

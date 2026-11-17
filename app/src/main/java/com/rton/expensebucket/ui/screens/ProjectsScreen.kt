@@ -1,5 +1,7 @@
 package com.rton.expensebucket.ui.screens
 
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.R
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -32,6 +34,8 @@ fun ProjectsScreen(
     onAddProject: (Project) -> Unit,
     onProjectClick: (Long) -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     var showAddDialog by remember { mutableStateOf(false) }
 
     val sortedProjects = remember(projects) {
@@ -46,7 +50,7 @@ fun ProjectsScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "旅行專案",
+                        strings.getString(R.string.trip_projects),
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.SemiBold
                         )
@@ -61,8 +65,8 @@ fun ProjectsScreen(
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { showAddDialog = true },
-                icon = { Icon(Icons.Filled.Add, "新增") },
-                text = { Text("新專案") },
+                icon = { Icon(Icons.Filled.Add, strings.getString(R.string.add)) },
+                text = { Text(strings.getString(R.string.new_project)) },
                 containerColor = MaterialTheme.colorScheme.primary
             )
         }
@@ -83,12 +87,12 @@ fun ProjectsScreen(
                     )
                     Spacer(modifier = Modifier.height(16.dp))
                     Text(
-                        "尚無旅行專案",
+                        strings.getString(R.string.no_trip_projects),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                     )
                     Text(
-                        "建立一個專案開始追蹤旅途花費",
+                        strings.getString(R.string.create_trip_hint),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.4f)
                     )
@@ -151,6 +155,8 @@ private fun ProjectCard(
     expenseTotal: Double?,
     onClick: () -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     val dateFormat = remember { SimpleDateFormat("yyyy/MM/dd", Locale.getDefault()) }
     val shortDateFormat = remember { SimpleDateFormat("MM/dd", Locale.getDefault()) }
 
@@ -207,7 +213,7 @@ private fun ProjectCard(
                 val expenseText = expenseTotal?.let {
                     val fmt = NumberFormat.getNumberInstance(Locale.getDefault())
                     fmt.maximumFractionDigits = 0
-                    "總花費 ${project.defaultCurrency} ${fmt.format(it)}"
+                    strings.getString(R.string.project_total_spent, project.defaultCurrency, fmt.format(it))
                 }
 
                 // Date range
@@ -219,13 +225,13 @@ private fun ProjectCard(
                 val budgetText = project.budget?.let {
                     val fmt = NumberFormat.getNumberInstance(Locale.getDefault())
                     fmt.maximumFractionDigits = 0
-                    "預算 ${project.defaultCurrency} ${fmt.format(it)}"
+                    strings.getString(R.string.project_budget, project.defaultCurrency, fmt.format(it))
                 }
 
                 Text(
                     buildString {
                         if (!project.isActive) {
-                            append("封存")
+                            append(strings.getString(R.string.archived))
                             append(" · ")
                         }
                         if (expenseText != null) {

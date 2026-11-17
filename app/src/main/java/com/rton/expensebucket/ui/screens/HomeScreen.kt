@@ -1,5 +1,8 @@
 package com.rton.expensebucket.ui.screens
 
+import com.rton.expensebucket.ui.util.localizedLabel
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.R
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
@@ -59,6 +62,8 @@ fun HomeScreen(
     onSetPeriodDate: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalContext.current.resources
+
     val categoryMap = remember(categories) { categories.associateBy { it.id } }
     val paymentMethodMap = remember(paymentMethods) { paymentMethods.associateBy { it.id } }
     val projectMap = remember(projects) { projects.associateBy { it.id } }
@@ -98,7 +103,7 @@ fun HomeScreen(
                             }
                         ) {
                             IconButton(onClick = onNavigateToDrafts) {
-                                Icon(Icons.Filled.Notifications, contentDescription = "待確認")
+                                Icon(Icons.Filled.Notifications, contentDescription = strings.getString(R.string.pending_confirmation))
                             }
                         }
                     }
@@ -111,7 +116,7 @@ fun HomeScreen(
                         ) {
                             Icon(
                                 Icons.Filled.ChevronLeft,
-                                contentDescription = "上一期",
+                                contentDescription = strings.getString(R.string.previous_period),
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -121,7 +126,7 @@ fun HomeScreen(
                                 .padding(horizontal = 8.dp, vertical = 4.dp)
                         ) {
                             Text(
-                                text = periodLabel,
+                                text = strings.localizedLabel(periodLabel),
                                 style = MaterialTheme.typography.labelLarge.copy(
                                     fontWeight = FontWeight.Medium,
                                     fontSize = 13.sp
@@ -135,13 +140,13 @@ fun HomeScreen(
                         ) {
                             Icon(
                                 Icons.Filled.ChevronRight,
-                                contentDescription = "下一期",
+                                contentDescription = strings.getString(R.string.next_period),
                                 modifier = Modifier.size(20.dp)
                             )
                         }
                     } else {
                         Text(
-                            text = "全部",
+                            text = strings.getString(R.string.all),
                             style = MaterialTheme.typography.labelLarge.copy(
                                 fontWeight = FontWeight.Medium,
                                 fontSize = 13.sp
@@ -211,7 +216,7 @@ fun HomeScreen(
                                 tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.35f)
                             )
                             Text(
-                                text = "尚無記帳紀錄",
+                                text = strings.getString(R.string.no_transactions),
                                 style = MaterialTheme.typography.bodyLarge,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
                                 textAlign = TextAlign.Center
@@ -226,7 +231,7 @@ fun HomeScreen(
                                     modifier = Modifier.size(18.dp)
                                 )
                                 Spacer(modifier = Modifier.width(6.dp))
-                                Text("記第一筆")
+                                Text(strings.getString(R.string.add_first_transaction))
                             }
                         }
                     }
@@ -256,7 +261,7 @@ fun HomeScreen(
                             horizontalArrangement = Arrangement.spacedBy(8.dp)
                         ) {
                             Text(
-                                text = formatHomeDateHeader(dateMillis),
+                                text = formatHomeDateHeader(strings, dateMillis),
                                 style = MaterialTheme.typography.titleSmall.copy(
                                     fontWeight = FontWeight.Bold
                                 ),
@@ -264,10 +269,10 @@ fun HomeScreen(
                             )
                             val summaryText = buildList {
                                 if (dailyExpense > 0) {
-                                    add("支出 ${CurrencyFormats.formatCompactAmount("TWD", dailyExpense)}")
+                                    add(strings.getString(R.string.daily_expense, CurrencyFormats.formatCompactAmount("TWD", dailyExpense)))
                                 }
                                 if (dailyIncome > 0) {
-                                    add("收入 ${CurrencyFormats.formatCompactAmount("TWD", dailyIncome)}")
+                                    add(strings.getString(R.string.daily_income, CurrencyFormats.formatCompactAmount("TWD", dailyIncome)))
                                 }
                             }.joinToString(" · ")
 
@@ -351,12 +356,12 @@ fun HomeScreen(
                             }
                             showDatePicker = false
                         }) {
-                            Text("確定")
+                            Text(strings.getString(R.string.ok))
                         }
                     },
                     dismissButton = {
                         TextButton(onClick = { showDatePicker = false }) {
-                            Text("取消")
+                            Text(strings.getString(R.string.cancel))
                         }
                     }
                 ) {
@@ -367,10 +372,10 @@ fun HomeScreen(
     }
 }
 
-internal fun formatHomeDateHeader(dateMillis: Long, nowMillis: Long = System.currentTimeMillis()): String {
+internal fun formatHomeDateHeader(strings: android.content.res.Resources, dateMillis: Long, nowMillis: Long = System.currentTimeMillis()): String {
     return when (getDayOffsetFromToday(dateMillis, nowMillis)) {
-        0 -> "今天"
-        -1 -> "昨天"
+        0 -> strings.getString(R.string.today)
+        -1 -> strings.getString(R.string.yesterday)
         else -> {
             val nowCal = Calendar.getInstance().apply { timeInMillis = nowMillis }
             val targetCal = Calendar.getInstance().apply { timeInMillis = dateMillis }
@@ -379,7 +384,7 @@ internal fun formatHomeDateHeader(dateMillis: Long, nowMillis: Long = System.cur
             } else {
                 "yyyy/MM/dd E"
             }
-            SimpleDateFormat(pattern, Locale.TAIWAN).format(Date(dateMillis))
+            SimpleDateFormat(pattern, strings.configuration.locales[0]).format(Date(dateMillis))
         }
     }
 }

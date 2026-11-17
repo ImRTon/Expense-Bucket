@@ -1,5 +1,7 @@
 package com.rton.expensebucket.ui.components
 
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.R
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectHorizontalDragGestures
@@ -64,6 +66,8 @@ fun ProjectTimelineChart(
     onProjectFocused: (Long?) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalContext.current.resources
+
     var selectedWindow by rememberSaveable { mutableStateOf(TimelineWindow.ONE_YEAR) }
     var scrollOffsetPx by remember { mutableFloatStateOf(0f) }
     var chartWidthPx by remember { mutableIntStateOf(0) }
@@ -112,7 +116,7 @@ fun ProjectTimelineChart(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        "時間軸",
+                        strings.getString(R.string.timeline),
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
                     )
                     TimelineWindowSelector(
@@ -238,7 +242,7 @@ fun ProjectTimelineChart(
                                 strokeWidth = if (isJan) 1.2.dp.toPx() else 1.dp.toPx()
                             )
 
-                            val label = if (isJan) year.toString() else "${monthZeroBased + 1}月"
+                            val label = if (isJan) year.toString() else strings.getString(R.string.month_number, monthZeroBased + 1)
                             val measuredLabel = textMeasurer.measure(label, tickTextStyle)
                             val labelX = (x - measuredLabel.size.width / 2f)
                                 .coerceIn(0f, width - measuredLabel.size.width.toFloat())

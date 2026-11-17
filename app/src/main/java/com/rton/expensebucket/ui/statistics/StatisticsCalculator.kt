@@ -4,6 +4,7 @@ import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.Transaction
 import com.rton.expensebucket.data.model.toBudgetTransactionsForRange
 import java.util.Calendar
+import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 enum class StatsPeriod(val label: String) {
@@ -147,7 +148,8 @@ object StatisticsCalculator {
         period: StatsPeriod,
         window: StatsWindow,
         firstDayOfWeek: Int = Calendar.MONDAY,
-        now: Long = System.currentTimeMillis()
+        now: Long = System.currentTimeMillis(),
+        locale: Locale = Locale.TAIWAN
     ): String {
         val start = calendar(window.start, firstDayOfWeek)
         val end = calendar(window.end, firstDayOfWeek)
@@ -164,12 +166,16 @@ object StatisticsCalculator {
                     else -> "$startText – $endText"
                 }
             }
-            StatsPeriod.MONTH -> "${start.get(Calendar.YEAR)}年${start.get(Calendar.MONTH) + 1}月"
-            StatsPeriod.YEAR -> "${start.get(Calendar.YEAR)}年"
+            StatsPeriod.MONTH -> java.text.SimpleDateFormat(if (locale.language == "en") "yyyy/MM" else "yyyy年M月", locale).format(start.time)
+            StatsPeriod.YEAR -> java.text.SimpleDateFormat(if (locale.language == "en") "yyyy" else "yyyy年", locale).format(start.time)
             StatsPeriod.ALL -> {
                 val startYear = start.get(Calendar.YEAR)
                 val endYear = end.get(Calendar.YEAR)
-                if (startYear == endYear) "${startYear}年" else "$startYear – ${endYear}年"
+                if (locale.language == "en") {
+                    if (startYear == endYear) "$startYear" else "$startYear – $endYear"
+                } else {
+                    if (startYear == endYear) "${startYear}年" else "$startYear – ${endYear}年"
+                }
             }
         }
     }

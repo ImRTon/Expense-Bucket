@@ -1,5 +1,7 @@
 package com.rton.expensebucket.ui.screens
 
+import com.rton.expensebucket.ui.util.localizedLabel
+import com.rton.expensebucket.R
 import android.Manifest
 import android.content.Context
 import android.content.pm.PackageManager
@@ -96,6 +98,8 @@ fun InvoiceQrScannerScreen(
     onApplyPrefill: (TransactionPrefill) -> Unit,
     onBack: () -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val previewView = remember {
@@ -123,7 +127,7 @@ fun InvoiceQrScannerScreen(
     ) { granted ->
         hasCameraPermission = granted
         if (!granted) {
-            errorMessage = "需要相機權限才能即時掃描發票 QR Code"
+            errorMessage = strings.getString(R.string.invoice_qr_camera_required)
         }
     }
 
@@ -158,7 +162,7 @@ fun InvoiceQrScannerScreen(
                             isResolvingMetadata = true
                             scanResult = parsed
                         }.onFailure { throwable ->
-                            errorMessage = throwable.localizedMessage ?: "發票 QR 解析失敗"
+                            errorMessage = throwable.localizedMessage?.let { strings.localizedLabel(it) } ?: strings.getString(R.string.invoice_qr_failed)
                         }
                     }
                 }
@@ -209,13 +213,13 @@ fun InvoiceQrScannerScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "發票辨識",
+                        strings.getString(R.string.invoice_scan),
                         style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
                     )
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.getString(R.string.back))
                     }
                 },
                 windowInsets = WindowInsets(0),
@@ -289,7 +293,7 @@ fun InvoiceQrScannerScreen(
                                 strokeWidth = 2.dp
                             )
                             Spacer(modifier = Modifier.width(12.dp))
-                            Text("已掃到兩個 QR Code，正在整理發票內容...")
+                            Text(strings.getString(R.string.invoice_qr_processing))
                         }
                     }
                 }
@@ -307,7 +311,7 @@ fun InvoiceQrScannerScreen(
                             onApplyPrefill(
                                 TransactionPrefill(
                                     amount = result.totalAmount.toDouble(),
-                                    note = result.noteText,
+                                    note = localizedInvoiceNote(strings, result),
                                     isExpense = true,
                                     date = result.resolvedDateMillis,
                                     source = "invoice_qr",
@@ -327,6 +331,8 @@ fun InvoiceQrScannerScreen(
 private fun PermissionPlaceholder(
     onRequestPermission: () -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     Box(
         modifier = Modifier.fillMaxSize(),
         contentAlignment = Alignment.Center
@@ -349,9 +355,9 @@ private fun PermissionPlaceholder(
                     tint = MaterialTheme.colorScheme.primary,
                     modifier = Modifier.size(36.dp)
                 )
-                Text("需要相機權限才能即時掃描發票")
+                Text(strings.getString(R.string.invoice_camera_required))
                 Button(onClick = onRequestPermission) {
-                    Text("開啟相機權限")
+                    Text(strings.getString(R.string.enable_camera))
                 }
             }
         }
@@ -364,6 +370,8 @@ private fun InvoiceScannerOverlay(
     rightDetected: Boolean,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalContext.current.resources
+
     val inactiveColor = Color.White.copy(alpha = 0.78f)
     val activeColor = Color(0xFF7DFF9B)
     val maskColor = Color.Black.copy(alpha = 0.34f)
@@ -422,13 +430,13 @@ private fun InvoiceScannerOverlay(
                         Icon(Icons.Filled.QrCodeScanner, contentDescription = null)
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            "將發票平放在鏡頭下",
+                            strings.getString(R.string.invoice_position),
                             style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
                         )
                     }
                     Spacer(modifier = Modifier.height(6.dp))
                     Text(
-                        "讓左、右兩個 QR Code 各自對準框內，掃到後會自動帶入記帳編輯。",
+                        strings.getString(R.string.invoice_qr_position),
                         style = MaterialTheme.typography.bodyMedium
                     )
                 }
@@ -447,7 +455,7 @@ private fun InvoiceScannerOverlay(
                 contentAlignment = Alignment.Center
             ) {
                 GuideLabel(
-                    text = if (leftDetected) "左 QR 已偵測" else "左 QR",
+                    text = if (leftDetected) strings.getString(R.string.left_qr_detected) else strings.getString(R.string.left_qr),
                     active = leftDetected
                 )
             }
@@ -457,7 +465,7 @@ private fun InvoiceScannerOverlay(
                 contentAlignment = Alignment.Center
             ) {
                 GuideLabel(
-                    text = if (rightDetected) "右 QR 已偵測" else "右 QR",
+                    text = if (rightDetected) strings.getString(R.string.right_qr_detected) else strings.getString(R.string.right_qr),
                     active = rightDetected
                 )
             }
@@ -497,6 +505,8 @@ private fun InvoiceScanResultCard(
     onRescan: () -> Unit,
     onApplyPrefill: () -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     val scrollState = rememberScrollState()
     val dateLabel = remember(result.metadata, result.invoiceDate) {
         val exactTime = result.metadata?.invoiceDateTime
@@ -528,7 +538,7 @@ private fun InvoiceScanResultCard(
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    "發票辨識完成",
+                    strings.getString(R.string.invoice_scanned),
                     style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold)
                 )
             }
@@ -537,14 +547,14 @@ private fun InvoiceScanResultCard(
                 result.totalAmount.toCurrencyString(),
                 style = MaterialTheme.typography.headlineMedium.copy(fontWeight = FontWeight.Bold)
             )
-            Text("發票號碼：${result.invoiceNumber}")
-            Text("店家 / 賣方：${result.merchantLabel}")
-            Text("日期：$dateLabel")
-            Text("隨機碼：${result.randomCode}")
+            Text(strings.getString(R.string.invoice_number, result.invoiceNumber))
+            Text(strings.getString(R.string.invoice_merchant, localizedInvoiceMerchant(strings, result)))
+            Text(strings.getString(R.string.invoice_date, dateLabel))
+            Text(strings.getString(R.string.invoice_random_code, result.randomCode))
 
             if (result.items.isNotEmpty()) {
                 Text(
-                    "品項",
+                    strings.getString(R.string.invoice_items),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -553,7 +563,7 @@ private fun InvoiceScanResultCard(
                 }
                 if (result.encodedItemCount < result.totalItemCount) {
                     Text(
-                        "本張發票共有 ${result.totalItemCount} 筆，QR 僅載入 ${result.encodedItemCount} 筆，剩餘內容可進編輯頁補充。",
+                        strings.getString(R.string.invoice_partial_items, result.totalItemCount, result.encodedItemCount),
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         style = MaterialTheme.typography.bodySmall
                     )
@@ -562,7 +572,7 @@ private fun InvoiceScanResultCard(
 
             if (result.metadata?.merchantName == null || result.metadata?.invoiceDateTime == null) {
                 Text(
-                    "若店名或精確時間未抓到，進入編輯頁後仍可手動調整。",
+                    strings.getString(R.string.invoice_edit_hint),
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall
                 )
@@ -578,7 +588,7 @@ private fun InvoiceScanResultCard(
                 ) {
                     Icon(Icons.Filled.Refresh, contentDescription = null)
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("重新掃描")
+                    Text(strings.getString(R.string.scan_again))
                 }
                 Button(
                     onClick = onApplyPrefill,
@@ -586,7 +596,7 @@ private fun InvoiceScanResultCard(
                 ) {
                     Icon(Icons.Filled.ReceiptLong, contentDescription = null)
                     Spacer(modifier = Modifier.width(6.dp))
-                    Text("帶入記帳編輯")
+                    Text(strings.getString(R.string.open_transaction_editor))
                 }
             }
         }
@@ -699,4 +709,23 @@ private class InvoiceQrAnalyzer(
 
 private fun <T> ListenableFuture<T>.getOrNull(): T? {
     return if (isDone) runCatching { get() }.getOrNull() else null
+}
+
+private fun localizedInvoiceMerchant(strings: android.content.res.Resources, result: TaiwanInvoiceQrResult): String =
+    result.metadata?.merchantName?.takeIf { it.isNotBlank() }
+        ?: strings.getString(R.string.seller_tax_id, result.sellerIdentifier)
+
+private fun localizedInvoiceNote(strings: android.content.res.Resources, result: TaiwanInvoiceQrResult): String = buildString {
+    append(strings.getString(R.string.invoice_note_number, result.invoiceNumber))
+    append('\n').append(localizedInvoiceMerchant(strings, result))
+    append('\n').append(strings.getString(R.string.invoice_note_random_code, result.randomCode))
+    append('\n').append(strings.getString(R.string.total_amount)).append(' ')
+        .append(result.totalAmount.stripTrailingZeros().toPlainString())
+    if (result.items.isNotEmpty()) {
+        append("\n\n").append(strings.getString(R.string.invoice_items))
+        result.items.forEach { append("\n- ").append(it.displayText) }
+    }
+    result.supplement?.takeIf { it.isNotBlank() }?.let {
+        append("\n\n").append(strings.getString(R.string.invoice_supplement)).append('\n').append(it)
+    }
 }

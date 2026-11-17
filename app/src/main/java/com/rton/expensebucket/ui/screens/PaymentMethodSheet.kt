@@ -1,5 +1,8 @@
 package com.rton.expensebucket.ui.screens
 
+import com.rton.expensebucket.ui.util.localizedLabel
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.R
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
@@ -33,6 +36,8 @@ fun PaymentMethodSheet(
     onSelectPaymentMethod: (Long) -> Unit,
     onDismiss: () -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val initialExpandedParentId = remember(selectedPaymentMethodId, parentPaymentMethods, childPaymentMethodsMap) {
         childPaymentMethodsMap.entries.firstOrNull { (_, children) ->
@@ -55,7 +60,7 @@ fun PaymentMethodSheet(
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Text(
-                text = "選擇支付工具",
+                text = strings.getString(R.string.choose_payment_method),
                 style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.SemiBold),
                 modifier = Modifier.padding(horizontal = 4.dp, vertical = 4.dp)
             )
@@ -162,6 +167,8 @@ private fun PaymentMethodGridTile(
     onClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalContext.current.resources
+
     val methodColor = Color(method.color)
 
     Column(
@@ -181,16 +188,16 @@ private fun PaymentMethodGridTile(
         ) {
             Icon(
                 imageVector = PaymentIconMapper.getIcon(method.icon),
-                contentDescription = method.name,
+                contentDescription = strings.localizedLabel(method.name),
                 tint = if (isSelected) Color.White else methodColor,
                 modifier = Modifier.size(iconSize)
             )
         }
         Text(
             text = when {
-                hasChildren && isExpanded -> "${method.name} ▴"
-                hasChildren -> "${method.name} ▾"
-                else -> method.name
+                hasChildren && isExpanded -> "${strings.localizedLabel(method.name)} ▴"
+                hasChildren -> "${strings.localizedLabel(method.name)} ▾"
+                else -> strings.localizedLabel(method.name)
             },
             style = MaterialTheme.typography.labelMedium.copy(
                 fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium

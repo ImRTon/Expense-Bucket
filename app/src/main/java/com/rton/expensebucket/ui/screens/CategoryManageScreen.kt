@@ -1,5 +1,8 @@
 package com.rton.expensebucket.ui.screens
 
+import com.rton.expensebucket.ui.util.localizedLabel
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.R
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -29,6 +32,8 @@ fun CategoryManageScreen(
     onDeleteCategory: (Category) -> Unit,
     onBack: () -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     var isExpenseTab by remember { mutableStateOf(true) }
     var showAddDialog by remember { mutableStateOf(false) }
     var editingCategory by remember { mutableStateOf<Category?>(null) }
@@ -54,8 +59,8 @@ fun CategoryManageScreen(
         for (p in parentCategories) {
             list.add(FlatCat(p, true, p.id))
             if (expandedParentIds.contains(p.id)) {
-                childCategoriesMap[p.id]?.forEach { c -> 
-                    list.add(FlatCat(c, false, p.id)) 
+                childCategoriesMap[p.id]?.forEach { c ->
+                    list.add(FlatCat(c, false, p.id))
                 }
             }
         }
@@ -91,7 +96,7 @@ fun CategoryManageScreen(
             TopAppBar(
                 title = {
                     Text(
-                        "分類管理",
+                        strings.getString(R.string.category_management),
                         style = MaterialTheme.typography.titleLarge.copy(
                             fontWeight = FontWeight.SemiBold
                         )
@@ -99,7 +104,7 @@ fun CategoryManageScreen(
                 },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "返回")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.getString(R.string.back))
                     }
                 },
                 windowInsets = WindowInsets(0),
@@ -114,8 +119,8 @@ fun CategoryManageScreen(
                     addAsChildOf = null
                     showAddDialog = true
                 },
-                icon = { Icon(Icons.Filled.Add, "新增") },
-                text = { Text("新增母分類") },
+                icon = { Icon(Icons.Filled.Add, strings.getString(R.string.add)) },
+                text = { Text(strings.getString(R.string.add_parent_category)) },
                 containerColor = MaterialTheme.colorScheme.primary
             )
         }
@@ -139,13 +144,13 @@ fun CategoryManageScreen(
                         selected = isExpenseTab,
                         onClick = { isExpenseTab = true },
                         shape = SegmentedButtonDefaults.itemShape(0, 2),
-                        label = { Text("支出") }
+                        label = { Text(strings.getString(R.string.expense)) }
                     )
                     SegmentedButton(
                         selected = !isExpenseTab,
                         onClick = { isExpenseTab = false },
                         shape = SegmentedButtonDefaults.itemShape(1, 2),
-                        label = { Text("收入") }
+                        label = { Text(strings.getString(R.string.income)) }
                     )
                 }
             }
@@ -165,7 +170,7 @@ fun CategoryManageScreen(
                         )
                         Spacer(modifier = Modifier.height(8.dp))
                         Text(
-                            "尚無分類",
+                            strings.getString(R.string.no_categories),
                             style = MaterialTheme.typography.bodyLarge,
                             color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f)
                         )
@@ -181,7 +186,7 @@ fun CategoryManageScreen(
                     items(dragStateList, key = { if (it.isParent) "parent_${it.category.id}" else "child_${it.category.id}" }) { flatCat ->
                         ReorderableItem(state, key = if (flatCat.isParent) "parent_${flatCat.category.id}" else "child_${flatCat.category.id}") { isDragging ->
                             val elevation = if (isDragging) 8.dp else 0.dp
-                            
+
                             Box(modifier = Modifier
                                 .detectReorderAfterLongPress(state)
                                 .shadow(elevation, RoundedCornerShape(14.dp))
@@ -257,6 +262,8 @@ private fun CategoryListItem(
     onDelete: () -> Unit,
     onAddChild: () -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     val catColor = Color(category.color)
     val indent = if (isParent) 0.dp else 28.dp
 
@@ -290,14 +297,14 @@ private fun CategoryListItem(
             // Name + child count
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    category.name,
+                    strings.localizedLabel(category.name),
                     style = MaterialTheme.typography.bodyLarge.copy(
                         fontWeight = if (isParent) FontWeight.SemiBold else FontWeight.Normal
                     )
                 )
                 if (isParent && childCount > 0) {
                     Text(
-                        "$childCount 個子分類",
+                        strings.getQuantityString(R.plurals.subcategory_count, childCount, childCount),
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f)
                     )
@@ -310,7 +317,7 @@ private fun CategoryListItem(
                 IconButton(onClick = onAddChild, modifier = Modifier.size(32.dp)) {
                     Icon(
                         Icons.Filled.Add,
-                        contentDescription = "新增子分類",
+                        contentDescription = strings.getString(R.string.add_subcategory),
                         modifier = Modifier.size(18.dp),
                         tint = MaterialTheme.colorScheme.primary
                     )
@@ -320,7 +327,7 @@ private fun CategoryListItem(
                     IconButton(onClick = onToggleExpand, modifier = Modifier.size(32.dp)) {
                         Icon(
                             if (isExpanded) Icons.Filled.ExpandLess else Icons.Filled.ExpandMore,
-                            contentDescription = if (isExpanded) "收合" else "展開",
+                            contentDescription = if (isExpanded) strings.getString(R.string.collapse) else strings.getString(R.string.expand),
                             modifier = Modifier.size(18.dp)
                         )
                     }
@@ -331,7 +338,7 @@ private fun CategoryListItem(
             IconButton(onClick = onEdit, modifier = Modifier.size(32.dp)) {
                 Icon(
                     Icons.Filled.Edit,
-                    contentDescription = "編輯",
+                    contentDescription = strings.getString(R.string.edit),
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -341,7 +348,7 @@ private fun CategoryListItem(
             IconButton(onClick = onDelete, modifier = Modifier.size(32.dp)) {
                 Icon(
                     Icons.Filled.Delete,
-                    contentDescription = "刪除",
+                    contentDescription = strings.getString(R.string.delete),
                     modifier = Modifier.size(16.dp),
                     tint = MaterialTheme.colorScheme.error.copy(alpha = 0.7f)
                 )
@@ -358,6 +365,8 @@ private fun CategoryEditDialog(
     onDismiss: () -> Unit,
     onSave: (Category) -> Unit
 ) {
+    val strings = LocalContext.current.resources
+
     var name by remember { mutableStateOf(existing?.name ?: "") }
     var selectedIcon by remember { mutableStateOf(existing?.icon ?: "Restaurant") }
     var selectedColorIndex by remember { mutableStateOf(0) }
@@ -388,9 +397,9 @@ private fun CategoryEditDialog(
 
     val isParentAdd = parentCategory == null && existing == null
     val title = when {
-        existing != null -> "編輯分類"
-        parentCategory != null -> "新增子分類 (${parentCategory.name})"
-        else -> "新增母分類"
+        existing != null -> strings.getString(R.string.edit_category)
+        parentCategory != null -> strings.getString(R.string.add_named_subcategory, parentCategory.name)
+        else -> strings.getString(R.string.add_parent_category)
     }
 
     AlertDialog(
@@ -402,14 +411,14 @@ private fun CategoryEditDialog(
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
-                    label = { Text("分類名稱") },
+                    label = { Text(strings.getString(R.string.category_name)) },
                     singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(12.dp)
                 )
 
                 // Icon selector
-                Text("圖示", style = MaterialTheme.typography.labelLarge)
+                Text(strings.getString(R.string.icon), style = MaterialTheme.typography.labelLarge)
                 androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
                     columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(6),
                     modifier = Modifier.heightIn(max = 160.dp),
@@ -447,7 +456,7 @@ private fun CategoryEditDialog(
                 }
 
                 // Color selector
-                Text("顏色", style = MaterialTheme.typography.labelLarge)
+                Text(strings.getString(R.string.category_color), style = MaterialTheme.typography.labelLarge)
                 androidx.compose.foundation.lazy.grid.LazyVerticalGrid(
                     columns = androidx.compose.foundation.lazy.grid.GridCells.Fixed(8),
                     modifier = Modifier.heightIn(max = 80.dp),
@@ -497,12 +506,12 @@ private fun CategoryEditDialog(
                 },
                 enabled = name.isNotBlank()
             ) {
-                Text("儲存")
+                Text(strings.getString(R.string.save))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("取消")
+                Text(strings.getString(R.string.cancel))
             }
         }
     )

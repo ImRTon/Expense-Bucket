@@ -1,5 +1,8 @@
 package com.rton.expensebucket.ui.screens
 
+import com.rton.expensebucket.ui.util.localizedLabel
+import androidx.compose.ui.platform.LocalContext
+import com.rton.expensebucket.R
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -47,13 +50,15 @@ fun AmountHeader(
     onPersonalAmountClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val strings = LocalContext.current.resources
+
     val semanticColors = MaterialTheme.semanticColors
     val accentColor = if (isExpense) semanticColors.expense else semanticColors.income
     val categoryColor = selectedCategory?.let { Color(it.color) } ?: MaterialTheme.colorScheme.outline
     val categoryLabel = when {
-        selectedCategory == null -> "未選分類"
-        !parentCategoryName.isNullOrBlank() -> "$parentCategoryName · ${selectedCategory.name}"
-        else -> selectedCategory.name
+        selectedCategory == null -> strings.getString(R.string.no_category_selected)
+        !parentCategoryName.isNullOrBlank() -> "${strings.localizedLabel(parentCategoryName)} · ${strings.localizedLabel(selectedCategory.name)}"
+        else -> strings.localizedLabel(selectedCategory.name)
     }
 
     val hasOperator = ExpressionEvaluator.hasOperator(amountText)
@@ -222,7 +227,7 @@ fun AmountHeader(
                             )
                             Icon(
                                 imageVector = Icons.Filled.KeyboardArrowDown,
-                                contentDescription = "選擇幣別",
+                                contentDescription = strings.getString(R.string.choose_currency),
                                 tint = if (hasFx) {
                                     MaterialTheme.colorScheme.onPrimaryContainer
                                 } else {
@@ -264,7 +269,7 @@ fun AmountHeader(
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.People,
-                                contentDescription = "分攤",
+                                contentDescription = strings.getString(R.string.split),
                                 tint = if (hasSplit) {
                                     MaterialTheme.colorScheme.onPrimaryContainer
                                 } else {
@@ -274,9 +279,9 @@ fun AmountHeader(
                             )
                             Text(
                                 text = if (hasSplit) {
-                                    "我的花費 ${CurrencyFormats.formatAmount(selectedCurrency, parsedPersonalAmount!!)}"
+                                    strings.getString(R.string.my_share_amount, CurrencyFormats.formatAmount(selectedCurrency, parsedPersonalAmount!!))
                                 } else {
-                                    "分攤"
+                                    strings.getString(R.string.split)
                                 },
                                 style = MaterialTheme.typography.labelMedium.copy(
                                     fontWeight = if (hasSplit) FontWeight.SemiBold else FontWeight.Medium
@@ -294,7 +299,7 @@ fun AmountHeader(
 
             if (isExpense && personalAmountError != null) {
                 Text(
-                    text = personalAmountError,
+                    text = strings.localizedLabel(personalAmountError),
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.error,
                     textAlign = TextAlign.End,
