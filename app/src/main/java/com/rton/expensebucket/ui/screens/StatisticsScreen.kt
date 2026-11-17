@@ -295,7 +295,7 @@ private fun StatsTypeSwitch(
                             modifier = Modifier.size(18.dp)
                         )
                         Spacer(modifier = Modifier.width(6.dp))
-                        Column(horizontalAlignment = Alignment.Start) {
+                        Column(horizontalAlignment = Alignment.CenterHorizontally) {
                             Text(
                                 type.label,
                                 style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.SemiBold),
@@ -308,6 +308,8 @@ private fun StatsTypeSwitch(
                                 maxLines = 1
                             )
                         }
+                        // Balance the icon and gap so the text stays centered in the segment.
+                        Spacer(modifier = Modifier.width(24.dp))
                     }
                 }
             }
