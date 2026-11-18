@@ -62,7 +62,8 @@ fun TransactionDetailList(
     onAmortizationClick: () -> Unit,
     onNoteChange: (String) -> Unit,
     onNoteFocusChanged: (Boolean) -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    cardCurrency: String? = null
 ) {
     val strings = LocalContext.current.resources
 
@@ -114,6 +115,14 @@ fun TransactionDetailList(
                 value = paymentMethodLabel,
                 onClick = onPaymentMethodClick,
                 modifier = Modifier.weight(1f)
+            )
+        }
+
+        if (isExpense && cardCurrency != null && !currency.equals(cardCurrency, ignoreCase = true)) {
+            Text(
+                text = strings.getString(R.string.stored_value_currency_hint, cardCurrency),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
 

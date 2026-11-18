@@ -10,6 +10,7 @@ import com.rton.expensebucket.data.model.NonPaymentNotification
 import com.rton.expensebucket.data.model.NotificationCapture
 import com.rton.expensebucket.data.model.PaymentMethod
 import com.rton.expensebucket.data.model.Project
+import com.rton.expensebucket.data.model.StoredValueBalance
 import com.rton.expensebucket.data.model.Transaction
 import kotlinx.coroutines.flow.Flow
 import javax.inject.Inject
@@ -45,6 +46,9 @@ class ExpenseBucketRepository @Inject constructor(
         transactionDao.getTransactionById(id)
     suspend fun insertTransaction(transaction: Transaction): Long =
         transactionDao.insertTransaction(transaction)
+
+    suspend fun restoreNfcTransaction(transaction: Transaction): Long =
+        transactionDao.insertNfcTransactions(listOf(transaction)).single()
     suspend fun insertNotificationDraftIfAbsent(
         transaction: Transaction,
         capture: NotificationCapture
@@ -106,7 +110,16 @@ class ExpenseBucketRepository @Inject constructor(
     suspend fun getDefaultPaymentMethod(): PaymentMethod? = paymentMethodDao.getDefaultPaymentMethod()
     suspend fun insertPaymentMethod(method: PaymentMethod): Long = paymentMethodDao.insertPaymentMethod(method)
     suspend fun insertPaymentMethods(methods: List<PaymentMethod>) = paymentMethodDao.insertPaymentMethods(methods)
-    suspend fun updatePaymentMethod(method: PaymentMethod) = paymentMethodDao.updatePaymentMethod(method)
+    suspend fun updatePaymentMethod(method: PaymentMethod) = paymentMethodDao.updatePaymentMethodDetails(method)
+    suspend fun setStoredValueBalance(id: Long, balance: StoredValueBalance, onlyIfUnset: Boolean = false) =
+        paymentMethodDao.setStoredValueBalance(id, balance.amount, balance.asOf, balance.currency, onlyIfUnset)
+
+    suspend fun topUpStoredValueBalance(id: Long, amount: Double) =
+        paymentMethodDao.topUpStoredValueBalance(id, amount)
+
+    suspend fun restoreNfcCardBinding(id: Long, fingerprint: String) =
+        paymentMethodDao.restoreNfcCardBinding(id, fingerprint)
+
     suspend fun deletePaymentMethod(method: PaymentMethod) = paymentMethodDao.deletePaymentMethod(method)
     suspend fun deleteSubPaymentMethods(parentId: Long) = paymentMethodDao.deleteSubPaymentMethods(parentId)
     suspend fun setDefaultPaymentMethod(id: Long) {

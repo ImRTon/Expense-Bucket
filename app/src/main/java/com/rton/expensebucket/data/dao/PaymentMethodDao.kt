@@ -33,6 +33,49 @@ interface PaymentMethodDao {
     @Update
     suspend fun updatePaymentMethod(method: PaymentMethod)
 
+    @Transaction
+    suspend fun updatePaymentMethodDetails(method: PaymentMethod) {
+        val current = getPaymentMethodById(method.id) ?: return
+        updatePaymentMethod(
+            method.copy(storedValueBalance = current.storedValueBalance, nfcCardFingerprint = current.nfcCardFingerprint)
+        )
+    }
+
+    @Query(
+        """UPDATE payment_methods
+           SET storedValue_amount = :amount, storedValue_asOf = :asOf, storedValue_currency = :currency
+           WHERE id = :id AND (:onlyIfUnset = 0 OR storedValue_amount IS NULL)"""
+    )
+    suspend fun setStoredValueBalance(
+        id: Long,
+        amount: Double,
+        asOf: Long,
+        currency: String,
+        onlyIfUnset: Boolean
+    ): Int
+
+    @Query(
+        """UPDATE payment_methods SET storedValue_amount = ROUND(storedValue_amount + :amount, 2)
+           WHERE id = :id AND storedValue_amount IS NOT NULL"""
+    )
+    suspend fun topUpStoredValueBalance(id: Long, amount: Double)
+
+    @Query("SELECT id FROM payment_methods WHERE nfcCardFingerprint = :fingerprint LIMIT 1")
+    suspend fun findNfcCardOwner(fingerprint: String): Long?
+
+    @Query(
+        """UPDATE payment_methods SET nfcCardFingerprint = :fingerprint
+           WHERE id = :id AND nfcCardFingerprint IS NULL AND
+           NOT EXISTS (SELECT 1 FROM payment_methods WHERE nfcCardFingerprint = :fingerprint)"""
+    )
+    suspend fun restoreNfcCardBinding(id: Long, fingerprint: String): Int
+
+    @Query(
+        """UPDATE payment_methods SET storedValue_amount = :amount, storedValue_asOf = :asOf,
+               storedValue_currency = 'JPY', nfcCardFingerprint = :fingerprint WHERE id = :id"""
+    )
+    suspend fun setNfcCardBalance(id: Long, amount: Double, asOf: Long, fingerprint: String)
+
     @Delete
     suspend fun deletePaymentMethod(method: PaymentMethod)
 

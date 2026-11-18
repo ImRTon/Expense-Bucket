@@ -15,14 +15,19 @@ import com.rton.expensebucket.data.model.BudgetTransaction
 import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.NonPaymentNotification
 import com.rton.expensebucket.data.model.PaymentMethod
+import com.rton.expensebucket.data.model.StoredValueBalance
 import com.rton.expensebucket.data.model.Project
 import com.rton.expensebucket.data.model.Transaction
 import com.rton.expensebucket.data.model.budgetExpenseForRange
 import com.rton.expensebucket.data.model.effectiveConvertedAmount
 import com.rton.expensebucket.data.model.toBudgetTransactionsForRange
 import com.rton.expensebucket.data.repository.ExpenseBucketRepository
+import com.rton.expensebucket.data.repository.TransitCardImportRepository
+import com.rton.expensebucket.nfc.TransitCardScan
 import com.rton.expensebucket.util.PaymentMethodBillingCalculator
 import com.rton.expensebucket.util.PaymentMethodBillingSummary
+import com.rton.expensebucket.util.StoredValueCalculator
+import com.rton.expensebucket.util.storedValueCurrency
 import com.rton.expensebucket.util.DataExportImportManager
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.*
@@ -58,7 +63,8 @@ class MainViewModel @Inject constructor(
     private val repository: ExpenseBucketRepository,
     private val budgetDataStore: BudgetDataStore,
     private val appSettingsDataStore: AppSettingsDataStore,
-    private val dataExportImportManager: DataExportImportManager
+    private val dataExportImportManager: DataExportImportManager,
+    private val transitCardImportRepository: TransitCardImportRepository
 ) : ViewModel() {
 
     // ─── Categories ─────────────────────────────────────────────────
@@ -288,10 +294,21 @@ class MainViewModel @Inject constructor(
 
     val paymentMethodBillingSummaries: StateFlow<Map<Long, PaymentMethodBillingSummary>> =
         combine(allPaymentMethods, allConfirmedTransactions) { methods, transactions ->
+            val methodsById = methods.associateBy { it.id }
             methods.mapNotNull { method ->
+                if (method.storedValueCurrency(methodsById[method.parentId]) != null) return@mapNotNull null
                 PaymentMethodBillingCalculator.buildCurrentSummary(method, transactions)?.let {
                     method.id to it
                 }
+            }.toMap()
+        }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
+
+    val paymentMethodBalances: StateFlow<Map<Long, Double>> =
+        combine(allPaymentMethods, allConfirmedTransactions) { methods, transactions ->
+            val transactionsByMethod = transactions.groupBy { it.paymentMethodId }
+            methods.mapNotNull { method ->
+                StoredValueCalculator.currentBalance(method, transactionsByMethod[method.id].orEmpty())
+                    ?.let { method.id to it }
             }.toMap()
         }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyMap())
 
@@ -477,6 +494,25 @@ class MainViewModel @Inject constructor(
     fun updatePaymentMethod(method: PaymentMethod) {
         viewModelScope.launch { repository.updatePaymentMethod(method) }
     }
+
+    fun reconcilePaymentMethodBalance(id: Long, currency: String, amount: Double) {
+        val balance = StoredValueBalance(amount, System.currentTimeMillis(), currency)
+        viewModelScope.launch { repository.setStoredValueBalance(id, balance) }
+    }
+
+    fun topUpPaymentMethodBalance(id: Long, amount: Double) {
+        viewModelScope.launch { repository.topUpStoredValueBalance(id, amount) }
+    }
+
+    suspend fun previewTransitCard(id: Long, scan: TransitCardScan) =
+        transitCardImportRepository.preview(id, scan)
+
+    suspend fun saveTransitCard(
+        id: Long,
+        scan: TransitCardScan,
+        selectedNotes: Map<String, String>,
+        manualRate: Double?
+    ) = transitCardImportRepository.save(id, scan, selectedNotes, manualRate)
 
     fun deletePaymentMethod(method: PaymentMethod) {
         viewModelScope.launch {

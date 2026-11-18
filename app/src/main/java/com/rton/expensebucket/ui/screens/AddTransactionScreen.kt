@@ -58,6 +58,7 @@ import com.rton.expensebucket.ui.theme.amountLarge
 import com.rton.expensebucket.ui.theme.semanticColors
 import com.rton.expensebucket.ui.util.CurrencyFormats
 import com.rton.expensebucket.ui.util.ExpressionEvaluator
+import com.rton.expensebucket.util.storedValueCurrency
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 
@@ -138,8 +139,12 @@ fun AddTransactionScreen(
     val initialSettlementCurrency = initialProjectSelectionId
         ?.let { projectId -> projects.find { it.id == projectId }?.defaultCurrency }
         ?: "TWD"
+    val defaultPaymentMethod = paymentMethods.firstOrNull { it.isDefault } ?: paymentMethods.firstOrNull()
+    val defaultCardCurrency = defaultPaymentMethod?.let { method ->
+        method.storedValueCurrency(paymentMethods.firstOrNull { it.id == method.parentId })
+    }
     var selectedCurrency by remember {
-        mutableStateOf(existingTransaction?.currency ?: prefill?.currency ?: initialSettlementCurrency)
+        mutableStateOf(existingTransaction?.currency ?: prefill?.currency ?: defaultCardCurrency ?: initialSettlementCurrency)
     }
     var exchangeRateText by remember {
         mutableStateOf(CurrencyFormats.formatRate(existingTransaction?.exchangeRate ?: prefill?.exchangeRate ?: 1.0))
@@ -158,11 +163,7 @@ fun AddTransactionScreen(
     }
 
     var selectedPaymentMethodId by remember {
-        mutableStateOf(
-            existingTransaction?.paymentMethodId
-                ?: paymentMethods.firstOrNull { it.isDefault }?.id
-                ?: paymentMethods.firstOrNull()?.id
-        )
+        mutableStateOf(existingTransaction?.paymentMethodId ?: defaultPaymentMethod?.id)
     }
 
     var expandedParentId by remember { mutableStateOf<Long?>(null) }
@@ -257,13 +258,16 @@ fun AddTransactionScreen(
     val selectedPaymentMethod = remember(selectedPaymentMethodId, paymentMethods) {
         paymentMethods.find { it.id == selectedPaymentMethodId }
     }
+    val selectedCardCurrency = selectedPaymentMethod?.let { method ->
+        method.storedValueCurrency(parentPaymentMethods.firstOrNull { it.id == method.parentId })
+    }
     val selectedProject = remember(selectedProjectId, projects) {
         projects.find { it.id == selectedProjectId }
     }
     val settlementCurrency = selectedProject?.defaultCurrency ?: "TWD"
 
     LaunchedEffect(settlementCurrency) {
-        if (selectedCurrency == previousSettlementCurrency) {
+        if (selectedCurrency == previousSettlementCurrency && selectedCurrency != selectedCardCurrency) {
             selectedCurrency = settlementCurrency
         }
         if (selectedCurrency == settlementCurrency) {
@@ -712,6 +716,7 @@ fun AddTransactionScreen(
                         onRemoveItem = { index -> items = items.filterIndexed { itemIndex, _ -> itemIndex != index } },
                         selectedDateTime = selectedDateTime,
                         selectedPaymentMethod = selectedPaymentMethod,
+                        cardCurrency = selectedCardCurrency,
                         projects = projects,
                         selectedProject = selectedProject,
                         isExpense = pageIsExpense,
@@ -788,6 +793,11 @@ fun AddTransactionScreen(
             selectedPaymentMethodId = selectedPaymentMethodId,
             onSelectPaymentMethod = { methodId ->
                 selectedPaymentMethodId = methodId
+                if (!isEditMode && prefill == null && selectedCurrency == settlementCurrency) {
+                    val method = paymentMethods.firstOrNull { it.id == methodId }
+                    val parent = parentPaymentMethods.firstOrNull { it.id == method?.parentId }
+                    method?.storedValueCurrency(parent)?.let { selectedCurrency = it }
+                }
             },
             onDismiss = { showPaymentMethodSheet = false }
         )
@@ -830,7 +840,7 @@ fun AddTransactionScreen(
                             val oldSettlementCurrency = settlementCurrency
                             hasUserEditedProjectSelection = true
                             selectedProjectId = null
-                            if (selectedCurrency == oldSettlementCurrency) {
+                            if (selectedCurrency == oldSettlementCurrency && selectedCurrency != selectedCardCurrency) {
                                 selectedCurrency = "TWD"
                                 exchangeRateText = "1"
                             }
@@ -864,7 +874,7 @@ fun AddTransactionScreen(
                                 val oldSettlementCurrency = settlementCurrency
                                 hasUserEditedProjectSelection = true
                                 selectedProjectId = project.id
-                                if (selectedCurrency == oldSettlementCurrency) {
+                                if (selectedCurrency == oldSettlementCurrency && selectedCurrency != selectedCardCurrency) {
                                     selectedCurrency = project.defaultCurrency
                                     exchangeRateText = "1"
                                 }

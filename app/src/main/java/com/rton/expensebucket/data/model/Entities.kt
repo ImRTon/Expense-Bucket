@@ -1,6 +1,7 @@
 package com.rton.expensebucket.data.model
 
 import androidx.room.ColumnInfo
+import androidx.room.Embedded
 import androidx.room.Entity
 import androidx.room.ForeignKey
 import androidx.room.Index
@@ -42,7 +43,15 @@ data class PaymentMethod(
     val billingCycleType: String = BillingCycleType.NONE.value,
     val billingCycleDay: Int? = null,
     val billingLimitType: String = BillingLimitType.CREDIT.value,
-    val billingLimitAmount: Double? = null
+    val billingLimitAmount: Double? = null,
+    @Embedded(prefix = "storedValue_") val storedValueBalance: StoredValueBalance? = null,
+    val nfcCardFingerprint: String? = null
+)
+
+data class StoredValueBalance(
+    val amount: Double,
+    val asOf: Long,
+    val currency: String
 )
 
 /**
@@ -107,7 +116,8 @@ data class Project(
         Index(value = ["categoryId"]),
         Index(value = ["projectId"]),
         Index(value = ["paymentMethodId"]),
-        Index(value = ["date"])
+        Index(value = ["date"]),
+        Index(value = ["nfcReference"], unique = true)
     ]
 )
 data class Transaction(
@@ -128,7 +138,8 @@ data class Transaction(
     val amortizationStartYearMonth: Int? = null, // YYYYMM
     val amortizationMonthCount: Int? = null,
     @ColumnInfo(defaultValue = "'[]'") val items: List<TransactionItem> = emptyList(),
-    val createdAt: Long = System.currentTimeMillis()
+    val createdAt: Long = System.currentTimeMillis(),
+    val nfcReference: String? = null
 )
 
 /**

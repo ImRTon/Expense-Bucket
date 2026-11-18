@@ -36,7 +36,13 @@ class NotificationCaptureDatabaseTest {
 
     private fun openDatabase(name: String): ExpenseBucketDatabase =
         Room.databaseBuilder(context, ExpenseBucketDatabase::class.java, name)
-            .addMigrations(ExpenseBucketDatabase.MIGRATION_11_12, ExpenseBucketDatabase.MIGRATION_12_13, ExpenseBucketDatabase.MIGRATION_13_14).build()
+            .addMigrations(
+                ExpenseBucketDatabase.MIGRATION_11_12,
+                ExpenseBucketDatabase.MIGRATION_12_13,
+                ExpenseBucketDatabase.MIGRATION_13_14,
+                ExpenseBucketDatabase.MIGRATION_14_15,
+                ExpenseBucketDatabase.MIGRATION_15_16
+            ).build()
 
     @Test
     fun migratesVersion11PreservingTransactionsAndValidatingSchema() = runBlocking {

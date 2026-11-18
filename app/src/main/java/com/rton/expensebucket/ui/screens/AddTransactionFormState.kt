@@ -187,7 +187,8 @@ object AddTransactionFormLogic {
             amortizationEnabled = activeAmortization,
             amortizationStartYearMonth = if (activeAmortization) draft.amortizationStartYearMonth else null,
             amortizationMonthCount = if (activeAmortization) draft.amortizationMonthCount else null,
-            createdAt = existingTransaction?.createdAt ?: nowMillis
+            createdAt = existingTransaction?.createdAt ?: nowMillis,
+            nfcReference = existingTransaction?.nfcReference
         )
     }
 

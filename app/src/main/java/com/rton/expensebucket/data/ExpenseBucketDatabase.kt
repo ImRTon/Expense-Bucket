@@ -20,7 +20,7 @@ import com.rton.expensebucket.data.model.TransactionItemConverter
 
 @Database(
     entities = [Transaction::class, Category::class, Project::class, PaymentMethod::class, NonPaymentNotification::class, NotificationCapture::class],
-    version = 14,
+    version = 16,
     exportSchema = true
 )
 @TypeConverters(TransactionItemConverter::class)
@@ -32,6 +32,22 @@ abstract class ExpenseBucketDatabase : RoomDatabase() {
     abstract fun nonPaymentNotificationDao(): NonPaymentNotificationDao
 
     companion object {
+        val MIGRATION_15_16 = object : Migration(15, 16) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE payment_methods ADD COLUMN nfcCardFingerprint TEXT")
+                db.execSQL("ALTER TABLE transactions ADD COLUMN nfcReference TEXT")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS index_transactions_nfcReference ON transactions (nfcReference)")
+            }
+        }
+
+        val MIGRATION_14_15 = object : Migration(14, 15) {
+            override fun migrate(database: SupportSQLiteDatabase) {
+                database.execSQL("ALTER TABLE `payment_methods` ADD COLUMN `storedValue_amount` REAL")
+                database.execSQL("ALTER TABLE `payment_methods` ADD COLUMN `storedValue_asOf` INTEGER")
+                database.execSQL("ALTER TABLE `payment_methods` ADD COLUMN `storedValue_currency` TEXT")
+            }
+        }
+
         val MIGRATION_13_14 = object : Migration(13, 14) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 PaymentMethodDefaultsMigration.migrate(database)

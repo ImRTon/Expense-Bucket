@@ -20,6 +20,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -27,27 +28,40 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.rton.expensebucket.data.model.BillingCycleType
 import com.rton.expensebucket.data.model.BillingLimitType
 import com.rton.expensebucket.data.model.PaymentMethod
+import com.rton.expensebucket.data.repository.TransitCardImportPreview
+import com.rton.expensebucket.data.repository.TransitCardImportResult
+import com.rton.expensebucket.nfc.TransitCardScan
+import com.rton.expensebucket.ui.components.SlidingPillSelector
 import com.rton.expensebucket.ui.theme.Amber40
 import com.rton.expensebucket.ui.theme.amountMedium
 import com.rton.expensebucket.ui.theme.amountSmall
 import com.rton.expensebucket.ui.util.CurrencyFormats
 import com.rton.expensebucket.ui.util.PaymentIconMapper
 import com.rton.expensebucket.util.PaymentMethodBillingSummary
+import com.rton.expensebucket.util.isTransitCardGroup
+import com.rton.expensebucket.util.storedValueCurrency
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PaymentMethodsScreen(
     paymentMethods: List<PaymentMethod>,
     billingSummaries: Map<Long, PaymentMethodBillingSummary>,
+    balances: Map<Long, Double>,
     onAdd: (PaymentMethod) -> Unit,
     onEdit: (PaymentMethod) -> Unit,
     onDelete: (PaymentMethod) -> Unit,
     onSetDefault: (Long) -> Unit,
+    onReconcileBalance: (Long, String, Double) -> Unit,
+    onTopUp: (Long, Double) -> Unit,
+    onPreviewTransitCard: suspend (Long, TransitCardScan) -> TransitCardImportPreview?,
+    onSaveTransitCard: suspend (Long, TransitCardScan, Map<String, String>, Double?) -> TransitCardImportResult,
     onBack: (() -> Unit)? = null
 ) {
     val strings = LocalContext.current.resources
@@ -55,6 +69,14 @@ fun PaymentMethodsScreen(
     var showEditorSheet by remember { mutableStateOf(false) }
     var selectedParentIdForAdd by remember { mutableStateOf<Long?>(null) }
     var methodToEdit by remember { mutableStateOf<PaymentMethod?>(null) }
+    var balanceMethodId by rememberSaveable { mutableStateOf<Long?>(null) }
+    var scanningCard by rememberSaveable { mutableStateOf(false) }
+    val snackbarHost = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
+    val balanceMethod = paymentMethods.firstOrNull { it.id == balanceMethodId }
+    val balanceCurrency = balanceMethod?.let { method ->
+        method.storedValueCurrency(paymentMethods.firstOrNull { it.id == method.parentId })
+    }
 
     val parents = remember(paymentMethods) {
         paymentMethods.filter { it.parentId == null }.sortedBy { it.sortOrder }
@@ -65,6 +87,7 @@ fun PaymentMethodsScreen(
 
     Scaffold(
         contentWindowInsets = WindowInsets(0),
+        snackbarHost = { SnackbarHost(snackbarHost) },
         topBar = {
             TopAppBar(
                 title = {
@@ -198,13 +221,20 @@ fun PaymentMethodsScreen(
                         ) {
                             Column(modifier = Modifier.fillMaxWidth()) {
                                 itemsToDisplay.forEach { method ->
+                                    val currency = method.storedValueCurrency(parent.takeIf { method.parentId == it.id })
                                     UnifiedPaymentMethodRow(
                                         method = method,
                                         billingSummary = billingSummaries[method.id],
+                                        balanceCurrency = currency,
+                                        balance = balances[method.id],
                                         onClick = {
-                                            methodToEdit = method
-                                            selectedParentIdForAdd = method.parentId
-                                            showEditorSheet = true
+                                            if (currency != null) {
+                                                balanceMethodId = method.id
+                                            } else {
+                                                methodToEdit = method
+                                                selectedParentIdForAdd = method.parentId
+                                                showEditorSheet = true
+                                            }
                                         }
                                     )
                                 }
@@ -218,10 +248,57 @@ fun PaymentMethodsScreen(
         }
     }
 
+    if (balanceMethod != null && balanceCurrency != null && scanningCard) {
+        TransitNfcSheet(
+            cardName = strings.localizedLabel(balanceMethod.name),
+            cardIcon = balanceMethod.icon,
+            onDismiss = { scanningCard = false },
+            onPreview = { onPreviewTransitCard(balanceMethod.id, it) },
+            onSave = { scan, selectedNotes, manualRate ->
+                onSaveTransitCard(balanceMethod.id, scan, selectedNotes, manualRate)
+            },
+            onSaved = { count ->
+                scanningCard = false
+                balanceMethodId = null
+                scope.launch {
+                    snackbarHost.showSnackbar(
+                        if (count == 0) strings.getString(R.string.transit_nfc_balance_saved)
+                        else strings.getString(R.string.transit_nfc_import_saved, count)
+                    )
+                }
+            }
+        )
+    } else if (balanceMethod != null && balanceCurrency != null) {
+        StoredValueBalanceSheet(
+            method = balanceMethod,
+            currency = balanceCurrency,
+            balance = balances[balanceMethod.id],
+            onScan = if (balanceCurrency == "JPY" && balanceMethod.icon in setOf("suica", "icoca")) {
+                { scanningCard = true }
+            } else null,
+            onDismiss = { balanceMethodId = null },
+            onEditMethod = {
+                balanceMethodId = null
+                methodToEdit = balanceMethod
+                selectedParentIdForAdd = balanceMethod.parentId
+                showEditorSheet = true
+            },
+            onReconcile = { amount ->
+                onReconcileBalance(balanceMethod.id, balanceCurrency, amount)
+                balanceMethodId = null
+            },
+            onTopUp = { amount ->
+                onTopUp(balanceMethod.id, amount)
+                balanceMethodId = null
+            }
+        )
+    }
+
     if (showEditorSheet) {
         PaymentMethodEditorSheet(
             parentId = selectedParentIdForAdd,
             initialMethod = methodToEdit,
+            parentMethod = parents.firstOrNull { it.id == selectedParentIdForAdd },
             onDismiss = {
                 showEditorSheet = false
                 methodToEdit = null
@@ -253,6 +330,8 @@ fun PaymentMethodsScreen(
 private fun UnifiedPaymentMethodRow(
     method: PaymentMethod,
     billingSummary: PaymentMethodBillingSummary?,
+    balanceCurrency: String?,
+    balance: Double?,
     onClick: () -> Unit
 ) {
     val strings = LocalContext.current.resources
@@ -326,13 +405,21 @@ private fun UnifiedPaymentMethodRow(
                     }
                 }
 
-                if (billingSummary != null) {
+                if (balanceCurrency != null) {
+                    Text(
+                        text = strings.getString(
+                            if (balance == null) R.string.stored_value_set_initial else R.string.stored_value_balance
+                        ),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                } else if (billingSummary != null) {
                     Text(
                         text = "${billingSummary.periodLabel} · ${strings.getString(R.string.billing_day, method.billingCycleDay ?: "-")}",
                         style = MaterialTheme.typography.labelSmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
                     )
-                } else {
+                } else if (!method.isTransitCardGroup()) {
                     Text(
                         text = strings.getString(R.string.no_billing_day),
                         style = MaterialTheme.typography.labelSmall,
@@ -341,7 +428,13 @@ private fun UnifiedPaymentMethodRow(
                 }
             }
 
-            if (billingSummary != null) {
+            if (balanceCurrency != null && balance != null) {
+                Text(
+                    text = CurrencyFormats.formatAmount(balanceCurrency, balance),
+                    style = MaterialTheme.typography.amountMedium,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            } else if (balanceCurrency == null && billingSummary != null) {
                 Column(horizontalAlignment = Alignment.End) {
                     Text(
                         text = CurrencyFormats.formatCompactAmount("TWD", billingSummary.totalAmount),
@@ -365,7 +458,7 @@ private fun UnifiedPaymentMethodRow(
         }
 
         // Progress bar when both billing cycle and credit/promo limit are active
-        if (billingSummary != null && billingLimit != null && progress != null) {
+        if (balanceCurrency == null && billingSummary != null && billingLimit != null && progress != null) {
             val barColor = when {
                 billingSummary.totalAmount > billingLimit -> MaterialTheme.colorScheme.error
                 progress >= 0.85f -> Amber40
@@ -410,11 +503,139 @@ private fun UnifiedPaymentMethodRow(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun StoredValueBalanceSheet(
+    method: PaymentMethod,
+    currency: String,
+    balance: Double?,
+    onScan: (() -> Unit)?,
+    onDismiss: () -> Unit,
+    onEditMethod: () -> Unit,
+    onReconcile: (Double) -> Unit,
+    onTopUp: (Double) -> Unit
+) {
+    val strings = LocalContext.current.resources
+    val hasBalance = method.storedValueBalance != null
+    var topUpSelected by rememberSaveable(method.id) { mutableStateOf(true) }
+    val isTopUp = hasBalance && topUpSelected
+    var amountText by rememberSaveable(method.id, isTopUp) { mutableStateOf("") }
+    var negative by rememberSaveable(method.id, isTopUp) { mutableStateOf(false) }
+    val amount = amountText.toDoubleOrNull()
+        ?.takeIf { it.isFinite() && (!isTopUp || it > 0) }
+        ?.let { if (negative) -it else it }
+    val action = when {
+        isTopUp -> R.string.stored_value_top_up
+        hasBalance -> R.string.stored_value_reconcile
+        else -> R.string.stored_value_set_initial
+    }
+    val choices = listOf(R.string.stored_value_top_up, R.string.stored_value_reconcile)
+    val amountPattern = remember(currency) {
+        val decimals = if (currency == "JPY") "" else "(\\.\\d{0,2})?"
+        Regex("\\d{0,10}$decimals")
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(start = 24.dp, end = 24.dp, bottom = 24.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Text(
+                    text = strings.localizedLabel(method.name),
+                    style = MaterialTheme.typography.titleLarge,
+                    modifier = Modifier.weight(1f)
+                )
+                IconButton(onClick = onEditMethod) {
+                    Icon(Icons.Filled.Edit, contentDescription = strings.getString(R.string.edit_payment_method))
+                }
+            }
+            if (balance != null) {
+                Text(
+                    text = strings.getString(
+                        R.string.stored_value_balance_amount,
+                        CurrencyFormats.formatAmount(currency, balance)
+                    ),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+            }
+            if (onScan != null) {
+                OutlinedButton(onClick = onScan, modifier = Modifier.fillMaxWidth()) {
+                    Icon(Icons.Filled.Contactless, contentDescription = null)
+                    Spacer(Modifier.width(8.dp))
+                    Text(strings.getString(R.string.transit_nfc_scan))
+                }
+            }
+            if (hasBalance) {
+                SlidingPillSelector(
+                    options = choices,
+                    selected = action,
+                    onSelect = { topUpSelected = it == R.string.stored_value_top_up },
+                    label = { strings.getString(it) }
+                )
+            }
+            OutlinedTextField(
+                value = amountText,
+                onValueChange = { input ->
+                    val normalized = input.replace(',', '.').replace('−', '-')
+                    val digits = if (isTopUp) normalized else normalized.removePrefix("-")
+                    if (amountPattern.matches(digits)) {
+                        amountText = digits
+                        if (normalized.startsWith("-")) negative = true
+                    }
+                },
+                leadingIcon = if (isTopUp) null else {
+                    {
+                        IconToggleButton(checked = negative, onCheckedChange = { negative = it }) {
+                            Icon(
+                                imageVector = if (negative) Icons.Filled.Remove else Icons.Filled.Add,
+                                contentDescription = strings.getString(R.string.stored_value_negative)
+                            )
+                        }
+                    }
+                },
+                label = {
+                    Text(strings.getString(if (isTopUp) R.string.stored_value_top_up_amount else R.string.stored_value_actual_amount))
+                },
+                suffix = { Text(currency) },
+                supportingText = {
+                    Text(strings.getString(if (isTopUp) R.string.stored_value_top_up_help else R.string.stored_value_reconcile_help))
+                },
+                keyboardOptions = KeyboardOptions(
+                    keyboardType = if (currency == "JPY") KeyboardType.Number else KeyboardType.Decimal
+                ),
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+            Button(
+                onClick = { amount?.let(if (isTopUp) onTopUp else onReconcile) },
+                enabled = amount != null,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(strings.getString(action))
+            }
+        }
+    }
+}
+
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
 private fun PaymentMethodEditorSheet(
     parentId: Long?,
     initialMethod: PaymentMethod? = null,
+    parentMethod: PaymentMethod?,
     onDismiss: () -> Unit,
     onConfirm: (PaymentMethod) -> Unit,
     onDelete: (PaymentMethod) -> Unit,
@@ -466,7 +687,10 @@ private fun PaymentMethodEditorSheet(
     val billingLimitAmount = billingLimitAmountText.toDoubleOrNull()
     val iconChoices = PaymentIconMapper.allKeys
 
-    val canSave = name.isNotBlank() && (!billingEnabled || billingDay != null)
+    val method = (initialMethod ?: PaymentMethod(name = name, icon = selectedIcon, parentId = parentId))
+        .copy(name = name, icon = selectedIcon)
+    val showBilling = !method.isTransitCardGroup() && method.storedValueCurrency(parentMethod) == null
+    val canSave = name.isNotBlank() && (!showBilling || !billingEnabled || billingDay != null)
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -651,8 +875,7 @@ private fun PaymentMethodEditorSheet(
                 }
             }
 
-            // ─── Billing Cycle & Limit Section ──────────────────────
-            Surface(
+            if (showBilling) Surface(
                 modifier = Modifier.fillMaxWidth(),
                 shape = MaterialTheme.shapes.medium,
                 color = MaterialTheme.colorScheme.surfaceContainerLow
@@ -734,24 +957,20 @@ private fun PaymentMethodEditorSheet(
             // ─── Save Button ────────────────────────────────────────
             Button(
                 onClick = {
-                    val finalMethod = initialMethod?.copy(
+                    val billingActive = showBilling && billingEnabled
+                    val finalMethod = (initialMethod ?: PaymentMethod(
                         name = name.trim(),
                         icon = selectedIcon,
-                        color = selectedColor,
-                        billingCycleType = if (billingEnabled) BillingCycleType.MONTHLY_CLOSING_DAY.value else BillingCycleType.NONE.value,
-                        billingCycleDay = if (billingEnabled) billingDay else null,
-                        billingLimitType = if (billingEnabled) billingLimitType.value else BillingLimitType.CREDIT.value,
-                        billingLimitAmount = if (billingEnabled) billingLimitAmount else null
-                    ) ?: PaymentMethod(
-                        name = name.trim(),
-                        icon = selectedIcon,
-                        color = selectedColor,
                         type = selectedType,
-                        parentId = parentId,
-                        billingCycleType = if (billingEnabled) BillingCycleType.MONTHLY_CLOSING_DAY.value else BillingCycleType.NONE.value,
-                        billingCycleDay = if (billingEnabled) billingDay else null,
-                        billingLimitType = if (billingEnabled) billingLimitType.value else BillingLimitType.CREDIT.value,
-                        billingLimitAmount = if (billingEnabled) billingLimitAmount else null
+                        parentId = parentId
+                    )).copy(
+                        name = name.trim(),
+                        icon = selectedIcon,
+                        color = selectedColor,
+                        billingCycleType = if (billingActive) BillingCycleType.MONTHLY_CLOSING_DAY.value else BillingCycleType.NONE.value,
+                        billingCycleDay = if (billingActive) billingDay else null,
+                        billingLimitType = if (billingActive) billingLimitType.value else BillingLimitType.CREDIT.value,
+                        billingLimitAmount = if (billingActive) billingLimitAmount else null
                     )
                     onConfirm(finalMethod)
                 },

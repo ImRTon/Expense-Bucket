@@ -46,6 +46,15 @@ interface TransactionDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertTransaction(transaction: Transaction): Long
 
+    @Insert(onConflict = OnConflictStrategy.IGNORE)
+    suspend fun insertNfcTransactions(transactions: List<Transaction>): List<Long>
+
+    @Query("SELECT * FROM transactions WHERE paymentMethodId = :methodId AND currency = 'JPY' COLLATE NOCASE AND isExpense = 1 AND date >= :since")
+    suspend fun getNfcImportCandidates(methodId: Long, since: Long): List<Transaction>
+
+    @Query("SELECT nfcReference FROM transactions WHERE nfcReference IN (:references)")
+    suspend fun getImportedNfcReferences(references: List<String>): List<String>
+
     @Query("SELECT * FROM notification_captures WHERE capturedAt >= :recentSince ORDER BY capturedAt DESC")
     suspend fun getRecentNotificationCaptures(recentSince: Long): List<NotificationCapture>
 

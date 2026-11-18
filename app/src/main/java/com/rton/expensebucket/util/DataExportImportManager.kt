@@ -7,6 +7,7 @@ import android.util.Log
 import com.rton.expensebucket.data.model.Category
 import com.rton.expensebucket.data.model.PaymentMethod
 import com.rton.expensebucket.data.model.Project
+import com.rton.expensebucket.data.model.StoredValueBalance
 import com.rton.expensebucket.data.model.Transaction
 import com.rton.expensebucket.data.model.TransactionItem
 import com.rton.expensebucket.data.model.TransactionItemConverter
@@ -55,6 +56,8 @@ data class ImportSummary(
 class DataExportImportManager @Inject constructor(
     private val repository: ExpenseBucketRepository
 ) {
+    private val nfcReferencePattern = Regex("[0-9a-f]{64}:\\d{4}-\\d{2}-\\d{2}:\\d{1,5}")
+
     private enum class ExportSection {
         CATEGORIES,
         PAYMENT_METHODS,
@@ -82,7 +85,9 @@ class DataExportImportManager @Inject constructor(
         val billingCycleType: String,
         val billingCycleDay: Int?,
         val billingLimitType: String,
-        val billingLimitAmount: Double?
+        val billingLimitAmount: Double?,
+        val storedValueBalance: StoredValueBalance?,
+        val nfcCardFingerprint: String?
     )
 
     private data class ProjectRecord(
@@ -117,7 +122,8 @@ class DataExportImportManager @Inject constructor(
         val amortizationEnabled: Boolean,
         val amortizationStartYearMonth: Int?,
         val amortizationMonthCount: Int?,
-        val createdAt: Long
+        val createdAt: Long,
+        val nfcReference: String? = null
     )
 
     private data class CategoryKey(
@@ -178,7 +184,10 @@ class DataExportImportManager @Inject constructor(
                     writer.write("\n")
 
                     writer.write("#SECTION:PAYMENT_METHODS\n")
-                    writer.write("name,parentName,icon,color,type,isDefault,sortOrder,billingCycleType,billingCycleDay,billingLimitType,billingLimitAmount\n")
+                    writer.write(
+                        "name,parentName,icon,color,type,isDefault,sortOrder,billingCycleType,billingCycleDay," +
+                            "billingLimitType,billingLimitAmount,storedValueAmount,storedValueAsOf,storedValueCurrency,nfcCardFingerprint\n"
+                    )
                     paymentMethods.forEach { method ->
                         writer.write(
                             toCsvRow(
@@ -193,7 +202,11 @@ class DataExportImportManager @Inject constructor(
                                     method.billingCycleType,
                                     method.billingCycleDay?.toString().orEmpty(),
                                     method.billingLimitType,
-                                    method.billingLimitAmount?.toString().orEmpty()
+                                    method.billingLimitAmount?.toString().orEmpty(),
+                                    method.storedValueBalance?.amount?.toString().orEmpty(),
+                                    method.storedValueBalance?.asOf?.toString().orEmpty(),
+                                    method.storedValueBalance?.currency.orEmpty(),
+                                    method.nfcCardFingerprint.orEmpty()
                                 )
                             ) + "\n"
                         )
@@ -222,7 +235,7 @@ class DataExportImportManager @Inject constructor(
                     writer.write("\n")
 
                     writer.write("#SECTION:TRANSACTIONS\n")
-                    writer.write("amount,personalAmount,note,categoryPath,projectName,projectCurrency,projectStartDate,projectEndDate,paymentMethodPath,date,currency,exchangeRate,isExpense,source,isDraft,amortizationEnabled,amortizationStartYearMonth,amortizationMonthCount,createdAt,items\n")
+                    writer.write("amount,personalAmount,note,categoryPath,projectName,projectCurrency,projectStartDate,projectEndDate,paymentMethodPath,date,currency,exchangeRate,isExpense,source,isDraft,amortizationEnabled,amortizationStartYearMonth,amortizationMonthCount,createdAt,items,nfcReference\n")
                     transactions.forEach { transaction ->
                         val categoryPath = transaction.categoryId
                             ?.let { categoryById[it] }
@@ -256,7 +269,8 @@ class DataExportImportManager @Inject constructor(
                                     transaction.amortizationStartYearMonth?.toString().orEmpty(),
                                     transaction.amortizationMonthCount?.toString().orEmpty(),
                                     transaction.createdAt.toString(),
-                                    TransactionItemConverter().encode(transaction.items)
+                                    TransactionItemConverter().encode(transaction.items),
+                                    transaction.nfcReference.orEmpty()
                                 )
                             ) + "\n"
                         )
@@ -338,7 +352,10 @@ class DataExportImportManager @Inject constructor(
                             billingCycleType = valueAt(values, currentHeader, "billingCycleType"),
                             billingCycleDay = valueAt(values, currentHeader, "billingCycleDay").toIntOrNull(),
                             billingLimitType = valueAt(values, currentHeader, "billingLimitType"),
-                            billingLimitAmount = valueAt(values, currentHeader, "billingLimitAmount").toDoubleOrNull()
+                            billingLimitAmount = valueAt(values, currentHeader, "billingLimitAmount").toDoubleOrNull(),
+                            storedValueBalance = parseStoredValueBalance(values, currentHeader),
+                            nfcCardFingerprint = valueAt(values, currentHeader, "nfcCardFingerprint")
+                                .takeIf { it.length == 64 && it.all { char -> char in "0123456789abcdef" } }
                         )
                         ExportSection.PROJECTS -> projectRecords += ProjectRecord(
                             name = valueAt(values, currentHeader, "name"),
@@ -371,7 +388,8 @@ class DataExportImportManager @Inject constructor(
                             amortizationEnabled = valueAt(values, currentHeader, "amortizationEnabled").toBooleanStrictOrNull() ?: false,
                             amortizationStartYearMonth = valueAt(values, currentHeader, "amortizationStartYearMonth").toIntOrNull(),
                             amortizationMonthCount = valueAt(values, currentHeader, "amortizationMonthCount").toIntOrNull(),
-                            createdAt = parseDateValue(valueAt(values, currentHeader, "createdAt")) ?: System.currentTimeMillis()
+                            createdAt = parseDateValue(valueAt(values, currentHeader, "createdAt")) ?: System.currentTimeMillis(),
+                            nfcReference = valueAt(values, currentHeader, "nfcReference").takeIf(nfcReferencePattern::matches)
                         )
                     }
                 }
@@ -509,7 +527,13 @@ class DataExportImportManager @Inject constructor(
             val key = PaymentMethodKey(path, record.type)
             val existingId = methodIdByKey[key]
             if (existingId != null) {
-                skipped++
+                val bindingRestored = record.nfcCardFingerprint?.let {
+                    repository.restoreNfcCardBinding(existingId, it)
+                } == 1
+                val restored = record.storedValueBalance?.let {
+                    repository.setStoredValueBalance(existingId, it, onlyIfUnset = true)
+                } == 1
+                if (restored || bindingRestored) imported++ else skipped++
                 if (record.isDefault) defaultMethodId = existingId
                 return@forEach
             }
@@ -525,23 +549,7 @@ class DataExportImportManager @Inject constructor(
                 return@forEach
             }
 
-            val insertedId = repository.insertPaymentMethod(
-                PaymentMethod(
-                    name = record.name,
-                    icon = record.icon,
-                    color = record.color,
-                    type = record.type,
-                    isDefault = false,
-                    parentId = parentId,
-                    sortOrder = record.sortOrder,
-                    billingCycleType = record.billingCycleType.ifBlank { "none" },
-                    billingCycleDay = record.billingCycleDay,
-                    billingLimitType = record.billingLimitType.ifBlank { "credit" },
-                    billingLimitAmount = record.billingLimitAmount
-                )
-            )
-            methodById[insertedId] = PaymentMethod(
-                id = insertedId,
+            val method = PaymentMethod(
                 name = record.name,
                 icon = record.icon,
                 color = record.color,
@@ -552,8 +560,11 @@ class DataExportImportManager @Inject constructor(
                 billingCycleType = record.billingCycleType.ifBlank { "none" },
                 billingCycleDay = record.billingCycleDay,
                 billingLimitType = record.billingLimitType.ifBlank { "credit" },
-                billingLimitAmount = record.billingLimitAmount
+                billingLimitAmount = record.billingLimitAmount,
+                storedValueBalance = record.storedValueBalance
             )
+            val insertedId = repository.insertPaymentMethod(method)
+            record.nfcCardFingerprint?.let { repository.restoreNfcCardBinding(insertedId, it) }
             methodIdByKey[key] = insertedId
             if (record.isDefault) defaultMethodId = insertedId
             imported++
@@ -671,8 +682,7 @@ class DataExportImportManager @Inject constructor(
                 else -> projectByName[normalizeKey(record.projectName)]?.id
             }
 
-            repository.insertTransaction(
-                Transaction(
+            val transaction = Transaction(
                     amount = record.amount,
                     personalAmount = record.personalAmount?.takeIf { record.isExpense && it > 0 },
                     note = record.note,
@@ -696,10 +706,15 @@ class DataExportImportManager @Inject constructor(
                     amortizationMonthCount = record.amortizationMonthCount?.takeIf {
                         record.isExpense && record.amortizationEnabled && it >= 2 && record.amortizationStartYearMonth != null
                     },
-                    createdAt = record.createdAt
-                )
+                    createdAt = record.createdAt,
+                    nfcReference = record.nfcReference
             )
-            imported++
+            val insertedId = if (transaction.nfcReference != null) {
+                repository.restoreNfcTransaction(transaction)
+            } else {
+                repository.insertTransaction(transaction)
+            }
+            if (insertedId != -1L) imported++
         }
 
         return imported
@@ -791,6 +806,15 @@ class DataExportImportManager @Inject constructor(
             record += "\n$nextLine"
         }
         return record
+    }
+
+    private fun parseStoredValueBalance(values: List<String>, header: Map<String, Int>): StoredValueBalance? {
+        val amount = valueAt(values, header, "storedValueAmount").toDoubleOrNull()
+            ?.takeIf { it.isFinite() } ?: return null
+        val asOf = valueAt(values, header, "storedValueAsOf").toLongOrNull() ?: return null
+        val currency = valueAt(values, header, "storedValueCurrency").uppercase(Locale.ROOT)
+        if (currency !in setOf("TWD", "JPY")) return null
+        return StoredValueBalance(amount, asOf, currency)
     }
 
     private fun valueAt(values: List<String>, header: Map<String, Int>, name: String): String =

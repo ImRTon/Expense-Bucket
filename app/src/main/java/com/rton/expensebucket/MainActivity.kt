@@ -241,7 +241,6 @@ fun ExpensesApp(
     val activeProjects by viewModel.activeProjects.collectAsStateWithLifecycle()
     val projectExpenseTotals by viewModel.projectExpenseTotals.collectAsStateWithLifecycle()
     val allPaymentMethods by viewModel.allPaymentMethods.collectAsStateWithLifecycle()
-    val paymentMethodBillingSummaries by viewModel.paymentMethodBillingSummaries.collectAsStateWithLifecycle()
     val compareMode by viewModel.compareMode.collectAsStateWithLifecycle()
     val firstDayOfWeek by viewModel.firstDayOfWeek.collectAsStateWithLifecycle()
 
@@ -561,13 +560,20 @@ fun ExpensesApp(
 
             // ─── Payment Methods ────────────────────────────────────
             composable(Screen.PaymentMethods.route) {
+                val billingSummaries by viewModel.paymentMethodBillingSummaries.collectAsStateWithLifecycle()
+                val balances by viewModel.paymentMethodBalances.collectAsStateWithLifecycle()
                 PaymentMethodsScreen(
                     paymentMethods = allPaymentMethods,
-                    billingSummaries = paymentMethodBillingSummaries,
+                    billingSummaries = billingSummaries,
+                    balances = balances,
                     onAdd = { viewModel.addPaymentMethod(it) },
                     onEdit = { viewModel.updatePaymentMethod(it) },
                     onDelete = { viewModel.deletePaymentMethod(it) },
-                    onSetDefault = { viewModel.setDefaultPaymentMethod(it) }
+                    onSetDefault = { viewModel.setDefaultPaymentMethod(it) },
+                    onReconcileBalance = viewModel::reconcilePaymentMethodBalance,
+                    onTopUp = viewModel::topUpPaymentMethodBalance,
+                    onPreviewTransitCard = viewModel::previewTransitCard,
+                    onSaveTransitCard = viewModel::saveTransitCard
                 )
             }
 

@@ -7,6 +7,8 @@ import androidx.sqlite.db.framework.FrameworkSQLiteOpenHelperFactory
 import androidx.test.platform.app.InstrumentationRegistry
 import com.rton.expensebucket.data.DefaultPaymentMethods
 import com.rton.expensebucket.data.ExpenseBucketDatabase
+import com.rton.expensebucket.data.model.StoredValueBalance
+import com.rton.expensebucket.util.StoredValueCalculator
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.json.JSONObject
@@ -54,6 +56,30 @@ class PaymentMethodDefaultsMigrationTest {
             for (key in DefaultPaymentMethods.addedIconKeys) {
                 assertEquals(1, methods.count { it.icon == key })
             }
+        }
+    }
+
+    @Test
+    fun upgrade_allowsTopUpAndReconciliationWithoutAddingTransactions() = runBlocking {
+        withVersion13Database("payment_stored_value_migration", false) { database ->
+            val methods = database.paymentMethodDao()
+            val card = methods.getPaymentMethodById(24)!!
+            val transactions = database.transactionDao().getAllConfirmedTransactions().first()
+            assertNull(card.storedValueBalance)
+            assertEquals(1, methods.setStoredValueBalance(card.id, 500.0, 999_999, "JPY", false))
+            methods.topUpStoredValueBalance(card.id, 200.0)
+            methods.updatePaymentMethodDetails(card.copy(name = "My ICOCA"))
+
+            val toppedUp = methods.getPaymentMethodById(card.id)!!
+            assertEquals("My ICOCA", toppedUp.name)
+            assertEquals(StoredValueBalance(700.0, 999_999, "JPY"), toppedUp.storedValueBalance)
+            assertEquals(600.0, StoredValueCalculator.currentBalance(toppedUp, transactions)!!, 0.0)
+            assertEquals(0, methods.setStoredValueBalance(card.id, 20.0, 999_999, "JPY", true))
+
+            assertEquals(1, methods.setStoredValueBalance(card.id, 350.0, 1_000_000, "JPY", false))
+            val reconciled = methods.getPaymentMethodById(card.id)!!
+            assertEquals(350.0, StoredValueCalculator.currentBalance(reconciled, transactions)!!, 0.0)
+            assertEquals(transactions, database.transactionDao().getAllConfirmedTransactions().first())
         }
     }
 
@@ -119,7 +145,12 @@ class PaymentMethodDefaultsMigrationTest {
             helper.writableDatabase
             helper.close()
             val database = Room.databaseBuilder(context, ExpenseBucketDatabase::class.java, name)
-                .addMigrations(ExpenseBucketDatabase.MIGRATION_13_14).build()
+                .addMigrations(
+                    ExpenseBucketDatabase.MIGRATION_13_14,
+                    ExpenseBucketDatabase.MIGRATION_14_15,
+                    ExpenseBucketDatabase.MIGRATION_15_16
+                )
+                .build()
             try { verify(database) } finally { database.close() }
         } finally {
             helper.close()
