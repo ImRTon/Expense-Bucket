@@ -14,6 +14,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
 import androidx.compose.ui.graphics.drawscope.translate
 import androidx.compose.ui.res.imageResource
@@ -81,19 +82,23 @@ private val suicaSilhouette = Path().apply {
     cubicTo(605f, 293f, 607f, 273f, 616f, 263f)
     cubicTo(626f, 251f, 647f, 252f, 657f, 263f)
     cubicTo(665f, 272f, 665f, 283f, 665f, 294f)
-    cubicTo(675f, 309f, 694f, 324f, 710f, 338f)
-    cubicTo(723f, 351f, 731f, 364f, 732f, 372f)
-    cubicTo(722f, 366f, 714f, 361f, 709f, 358f)
-    cubicTo(718f, 372f, 720f, 389f, 724f, 402f)
+    cubicTo(678f, 311f, 700f, 340f, 709f, 358f)
+    cubicTo(719f, 376f, 719f, 391f, 724f, 402f)
     cubicTo(728f, 407f, 737f, 406f, 737f, 413f)
     cubicTo(733f, 422f, 716f, 422f, 703f, 423f)
     cubicTo(690f, 431f, 671f, 435f, 653f, 438f)
     cubicTo(662f, 428f, 656f, 415f, 649f, 404f)
     cubicTo(634f, 382f, 619f, 365f, 617f, 348f)
+    cubicTo(615f, 333f, 619f, 315f, 619f, 304f)
+    close()
+}
+
+private val suicaForwardFlipper = Path().apply {
+    moveTo(623f, 324f)
+    quadraticTo(627f, 338f, 617f, 348f)
     cubicTo(607f, 357f, 590f, 337f, 581f, 327f)
     cubicTo(568f, 309f, 584f, 313f, 592f, 321f)
     cubicTo(604f, 332f, 610f, 336f, 615f, 325f)
-    cubicTo(618f, 317f, 619f, 311f, 619f, 304f)
     close()
 }
 
@@ -109,7 +114,16 @@ private val suicaBelly = Path().apply {
     close()
 }
 
-private val suicaFlipperMark = Path().apply {
+private val suicaRearFlipper = Path().apply {
+    moveTo(663f, 301f)
+    cubicTo(678f, 307f, 697f, 325f, 710f, 338f)
+    cubicTo(723f, 351f, 731f, 364f, 732f, 372f)
+    cubicTo(721f, 370f, 713f, 362f, 696f, 353f)
+    cubicTo(682f, 345f, 667f, 336f, 664f, 323f)
+    close()
+}
+
+private val suicaRearFlipperMark = Path().apply {
     moveTo(678f, 330f)
     cubicTo(693f, 331f, 717f, 352f, 725f, 365f)
     cubicTo(712f, 352f, 687f, 346f, 678f, 334f)
@@ -141,15 +155,28 @@ private fun DrawScope.drawSuicaMascot(progress: Float) {
         translate(frontFoot.x, frontFoot.y) { drawPath(suicaFoot, ink) }
 
         translate(bodyX, bodyY) {
-            drawPath(suicaSilhouette, ink)
-            drawPath(suicaBelly, white)
-            drawPath(suicaFlipperMark, white)
-            drawCircle(white, 5f, Offset(621f, 280f))
-            drawCircle(ink, 2.65f, Offset(621f, 280f))
-            drawCircle(white, 5f, Offset(650f, 277f))
-            drawCircle(ink, 2.65f, Offset(650f, 277f))
-            drawOval(white, Offset(628f, 279f), Size(16f, 14f))
-            drawLine(ink, Offset(631f, 286f), Offset(641f, 285f), 2f, StrokeCap.Round)
+            rotate(degrees = -5f * lift, pivot = Offset(676f, 421f)) {
+                drawSuicaTorso(lift, ink, white)
+            }
         }
     }
+}
+
+private fun DrawScope.drawSuicaTorso(stride: Float, ink: Color, white: Color) {
+    // The flippers counter-swing around their shoulders, with both tips below shoulder height.
+    rotate(degrees = -88f + 49f * stride, pivot = Offset(619f, 335f)) {
+        drawPath(suicaForwardFlipper, ink)
+    }
+    drawPath(suicaSilhouette, ink)
+    drawPath(suicaBelly, white)
+    rotate(degrees = -28f * stride, pivot = Offset(670f, 324f)) {
+        drawPath(suicaRearFlipper, ink)
+        drawPath(suicaRearFlipperMark, white)
+    }
+    drawCircle(white, 5f, Offset(621f, 280f))
+    drawCircle(ink, 2.65f, Offset(621f, 280f))
+    drawCircle(white, 5f, Offset(650f, 277f))
+    drawCircle(ink, 2.65f, Offset(650f, 277f))
+    drawOval(white, Offset(628f, 279f), Size(16f, 14f))
+    drawLine(ink, Offset(631f, 286f), Offset(641f, 285f), 2f, StrokeCap.Round)
 }
