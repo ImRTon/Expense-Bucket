@@ -123,7 +123,8 @@ class DataExportImportManager @Inject constructor(
         val amortizationStartYearMonth: Int?,
         val amortizationMonthCount: Int?,
         val createdAt: Long,
-        val nfcReference: String? = null
+        val nfcReference: String? = null,
+        val paymentMethodChangedAt: Long? = null
     )
 
     private data class CategoryKey(
@@ -235,7 +236,7 @@ class DataExportImportManager @Inject constructor(
                     writer.write("\n")
 
                     writer.write("#SECTION:TRANSACTIONS\n")
-                    writer.write("amount,personalAmount,note,categoryPath,projectName,projectCurrency,projectStartDate,projectEndDate,paymentMethodPath,date,currency,exchangeRate,isExpense,source,isDraft,amortizationEnabled,amortizationStartYearMonth,amortizationMonthCount,createdAt,items,nfcReference\n")
+                    writer.write("amount,personalAmount,note,categoryPath,projectName,projectCurrency,projectStartDate,projectEndDate,paymentMethodPath,date,currency,exchangeRate,isExpense,source,isDraft,amortizationEnabled,amortizationStartYearMonth,amortizationMonthCount,createdAt,items,nfcReference,paymentMethodChangedAt\n")
                     transactions.forEach { transaction ->
                         val categoryPath = transaction.categoryId
                             ?.let { categoryById[it] }
@@ -270,7 +271,8 @@ class DataExportImportManager @Inject constructor(
                                     transaction.amortizationMonthCount?.toString().orEmpty(),
                                     transaction.createdAt.toString(),
                                     TransactionItemConverter().encode(transaction.items),
-                                    transaction.nfcReference.orEmpty()
+                                    transaction.nfcReference.orEmpty(),
+                                    transaction.paymentMethodChangedAt?.toString().orEmpty()
                                 )
                             ) + "\n"
                         )
@@ -389,7 +391,8 @@ class DataExportImportManager @Inject constructor(
                             amortizationStartYearMonth = valueAt(values, currentHeader, "amortizationStartYearMonth").toIntOrNull(),
                             amortizationMonthCount = valueAt(values, currentHeader, "amortizationMonthCount").toIntOrNull(),
                             createdAt = parseDateValue(valueAt(values, currentHeader, "createdAt")) ?: System.currentTimeMillis(),
-                            nfcReference = valueAt(values, currentHeader, "nfcReference").takeIf(nfcReferencePattern::matches)
+                            nfcReference = valueAt(values, currentHeader, "nfcReference").takeIf(nfcReferencePattern::matches),
+                            paymentMethodChangedAt = valueAt(values, currentHeader, "paymentMethodChangedAt").toLongOrNull()
                         )
                     }
                 }
@@ -707,7 +710,8 @@ class DataExportImportManager @Inject constructor(
                         record.isExpense && record.amortizationEnabled && it >= 2 && record.amortizationStartYearMonth != null
                     },
                     createdAt = record.createdAt,
-                    nfcReference = record.nfcReference
+                    nfcReference = record.nfcReference,
+                    paymentMethodChangedAt = record.paymentMethodChangedAt
             )
             val insertedId = if (transaction.nfcReference != null) {
                 repository.restoreNfcTransaction(transaction)

@@ -139,7 +139,8 @@ data class Transaction(
     val amortizationMonthCount: Int? = null,
     @ColumnInfo(defaultValue = "'[]'") val items: List<TransactionItem> = emptyList(),
     val createdAt: Long = System.currentTimeMillis(),
-    val nfcReference: String? = null
+    val nfcReference: String? = null,
+    val paymentMethodChangedAt: Long? = null
 )
 
 /**

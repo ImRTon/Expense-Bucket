@@ -52,6 +52,16 @@ class StoredValueCalculatorTest {
     }
 
     @Test
+    fun currentBalance_deductsAnOlderExpenseReassignedAfterReconciliation() {
+        val expense = ride.copy(date = 99, paymentMethodChangedAt = 101)
+        val reconciledCard = card.copy(storedValueBalance = StoredValueBalance(440.0, 101, "JPY"))
+
+        assertEquals(440.0, StoredValueCalculator.currentBalance(card, listOf(expense))!!, 0.0)
+        assertEquals(500.0, StoredValueCalculator.currentBalance(card, listOf(expense.copy(paymentMethodId = 7)))!!, 0.0)
+        assertEquals(440.0, StoredValueCalculator.currentBalance(reconciledCard, listOf(expense))!!, 0.0)
+    }
+
+    @Test
     fun storedValueCurrency_usesCardCurrencyAndKeepsItAfterChangingTheIcon() {
         val transitGroup = PaymentMethod(id = 2, name = "電子票證", icon = "transit_card")
         val child = PaymentMethod(id = 3, name = "My transit pass", icon = "other", parentId = transitGroup.id)

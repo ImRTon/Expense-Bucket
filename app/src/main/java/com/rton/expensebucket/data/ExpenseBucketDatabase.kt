@@ -1,5 +1,6 @@
 package com.rton.expensebucket.data
 
+import androidx.room.AutoMigration
 import androidx.room.Database
 import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
@@ -20,7 +21,8 @@ import com.rton.expensebucket.data.model.TransactionItemConverter
 
 @Database(
     entities = [Transaction::class, Category::class, Project::class, PaymentMethod::class, NonPaymentNotification::class, NotificationCapture::class],
-    version = 16,
+    version = 17,
+    autoMigrations = [AutoMigration(from = 16, to = 17)],
     exportSchema = true
 )
 @TypeConverters(TransactionItemConverter::class)

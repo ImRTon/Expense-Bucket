@@ -19,11 +19,12 @@ object StoredValueCalculator {
     fun currentBalance(method: PaymentMethod, transactions: List<Transaction>): Double? {
         val balance = method.storedValueBalance ?: return null
         val importedFromCard = method.nfcCardFingerprint?.let { "$it:" }
-        // The physical balance already includes transactions at or before the last reconciliation.
+        // A payment method correction can assign an older expense to this card after reconciliation.
         val spending = transactions.asSequence()
             .filter { it.paymentMethodId == method.id && it.isExpense && !it.isDraft }
             .filterNot { importedFromCard != null && it.nfcReference?.startsWith(importedFromCard) == true }
-            .filter { it.date > balance.asOf && it.currency.equals(balance.currency, ignoreCase = true) }
+            .filter { it.currency.equals(balance.currency, ignoreCase = true) }
+            .filter { maxOf(it.date, it.paymentMethodChangedAt ?: it.date) > balance.asOf }
             .sumOf { it.amount }
         return balance.amount - spending
     }

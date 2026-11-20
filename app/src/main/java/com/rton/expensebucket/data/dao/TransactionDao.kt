@@ -89,7 +89,18 @@ interface TransactionDao {
     }
 
     @Update
-    suspend fun updateTransaction(transaction: Transaction)
+    suspend fun updateTransactionRow(transaction: Transaction)
+
+    @RoomTransaction
+    suspend fun updateTransaction(transaction: Transaction) {
+        val previous = getTransactionById(transaction.id) ?: return
+        val paymentMethodChangedAt = when {
+            transaction.paymentMethodId == null -> null
+            transaction.paymentMethodId != previous.paymentMethodId -> System.currentTimeMillis()
+            else -> previous.paymentMethodChangedAt
+        }
+        updateTransactionRow(transaction.copy(paymentMethodChangedAt = paymentMethodChangedAt))
+    }
 
     @Delete
     suspend fun deleteTransaction(transaction: Transaction)
