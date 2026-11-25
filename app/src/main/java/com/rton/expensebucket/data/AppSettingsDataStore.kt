@@ -3,6 +3,7 @@ package com.rton.expensebucket.data
 import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
@@ -37,6 +38,7 @@ class AppSettingsDataStore @Inject constructor(
         private val APP_PALETTE_KEY = stringPreferencesKey("app_palette")
         private val COMPARE_MODE_KEY = stringPreferencesKey("compare_mode")
         private val FIRST_DAY_OF_WEEK_KEY = intPreferencesKey("first_day_of_week")
+        private val SCREENSHOT_OCR_ENABLED_KEY = booleanPreferencesKey("screenshot_ocr_enabled")
     }
 
     val theme: Flow<AppTheme> = context.appSettingsDataStore.data.map { prefs ->
@@ -91,6 +93,30 @@ class AppSettingsDataStore @Inject constructor(
     suspend fun setFirstDayOfWeek(day: Int) {
         context.appSettingsDataStore.edit { prefs ->
             prefs[FIRST_DAY_OF_WEEK_KEY] = day
+        }
+    }
+
+    val screenshotOcrEnabled: Flow<Boolean> = context.appSettingsDataStore.data.map { prefs ->
+        prefs[SCREENSHOT_OCR_ENABLED_KEY] ?: true
+    }
+
+    suspend fun setScreenshotOcrEnabled(enabled: Boolean) {
+        context.appSettingsDataStore.edit { prefs ->
+            prefs[SCREENSHOT_OCR_ENABLED_KEY] = enabled
+        }
+    }
+
+    internal suspend fun restoreBackupSettings(
+        theme: AppTheme,
+        palette: AppPalette,
+        compareMode: String,
+        firstDayOfWeek: Int
+    ) {
+        context.appSettingsDataStore.edit { prefs ->
+            prefs[APP_THEME_KEY] = theme.name
+            prefs[APP_PALETTE_KEY] = palette.name
+            prefs[COMPARE_MODE_KEY] = compareMode
+            prefs[FIRST_DAY_OF_WEEK_KEY] = firstDayOfWeek
         }
     }
 }

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cloud_backup_title">Google Drive 备份</string>
+    <string name="cloud_backup_settings_hint">自动备份和恢复账本</string>
+    <string name="cloud_backup_connect_hint">关联 Google 账号后，可以自动备份账本，或在换手机时恢复数据。</string>
+    <string name="cloud_backup_connect">关联 Google 账号</string>
+    <string name="cloud_backup_reconnect">重新授权</string>
+    <string name="cloud_backup_disconnect">移除此设备的关联</string>
+    <string name="cloud_backup_paused">自动备份已关闭</string>
+    <string name="cloud_backup_daily">有网络时，系统约每天备份一次。</string>
+    <string name="cloud_backup_latest">上次成功备份：%1$s</string>
+    <string name="cloud_backup_enable">启用自动备份</string>
+    <string name="cloud_backup_pause">关闭自动备份</string>
+    <string name="cloud_backup_now">立即备份</string>
+    <string name="cloud_backup_uploading">正在备份…</string>
+    <string name="cloud_backup_queued">等待系统执行备份…</string>
+    <string name="cloud_backup_find">从 Google Drive 恢复</string>
+    <string name="cloud_backup_no_files">此账号还没有云端备份。</string>
+    <string name="cloud_backup_password">备份密码</string>
+    <string name="cloud_backup_repeat_password">再次输入备份密码</string>
+    <string name="cloud_backup_password_hint">请设置至少 12 个字符的密码。换机恢复时需要此密码，请妥善保存。</string>
+    <string name="cloud_backup_unlock">解锁备份</string>
+    <string name="cloud_backup_unlock_hint">输入创建此备份时设置的密码。</string>
+    <string name="cloud_backup_review">检查备份和恢复方式</string>
+    <string name="cloud_backup_remote_time">备份时间：%1$s</string>
+    <string name="cloud_backup_remote_count">云端备份：%1$d 笔交易（含草稿）</string>
+    <string name="cloud_backup_local_count">此手机：%1$d 笔交易（含草稿）</string>
+    <string name="cloud_backup_merge">合并账本</string>
+    <string name="cloud_backup_merge_hint">保留本机账本和设置，添加备份中未有的交易。</string>
+    <string name="cloud_backup_overwrite">覆盖本机账本</string>
+    <string name="cloud_backup_overwrite_hint">用备份替换此手机的账本、预算及相关设置。本机独有的交易会被移除。</string>
+    <string name="cloud_backup_skip">跳过此备份</string>
+    <string name="cloud_backup_merge_done">合并完成，已添加 %1$d 笔交易。</string>
+    <string name="cloud_backup_restore_done">恢复完成，已恢复 %1$d 笔交易。</string>
+    <string name="cloud_backup_password_invalid">无法解锁此备份，请确认备份密码。</string>
+    <string name="cloud_backup_authorize_again">Google Drive 授权已失效，请重新授权。</string>
+    <string name="cloud_backup_authorization_incomplete">Google 授权未完成。如果账号窗口立即关闭，请检查此版本的 Android OAuth 客户端与 Google Drive API 配置。</string>
+    <string name="cloud_backup_configuration">Google Drive 拒绝访问。请确认 Google Cloud 已启用 Drive API，并注册此版本的包名与签名 SHA-1。</string>
+    <string name="cloud_backup_too_large">此备份超出当前支持的大小。</string>
+    <string name="cloud_backup_update_required">请更新 App，再恢复此备份。</string>
+    <string name="cloud_backup_key_missing">此手机的备份密钥已失效，请关闭后重新启用自动备份。</string>
+    <string name="cloud_backup_failed">Google Drive 操作未完成，请检查网络连接后重试。</string>
+    <string name="cloud_backup_latest_transaction">最新一笔交易日期：%1$s</string>
+</resources>

@@ -7,6 +7,7 @@ import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
 import com.rton.expensebucket.data.dao.CategoryDao
+import com.rton.expensebucket.data.dao.CloudBackupDao
 import com.rton.expensebucket.data.dao.NonPaymentNotificationDao
 import com.rton.expensebucket.data.dao.PaymentMethodDao
 import com.rton.expensebucket.data.dao.ProjectDao
@@ -32,6 +33,7 @@ abstract class ExpenseBucketDatabase : RoomDatabase() {
     abstract fun projectDao(): ProjectDao
     abstract fun paymentMethodDao(): PaymentMethodDao
     abstract fun nonPaymentNotificationDao(): NonPaymentNotificationDao
+    abstract fun cloudBackupDao(): CloudBackupDao
 
     companion object {
         val MIGRATION_15_16 = object : Migration(15, 16) {

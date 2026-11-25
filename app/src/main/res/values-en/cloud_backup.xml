@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cloud_backup_title">Google Drive backup</string>
+    <string name="cloud_backup_settings_hint">Automatic backup and restore</string>
+    <string name="cloud_backup_connect_hint">Connect a Google account to back up your ledger automatically or restore it on a new phone.</string>
+    <string name="cloud_backup_connect">Connect Google account</string>
+    <string name="cloud_backup_reconnect">Reconnect</string>
+    <string name="cloud_backup_disconnect">Disconnect this device</string>
+    <string name="cloud_backup_paused">Automatic backup is off</string>
+    <string name="cloud_backup_daily">Android backs up about once a day when online.</string>
+    <string name="cloud_backup_latest">Last successful backup: %1$s</string>
+    <string name="cloud_backup_enable">Turn on automatic backup</string>
+    <string name="cloud_backup_pause">Turn off automatic backup</string>
+    <string name="cloud_backup_now">Back up now</string>
+    <string name="cloud_backup_uploading">Backing up…</string>
+    <string name="cloud_backup_queued">Waiting for Android to run the backup…</string>
+    <string name="cloud_backup_find">Restore from Google Drive</string>
+    <string name="cloud_backup_no_files">This account has no cloud backups yet.</string>
+    <string name="cloud_backup_password">Backup password</string>
+    <string name="cloud_backup_repeat_password">Confirm backup password</string>
+    <string name="cloud_backup_password_hint">Use at least 12 characters. Keep this password somewhere safe so you can restore on a new phone.</string>
+    <string name="cloud_backup_unlock">Unlock backup</string>
+    <string name="cloud_backup_unlock_hint">Enter the password used to create this backup.</string>
+    <string name="cloud_backup_review">Review backup and restore options</string>
+    <string name="cloud_backup_remote_time">Backup time: %1$s</string>
+    <string name="cloud_backup_remote_count">Cloud transactions including drafts: %1$d</string>
+    <string name="cloud_backup_local_count">Transactions on this phone including drafts: %1$d</string>
+    <string name="cloud_backup_merge">Merge ledgers</string>
+    <string name="cloud_backup_merge_hint">Keep your local ledger and settings and add missing transactions from the backup.</string>
+    <string name="cloud_backup_overwrite">Replace local ledger</string>
+    <string name="cloud_backup_overwrite_hint">Replace this phone’s ledger, budget, and related settings. Transactions found only on this phone will be removed.</string>
+    <string name="cloud_backup_skip">Skip this backup</string>
+    <string name="cloud_backup_merge_done">Merge complete. Transactions added: %1$d.</string>
+    <string name="cloud_backup_restore_done">Restore complete. Transactions restored: %1$d.</string>
+    <string name="cloud_backup_password_invalid">Could not unlock this backup. Check the backup password.</string>
+    <string name="cloud_backup_authorize_again">Google Drive access needs to be renewed. Reconnect your account.</string>
+    <string name="cloud_backup_authorization_incomplete">Google authorization did not complete. If the account window closes immediately, check this build’s Android OAuth client and Google Drive API setup.</string>
+    <string name="cloud_backup_configuration">Google Drive denied access. Enable the Drive API in Google Cloud and register this build’s package name and signing SHA-1.</string>
+    <string name="cloud_backup_too_large">This backup exceeds the supported size.</string>
+    <string name="cloud_backup_update_required">Update the app to restore this backup.</string>
+    <string name="cloud_backup_key_missing">This phone’s backup key is unavailable. Turn automatic backup off and back on.</string>
+    <string name="cloud_backup_failed">The Google Drive operation did not complete. Check your connection and try again.</string>
+    <string name="cloud_backup_latest_transaction">Latest transaction date: %1$s</string>
+</resources>

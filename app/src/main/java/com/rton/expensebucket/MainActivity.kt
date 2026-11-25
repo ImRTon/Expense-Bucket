@@ -20,6 +20,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
 import androidx.navigation.NavType
@@ -28,6 +29,7 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import com.rton.expensebucket.data.AppSettingsDataStore
 import com.rton.expensebucket.navigation.Screen
 import com.rton.expensebucket.ocr.OcrEngine
 import com.rton.expensebucket.ocr.ReceiptOcrEngine
@@ -42,10 +44,13 @@ import javax.inject.Inject
 import android.Manifest
 import android.content.pm.PackageManager
 import android.os.Build
+import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 
@@ -58,6 +63,7 @@ class MainActivity : ComponentActivity() {
 
     @Inject lateinit var ocrEngine: OcrEngine
     @Inject lateinit var receiptOcrEngine: ReceiptOcrEngine
+    @Inject lateinit var appSettingsDataStore: AppSettingsDataStore
 
     /** Reactive state for shared image URI — drives navigation + OCR without recreate(). */
     private val _sharedImageUri = MutableStateFlow<Uri?>(null)
@@ -84,7 +90,7 @@ class MainActivity : ComponentActivity() {
         }
 
         // Handle share intent (image shared from another app)
-        _sharedImageUri.value = handleShareIntent(intent)
+        handleShareIntent(intent)
 
         // Handle deep-link from notification action
         _pendingNavigateTo.value = intent?.getStringExtra("navigate_to")
@@ -128,11 +134,7 @@ class MainActivity : ComponentActivity() {
         setIntent(intent)
 
         // Handle new share intents — no recreate() needed, StateFlow drives recomposition
-        val uri = handleShareIntent(intent)
-        if (uri != null) {
-            _sharedImageUri.value = uri
-            return
-        }
+        if (handleShareIntent(intent)) return
 
         // Handle deep-link from notification
         val navigateTo = intent.getStringExtra("navigate_to")
@@ -142,23 +144,29 @@ class MainActivity : ComponentActivity() {
     }
 
     /**
-     * Extract shared image from intent and copy to internal cache.
-     * Copying immediately ensures we have a readable file:// URI even after
-     * the temporary content URI permission expires (e.g. after recreate / config change).
+     * Check the saved setting before copying the shared image while its URI grant is active.
      */
-    private fun handleShareIntent(intent: Intent?): Uri? {
+    private fun handleShareIntent(intent: Intent?): Boolean {
         if (intent?.action != Intent.ACTION_SEND || intent.type?.startsWith("image/") != true) {
-            return null
+            return false
         }
 
-        val sourceUri: Uri? = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        val sourceUri: Uri = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
         } else {
             @Suppress("DEPRECATION")
             intent.getParcelableExtra(Intent.EXTRA_STREAM) as? Uri
-        }
+        } ?: return false
 
-        return sourceUri?.let { copyToCache(it) }
+        lifecycleScope.launch {
+            if (appSettingsDataStore.screenshotOcrEnabled.first()) {
+                copyToCache(sourceUri)?.let { _sharedImageUri.value = it }
+            } else {
+                intent.removeExtra(Intent.EXTRA_STREAM)
+                Toast.makeText(this@MainActivity, R.string.screenshot_ocr_disabled, Toast.LENGTH_SHORT).show()
+            }
+        }
+        return true
     }
 
     /**
@@ -246,6 +254,40 @@ fun ExpensesApp(
 
     val allCategories = remember(expenseCategories, incomeCategories) {
         expenseCategories + incomeCategories
+    }
+
+    @Composable
+    fun CapturedDrafts(
+        onDismiss: () -> Unit,
+        showAsBottomSheet: Boolean = false,
+        onEnableNotificationAccess: (() -> Unit)? = null
+    ) {
+        val context = androidx.compose.ui.platform.LocalContext.current
+        val notificationManager = context.getSystemService(NotificationManager::class.java)
+        DraftsScreen(
+            drafts = draftTransactions,
+            nonPaymentNotifications = nonPaymentNotifications,
+            categories = allCategories,
+            onConfirm = { id ->
+                notificationManager?.cancel(id.toInt())
+                viewModel.confirmDraft(id)
+            },
+            onDelete = { draft ->
+                notificationManager?.cancel(draft.id.toInt())
+                viewModel.deleteTransaction(draft)
+            },
+            onEdit = { transaction ->
+                navController.navigate(Screen.EditTransaction.createRoute(transaction.id))
+            },
+            onClearDrafts = {
+                draftTransactions.forEach { draft -> notificationManager?.cancel(draft.id.toInt()) }
+                viewModel.clearDrafts()
+            },
+            onClearNonPaymentNotifications = { viewModel.clearNonPaymentNotifications() },
+            onBack = onDismiss,
+            showAsBottomSheet = showAsBottomSheet,
+            onEnableNotificationAccess = onEnableNotificationAccess
+        )
     }
 
     // Navigate to OCR preview if image was shared (only after navGraph is ready)
@@ -580,6 +622,7 @@ fun ExpensesApp(
             // ─── Settings ───────────────────────────────────────────
             composable(Screen.Settings.route) {
                 val firstDayOfWeek by viewModel.firstDayOfWeek.collectAsState()
+                val screenshotOcrEnabled by viewModel.screenshotOcrEnabled.collectAsStateWithLifecycle()
                 SettingsScreen(
                     currentTheme = currentTheme,
                     onSetTheme = { viewModel.setTheme(it) },
@@ -589,19 +632,30 @@ fun ExpensesApp(
                     onSetMonthlyBudget = { viewModel.setMonthlyBudget(it) },
                     firstDayOfWeek = firstDayOfWeek,
                     onSetFirstDayOfWeek = { viewModel.setFirstDayOfWeek(it) },
+                    screenshotOcrEnabled = screenshotOcrEnabled,
+                    onSetScreenshotOcrEnabled = viewModel::setScreenshotOcrEnabled,
                     onNavigateToCategories = {
                         navController.navigate(Screen.CategoryManage.route) {
                             launchSingleTop = true
                         }
                     },
-                    onNavigateToDrafts = {
-                        navController.navigate(Screen.Drafts.route) {
-                            launchSingleTop = true
-                        }
+                    notificationDraftsSheet = { onDismiss, onEnableNotificationAccess ->
+                        CapturedDrafts(
+                            onDismiss = onDismiss,
+                            showAsBottomSheet = true,
+                            onEnableNotificationAccess = onEnableNotificationAccess
+                        )
+                    },
+                    onNavigateToCloudBackup = {
+                        navController.navigate(Screen.CloudBackup.route) { launchSingleTop = true }
                     },
                     onExportData = { ctx, uri, callback -> viewModel.exportData(ctx, uri, callback) },
                     onImportData = { ctx, uri, callback -> viewModel.importData(ctx, uri, callback) }
                 )
+            }
+
+            composable(Screen.CloudBackup.route) {
+                CloudBackupScreen(onBack = { navController.popBackStack() })
             }
 
             // ─── Category Management ───────────────────────────────
@@ -657,30 +711,7 @@ fun ExpensesApp(
 
             // ─── Drafts ─────────────────────────────────────────────
             composable(Screen.Drafts.route) {
-                val context = androidx.compose.ui.platform.LocalContext.current
-                DraftsScreen(
-                    drafts = draftTransactions,
-                    nonPaymentNotifications = nonPaymentNotifications,
-                    categories = allCategories,
-                    onConfirm = { id ->
-                        context.getSystemService(NotificationManager::class.java)?.cancel(id.toInt())
-                        viewModel.confirmDraft(id)
-                    },
-                    onDelete = { draft ->
-                        context.getSystemService(NotificationManager::class.java)?.cancel(draft.id.toInt())
-                        viewModel.deleteTransaction(draft)
-                    },
-                    onEdit = { transaction ->
-                        navController.navigate(Screen.EditTransaction.createRoute(transaction.id))
-                    },
-                    onClearDrafts = {
-                        val nm = context.getSystemService(NotificationManager::class.java)
-                        draftTransactions.forEach { draft -> nm?.cancel(draft.id.toInt()) }
-                        viewModel.clearDrafts()
-                    },
-                    onClearNonPaymentNotifications = { viewModel.clearNonPaymentNotifications() },
-                    onBack = { navController.popBackStack() }
-                )
+                CapturedDrafts(onDismiss = { navController.popBackStack() })
             }
         }
 

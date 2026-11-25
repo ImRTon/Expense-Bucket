@@ -41,7 +41,6 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
 
     companion object {
         private const val TAG = "ExpensesNotifSvc"
-        private const val CHANNEL_ID = "expenses_transaction_capture"
 
         /**
          * Package name prefixes of apps we want to intercept.
@@ -246,7 +245,7 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+        val notification = NotificationCompat.Builder(this, CaptureNotificationContract.CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_notification_expense)
             .setContentTitle(strings.getString(R.string.detected_transaction, typeText, amountText))
             .setContentText(strings.getString(R.string.confirm_notification, typeText, merchantText))
@@ -280,7 +279,7 @@ class ExpenseBucketNotificationService : NotificationListenerService() {
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val channel = NotificationChannel(
-                CHANNEL_ID,
+                CaptureNotificationContract.CHANNEL_ID,
                 strings.getString(R.string.notification_channel),
                 NotificationManager.IMPORTANCE_HIGH
             ).apply {

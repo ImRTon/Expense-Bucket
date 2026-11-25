@@ -21,11 +21,14 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.clickable
 import androidx.lifecycle.Lifecycle
@@ -60,9 +63,15 @@ fun SettingsScreen(
     onSetFirstDayOfWeek: (Int) -> Unit = {},
     onBack: () -> Unit = {},
     onNavigateToCategories: () -> Unit = {},
-    onNavigateToDrafts: () -> Unit = {},
+    notificationDraftsSheet: @Composable (
+        onDismiss: () -> Unit,
+        onEnableNotificationAccess: (() -> Unit)?
+    ) -> Unit = { _, _ -> },
     onExportData: (Context, Uri, (Boolean, String?) -> Unit) -> Unit = { _, _, _ -> },
-    onImportData: (Context, Uri, (Boolean, String?) -> Unit) -> Unit = { _, _, _ -> }
+    onImportData: (Context, Uri, (Boolean, String?) -> Unit) -> Unit = { _, _, _ -> },
+    onNavigateToCloudBackup: () -> Unit = {},
+    screenshotOcrEnabled: Boolean = true,
+    onSetScreenshotOcrEnabled: (Boolean) -> Unit = {}
 ) {
     val strings = LocalContext.current.resources
     val languageContext = LocalContext.current
@@ -107,6 +116,16 @@ fun SettingsScreen(
     var showThemeDialog by remember { mutableStateOf(false) }
     var showPaletteDialog by remember { mutableStateOf(false) }
     var showFirstDayDialog by remember { mutableStateOf(false) }
+    var showScreenshotOcrGuide by rememberSaveable { mutableStateOf(false) }
+    var showNotificationDrafts by rememberSaveable { mutableStateOf(false) }
+
+    if (showScreenshotOcrGuide) {
+        ScreenshotOcrGuideSheet(
+            enabled = screenshotOcrEnabled,
+            onEnabledChange = onSetScreenshotOcrEnabled,
+            onDismiss = { showScreenshotOcrGuide = false }
+        )
+    }
 
     // ─── Theme Dialog ──────────────────────────────────────────
     if (showThemeDialog) {
@@ -438,17 +457,17 @@ fun SettingsScreen(
                 modifier = Modifier.padding(vertical = 8.dp)
             )
 
-            val context = LocalContext.current
             val lifecycleOwner = LocalLifecycleOwner.current
-
-            val notificationEnabled = remember {
+            var notificationEnabled by remember(context) {
                 mutableStateOf(isNotificationListenerEnabled(context))
             }
-            // Refresh when returning from system settings
-            DisposableEffect(lifecycleOwner) {
+            val openNotificationSettings: () -> Unit = {
+                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+            }
+            DisposableEffect(lifecycleOwner, context) {
                 val observer = LifecycleEventObserver { _, event ->
                     if (event == Lifecycle.Event.ON_RESUME) {
-                        notificationEnabled.value = isNotificationListenerEnabled(context)
+                        notificationEnabled = isNotificationListenerEnabled(context)
                     }
                 }
                 lifecycleOwner.lifecycle.addObserver(observer)
@@ -456,28 +475,35 @@ fun SettingsScreen(
                     lifecycleOwner.lifecycle.removeObserver(observer)
                 }
             }
+
+            if (showNotificationDrafts) {
+                notificationDraftsSheet(
+                    { showNotificationDrafts = false },
+                    openNotificationSettings.takeUnless { notificationEnabled }
+                )
+            }
+
             SettingsToggleItem(
                 icon = Icons.Filled.Notifications,
                 title = strings.getString(R.string.notification_capture),
-                subtitle = if (notificationEnabled.value) strings.getString(R.string.notification_capture_enabled)
-                           else strings.getString(R.string.enable_in_system_settings),
-                checked = notificationEnabled.value,
-                onCheckedChange = {
-                    // Open system notification listener settings
-                    context.startActivity(
-                        Intent(android.provider.Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
-                    )
-                },
-                onClick = onNavigateToDrafts
+                subtitle = strings.getString(
+                    if (notificationEnabled) R.string.notification_capture_enabled
+                    else R.string.notification_access_required
+                ),
+                checked = notificationEnabled,
+                onCheckedChange = { openNotificationSettings() },
+                onClick = { showNotificationDrafts = true },
+                onClickLabel = strings.getString(R.string.pending_transactions)
             )
 
-            var ocrEnabled by remember { mutableStateOf(true) }
             SettingsToggleItem(
                 icon = Icons.Filled.DocumentScanner,
                 title = strings.getString(R.string.screenshot_recognition),
                 subtitle = strings.getString(R.string.screenshot_share_hint),
-                checked = ocrEnabled,
-                onCheckedChange = { ocrEnabled = it }
+                checked = screenshotOcrEnabled,
+                onCheckedChange = onSetScreenshotOcrEnabled,
+                onClick = { showScreenshotOcrGuide = true },
+                onClickLabel = strings.getString(R.string.screenshot_ocr_guide_title)
             )
 
             HorizontalDivider(modifier = Modifier.padding(vertical = 8.dp))
@@ -492,6 +518,12 @@ fun SettingsScreen(
                 modifier = Modifier.padding(vertical = 8.dp)
             )
 
+            SettingsItem(
+                icon = Icons.Filled.CloudUpload,
+                title = strings.getString(R.string.cloud_backup_title),
+                subtitle = strings.getString(R.string.cloud_backup_settings_hint),
+                onClick = onNavigateToCloudBackup
+            )
             SettingsItem(
                 icon = Icons.Filled.FileUpload,
                 title = strings.getString(R.string.export_data),
@@ -610,7 +642,8 @@ private fun SettingsToggleItem(
     subtitle: String,
     checked: Boolean,
     onCheckedChange: (Boolean) -> Unit,
-    onClick: (() -> Unit)? = null
+    onClick: (() -> Unit)? = null,
+    onClickLabel: String? = null
 ) {
     Card(
         shape = MaterialTheme.shapes.medium,
@@ -619,7 +652,7 @@ private fun SettingsToggleItem(
         )
     ) {
         val modifier = if (onClick != null) {
-            Modifier.fillMaxWidth().clickable { onClick() }
+            Modifier.fillMaxWidth().clickable(onClickLabel = onClickLabel, onClick = onClick)
         } else {
             Modifier.fillMaxWidth()
         }
@@ -658,7 +691,8 @@ private fun SettingsToggleItem(
             }
             Switch(
                 checked = checked,
-                onCheckedChange = onCheckedChange
+                onCheckedChange = onCheckedChange,
+                modifier = Modifier.semantics { contentDescription = title }
             )
         }
     }
@@ -668,7 +702,7 @@ private fun SettingsToggleItem(
  * Check if our NotificationListenerService has permission.
  */
 private fun isNotificationListenerEnabled(context: Context): Boolean {
-    val cn = ComponentName(context, ExpenseBucketNotificationService::class.java)
-    val flat = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
-    return flat != null && flat.contains(cn.flattenToString())
+    val listener = ComponentName(context, ExpenseBucketNotificationService::class.java)
+    val enabledListeners = Settings.Secure.getString(context.contentResolver, "enabled_notification_listeners")
+    return enabledListeners.orEmpty().split(':').any { ComponentName.unflattenFromString(it) == listener }
 }

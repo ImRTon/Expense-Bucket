@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cloud_backup_title">Google Drive 備份</string>
+    <string name="cloud_backup_settings_hint">自動備份與還原帳本</string>
+    <string name="cloud_backup_connect_hint">連結 Google 帳號後，可以自動備份帳本，或在換手機時還原資料。</string>
+    <string name="cloud_backup_connect">連結 Google 帳號</string>
+    <string name="cloud_backup_reconnect">重新授權</string>
+    <string name="cloud_backup_disconnect">移除此裝置的連結</string>
+    <string name="cloud_backup_paused">自動備份已關閉</string>
+    <string name="cloud_backup_daily">有網路時，系統約每天備份一次。</string>
+    <string name="cloud_backup_latest">上次成功備份：%1$s</string>
+    <string name="cloud_backup_enable">啟用自動備份</string>
+    <string name="cloud_backup_pause">關閉自動備份</string>
+    <string name="cloud_backup_now">立即備份</string>
+    <string name="cloud_backup_uploading">正在備份…</string>
+    <string name="cloud_backup_queued">等待系統執行備份…</string>
+    <string name="cloud_backup_find">從 Google Drive 還原</string>
+    <string name="cloud_backup_no_files">這個帳號還沒有雲端備份。</string>
+    <string name="cloud_backup_password">備份密碼</string>
+    <string name="cloud_backup_repeat_password">再次輸入備份密碼</string>
+    <string name="cloud_backup_password_hint">請設定至少 12 個字元的密碼。換機還原時需要這組密碼，請妥善保存。</string>
+    <string name="cloud_backup_unlock">解鎖備份</string>
+    <string name="cloud_backup_unlock_hint">輸入建立這份備份時設定的密碼。</string>
+    <string name="cloud_backup_review">檢查備份與還原方式</string>
+    <string name="cloud_backup_remote_time">備份時間：%1$s</string>
+    <string name="cloud_backup_remote_count">雲端備份：%1$d 筆交易（含草稿）</string>
+    <string name="cloud_backup_local_count">這台手機：%1$d 筆交易（含草稿）</string>
+    <string name="cloud_backup_merge">合併帳本</string>
+    <string name="cloud_backup_merge_hint">保留本機帳本與設定，加入備份裡未有的交易。</string>
+    <string name="cloud_backup_overwrite">覆蓋本機帳本</string>
+    <string name="cloud_backup_overwrite_hint">以備份取代這台手機的帳本、預算和相關設定。本機獨有的交易會被移除。</string>
+    <string name="cloud_backup_skip">略過這份備份</string>
+    <string name="cloud_backup_merge_done">合併完成，已加入 %1$d 筆交易。</string>
+    <string name="cloud_backup_restore_done">還原完成，已還原 %1$d 筆交易。</string>
+    <string name="cloud_backup_password_invalid">無法解鎖這份備份，請確認備份密碼。</string>
+    <string name="cloud_backup_authorize_again">Google Drive 授權已失效，請重新授權。</string>
+    <string name="cloud_backup_authorization_incomplete">Google 授權未完成。如果帳號視窗一開就關閉，請確認此版本的 Android OAuth 用戶端與 Google Drive API 設定。</string>
+    <string name="cloud_backup_configuration">Google Drive 拒絕存取。請確認 Google Cloud 已啟用 Drive API，並註冊此版本的套件名稱與簽章 SHA-1。</string>
+    <string name="cloud_backup_too_large">這份備份超過目前支援的大小。</string>
+    <string name="cloud_backup_update_required">請更新 App，再還原這份備份。</string>
+    <string name="cloud_backup_key_missing">這台手機的備份金鑰已失效，請關閉後重新啟用自動備份。</string>
+    <string name="cloud_backup_failed">Google Drive 操作未完成，請檢查網路連線後再試。</string>
+    <string name="cloud_backup_latest_transaction">最新一筆交易日期：%1$s</string>
+</resources>

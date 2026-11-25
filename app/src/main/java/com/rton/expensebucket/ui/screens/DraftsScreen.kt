@@ -9,6 +9,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
@@ -23,6 +24,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.heading
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -45,7 +48,9 @@ fun DraftsScreen(
     onEdit: (Transaction) -> Unit,
     onClearDrafts: () -> Unit = {},
     onClearNonPaymentNotifications: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    showAsBottomSheet: Boolean = false,
+    onEnableNotificationAccess: (() -> Unit)? = null
 ) {
     val strings = LocalContext.current.resources
 
@@ -54,79 +59,67 @@ fun DraftsScreen(
     var showNonPaymentInbox by remember { mutableStateOf(false) }
     var showClearDraftsDialog by remember { mutableStateOf(false) }
 
-    Scaffold(
-        contentWindowInsets = WindowInsets(0),
-        topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        strings.getString(R.string.pending_transactions),
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.SemiBold
-                        )
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.getString(R.string.back))
-                    }
-                },
-                actions = {
-                    if (drafts.isNotEmpty()) {
-                        TextButton(onClick = { showClearDraftsDialog = true }) {
-                            Text(strings.getString(R.string.clear_all), color = MaterialTheme.colorScheme.error)
-                        }
-                    }
-                    BadgedBox(
-                        badge = {
-                            if (nonPaymentNotifications.isNotEmpty()) {
-                                Badge { Text(nonPaymentNotifications.size.toString()) }
-                            }
-                        }
-                    ) {
-                        IconButton(onClick = { showNonPaymentInbox = true }) {
-                            Icon(Icons.Filled.Delete, contentDescription = strings.getString(R.string.non_payment_notifications))
-                        }
-                    }
-                },
-                windowInsets = WindowInsets(0),
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = MaterialTheme.colorScheme.background
-                )
-            )
+    val draftActions: @Composable () -> Unit = {
+        if (drafts.isNotEmpty()) {
+            TextButton(onClick = { showClearDraftsDialog = true }) {
+                Text(strings.getString(R.string.clear_all), color = MaterialTheme.colorScheme.error)
+            }
         }
-    ) { padding ->
-        if (drafts.isEmpty()) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        Icons.Filled.Notifications,
-                        contentDescription = null,
-                        modifier = Modifier.size(64.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
-                    )
-                    Spacer(modifier = Modifier.height(12.dp))
-                    Text(
-                        strings.getString(R.string.no_pending_transactions),
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
-                        textAlign = TextAlign.Center
-                    )
+        BadgedBox(
+            badge = {
+                if (nonPaymentNotifications.isNotEmpty()) {
+                    Badge { Text(nonPaymentNotifications.size.toString()) }
                 }
             }
-        } else {
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
+        ) {
+            IconButton(onClick = { showNonPaymentInbox = true }) {
+                Icon(Icons.Filled.Delete, contentDescription = strings.getString(R.string.non_payment_notifications))
+            }
+        }
+    }
+
+    val draftList: @Composable (Modifier) -> Unit = { modifier ->
+        LazyColumn(
+            modifier = modifier,
+            contentPadding = if (showAsBottomSheet) {
+                PaddingValues(start = 24.dp, end = 24.dp, bottom = 28.dp)
+            } else {
+                PaddingValues(16.dp)
+            },
+            verticalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            if (showAsBottomSheet) {
+                item {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = strings.getString(R.string.pending_transactions),
+                            style = MaterialTheme.typography.headlineSmall,
+                            modifier = Modifier.weight(1f).semantics { heading() }
+                        )
+                        draftActions()
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.Filled.Close, contentDescription = strings.getString(R.string.close))
+                        }
+                    }
+                }
+            }
+            if (onEnableNotificationAccess != null) {
+                item {
+                    OutlinedCard(onClick = onEnableNotificationAccess, modifier = Modifier.fillMaxWidth()) {
+                        ListItem(
+                            headlineContent = { Text(strings.getString(R.string.notification_access_required)) },
+                            supportingContent = { Text(strings.getString(R.string.enable_in_system_settings)) },
+                            trailingContent = { Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = null) },
+                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                        )
+                    }
+                }
+            }
+            if (drafts.isEmpty()) {
+                item {
+                    EmptyDrafts(Modifier.fillMaxWidth().padding(vertical = 24.dp))
+                }
+            } else {
                 item {
                     Text(
                         strings.getString(R.string.review_captured_transactions),
@@ -135,17 +128,56 @@ fun DraftsScreen(
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                 }
+            }
+            items(drafts, key = { it.id }) { draft ->
+                DraftItem(
+                    draft = draft,
+                    category = categoryMap[draft.categoryId],
+                    dateFormat = dateFormat,
+                    onConfirm = { onConfirm(draft.id) },
+                    onDelete = { onDelete(draft) },
+                    onEdit = { onEdit(draft) }
+                )
+            }
+        }
+    }
 
-                items(drafts, key = { it.id }) { draft ->
-                    DraftItem(
-                        draft = draft,
-                        category = categoryMap[draft.categoryId],
-                        dateFormat = dateFormat,
-                        onConfirm = { onConfirm(draft.id) },
-                        onDelete = { onDelete(draft) },
-                        onEdit = { onEdit(draft) }
+    if (showAsBottomSheet) {
+        ModalBottomSheet(
+            onDismissRequest = onBack,
+            sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
+        ) {
+            draftList(Modifier.fillMaxWidth())
+        }
+    } else {
+        Scaffold(
+            contentWindowInsets = WindowInsets(0),
+            topBar = {
+                TopAppBar(
+                    title = {
+                        Text(
+                            strings.getString(R.string.pending_transactions),
+                            style = MaterialTheme.typography.titleLarge.copy(fontWeight = FontWeight.SemiBold)
+                        )
+                    },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = strings.getString(R.string.back))
+                        }
+                    },
+                    actions = { draftActions() },
+                    windowInsets = WindowInsets(0),
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.background
                     )
-                }
+                )
+            }
+        ) { padding ->
+            val modifier = Modifier.fillMaxSize().padding(padding)
+            if (drafts.isEmpty()) {
+                EmptyDrafts(modifier)
+            } else {
+                draftList(modifier)
             }
         }
     }
@@ -180,6 +212,27 @@ fun DraftsScreen(
             onClear = onClearNonPaymentNotifications,
             onDismiss = { showNonPaymentInbox = false }
         )
+    }
+}
+
+@Composable
+private fun EmptyDrafts(modifier: Modifier) {
+    Box(modifier = modifier, contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Icon(
+                Icons.Filled.Notifications,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.3f)
+            )
+            Spacer(modifier = Modifier.height(12.dp))
+            Text(
+                LocalContext.current.resources.getString(R.string.no_pending_transactions),
+                style = MaterialTheme.typography.bodyLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                textAlign = TextAlign.Center
+            )
+        }
     }
 }
 

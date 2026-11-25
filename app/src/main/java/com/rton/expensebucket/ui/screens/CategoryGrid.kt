@@ -126,7 +126,10 @@ fun CategoryGrid(
                                         isExpanded = false,
                                         circleSize = 40.dp,
                                         iconSize = 19.dp,
-                                        onClick = { onSelectCategory(child) },
+                                        onClick = {
+                                            onSelectCategory(child)
+                                            onToggleExpandParent(null)
+                                        },
                                         modifier = Modifier.weight(1f)
                                     )
                                 }

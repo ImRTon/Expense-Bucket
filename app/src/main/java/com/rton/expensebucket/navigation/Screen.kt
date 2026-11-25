@@ -21,6 +21,7 @@ sealed class Screen(val route: String) {
         fun createRoute(projectId: Long) = "project_detail/$projectId"
     }
     data object Settings : Screen("settings")
+    data object CloudBackup : Screen("cloud_backup")
     data object Drafts : Screen("drafts")
     data object PaymentMethods : Screen("payment_methods")
     data object CategoryManage : Screen("category_manage")

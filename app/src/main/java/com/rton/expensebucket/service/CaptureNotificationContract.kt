@@ -7,6 +7,7 @@ import com.rton.expensebucket.MainActivity
 import com.rton.expensebucket.navigation.Screen
 
 object CaptureNotificationContract {
+    const val CHANNEL_ID = "expenses_transaction_capture"
     const val EXTRA_NOTIFICATION_ID = "capture_notification_id"
 
     fun editIntent(context: Context, transactionId: Long, notificationId: Int): Intent =

@@ -273,6 +273,13 @@ class MainViewModel @Inject constructor(
         viewModelScope.launch { appSettingsDataStore.setFirstDayOfWeek(day) }
     }
 
+    val screenshotOcrEnabled: StateFlow<Boolean> = appSettingsDataStore.screenshotOcrEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), true)
+
+    fun setScreenshotOcrEnabled(enabled: Boolean) {
+        viewModelScope.launch { appSettingsDataStore.setScreenshotOcrEnabled(enabled) }
+    }
+
     // ─── Projects ───────────────────────────────────────────────────
     val activeProjects: StateFlow<List<Project>> =
         repository.getActiveProjects()

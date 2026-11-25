@@ -22,3 +22,14 @@
 -keepnames class * implements android.os.Parcelable {
     public static final ** CREATOR;
 }
+
+# Cloud backups use stable Gson field names across debug and release builds.
+-keep class com.rton.expensebucket.data.backup.LedgerSnapshot { *; }
+-keep class com.rton.expensebucket.data.backup.BackupPreferences { *; }
+-keep class com.rton.expensebucket.data.model.Category { *; }
+-keep class com.rton.expensebucket.data.model.PaymentMethod { *; }
+-keep class com.rton.expensebucket.data.model.StoredValueBalance { *; }
+-keep class com.rton.expensebucket.data.model.Project { *; }
+-keep class com.rton.expensebucket.data.model.Transaction { *; }
+-keep class com.rton.expensebucket.data.model.TransactionItem { *; }
+-keep class com.rton.expensebucket.data.model.NotificationCapture { *; }

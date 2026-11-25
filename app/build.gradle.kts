@@ -96,6 +96,8 @@ dependencies {
 
     // DataStore
     implementation(libs.datastore.preferences)
+    implementation(libs.androidx.work.runtime)
+    implementation(libs.play.services.auth)
 
     // Gson
     implementation(libs.gson)

@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="cloud_backup_title">Google Drive バックアップ</string>
+    <string name="cloud_backup_settings_hint">帳簿の自動バックアップと復元</string>
+    <string name="cloud_backup_connect_hint">Google アカウントを連携すると、帳簿の自動バックアップや機種変更時の復元ができます。</string>
+    <string name="cloud_backup_connect">Google アカウントを連携</string>
+    <string name="cloud_backup_reconnect">再認証</string>
+    <string name="cloud_backup_disconnect">この端末の連携を解除</string>
+    <string name="cloud_backup_paused">自動バックアップはオフです</string>
+    <string name="cloud_backup_daily">ネットワーク接続時に約 1 日に 1 回バックアップします。</string>
+    <string name="cloud_backup_latest">前回のバックアップ：%1$s</string>
+    <string name="cloud_backup_enable">自動バックアップをオンにする</string>
+    <string name="cloud_backup_pause">自動バックアップをオフにする</string>
+    <string name="cloud_backup_now">今すぐバックアップ</string>
+    <string name="cloud_backup_uploading">バックアップ中…</string>
+    <string name="cloud_backup_queued">バックアップの開始を待機中…</string>
+    <string name="cloud_backup_find">Google Drive から復元</string>
+    <string name="cloud_backup_no_files">このアカウントにはバックアップがありません。</string>
+    <string name="cloud_backup_password">バックアップのパスワード</string>
+    <string name="cloud_backup_repeat_password">パスワードを再入力</string>
+    <string name="cloud_backup_password_hint">12 文字以上で設定してください。機種変更時の復元に必要なため、安全な場所に保管してください。</string>
+    <string name="cloud_backup_unlock">バックアップのロックを解除</string>
+    <string name="cloud_backup_unlock_hint">このバックアップの作成時に設定したパスワードを入力してください。</string>
+    <string name="cloud_backup_review">バックアップと復元方法を確認</string>
+    <string name="cloud_backup_remote_time">バックアップ日時：%1$s</string>
+    <string name="cloud_backup_remote_count">クラウドの取引：%1$d 件（下書きを含む）</string>
+    <string name="cloud_backup_local_count">この端末の取引：%1$d 件（下書きを含む）</string>
+    <string name="cloud_backup_merge">帳簿を統合</string>
+    <string name="cloud_backup_merge_hint">この端末の帳簿と設定を保持し、バックアップにのみある取引を追加します。</string>
+    <string name="cloud_backup_overwrite">この端末の帳簿を上書き</string>
+    <string name="cloud_backup_overwrite_hint">帳簿、予算、関連設定をバックアップで置き換えます。この端末にのみある取引は削除されます。</string>
+    <string name="cloud_backup_skip">このバックアップをスキップ</string>
+    <string name="cloud_backup_merge_done">統合が完了しました。追加した取引：%1$d 件。</string>
+    <string name="cloud_backup_restore_done">復元が完了しました。復元した取引：%1$d 件。</string>
+    <string name="cloud_backup_password_invalid">バックアップのロックを解除できません。パスワードを確認してください。</string>
+    <string name="cloud_backup_authorize_again">Google Drive の認証が失効しました。再認証してください。</string>
+    <string name="cloud_backup_authorization_incomplete">Google の認証が完了しませんでした。アカウント画面がすぐに閉じる場合は、このビルドの Android OAuth クライアントと Google Drive API の設定を確認してください。</string>
+    <string name="cloud_backup_configuration">Google Drive がアクセスを拒否しました。Google Cloud で Drive API を有効にし、このビルドのパッケージ名と署名の SHA-1 を登録してください。</string>
+    <string name="cloud_backup_too_large">このバックアップはサイズの上限を超えています。</string>
+    <string name="cloud_backup_update_required">このバックアップを復元するには、アプリを更新してください。</string>
+    <string name="cloud_backup_key_missing">この端末のバックアップキーを使用できません。自動バックアップをオフにしてから再度オンにしてください。</string>
+    <string name="cloud_backup_failed">Google Drive の操作を完了できませんでした。ネットワーク接続を確認して再試行してください。</string>
+    <string name="cloud_backup_latest_transaction">最新の取引日：%1$s</string>
+</resources>

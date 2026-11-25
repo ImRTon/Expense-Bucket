@@ -100,6 +100,14 @@ Expense Bucket reduces manual data entry while keeping every transaction under u
 - Android SDK 36
 - Android 8.0 (API 26) or later for installation
 
+## Google Drive backup setup
+
+Enable the [Google Drive API](https://console.cloud.google.com/apis/library/drive.googleapis.com) in the Google Cloud project that owns the app's OAuth clients. Configure the Google Auth consent screen with the `https://www.googleapis.com/auth/drive.appdata` scope and add any test accounts while the app is in testing.
+
+Create an Android OAuth client for `com.rton.expensebucket` with the SHA-1 of each signing certificate used to install the app. Run `./gradlew.bat :app:signingReport` for local builds. For a Play-distributed build, use the app signing certificate listed in Play Console. Keep debug and production OAuth clients for the same app in the same Google Cloud project so they use the same Drive app data space.
+
+In the app, open **Settings → Google Drive backup**, connect your Google account, and set a backup password. Android runs the initial backup when network access is available, then schedules a backup about every 24 hours. Keep the password to unlock backups when you restore on another device.
+
 ## Build
 
 Clone the repository, open it in Android Studio, or run the following command from the project root:
